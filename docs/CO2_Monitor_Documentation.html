@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CO2 Monitor Documentation</title>
+<style>
+  :root {
+    --ink: #1f2328;
+    --muted: #57606a;
+    --line: #d0d7de;
+    --soft: #f6f8fa;
+    --accent: #0b6e4f;
+    --accent-soft: #e7f5ee;
+    --info: #0969da;
+    --info-soft: #e5f2ff;
+    --warn: #b08800;
+    --warn-soft: #fff8d6;
+    --bad: #c62828;
+  }
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm 14mm;
+    @bottom-center {
+      content: "CO2 Monitor documentation  \00B7  page " counter(page) " of " counter(pages);
+      font: 8pt "Segoe UI", sans-serif;
+      color: #8c959f;
+    }
+  }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; background: #fff; color: var(--ink); font: 10pt/1.5 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 182mm; margin: 0 auto; padding: 10mm 16px; }
+  @media print { main { max-width: none; padding: 0; } }
+
+  header.title { border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-bottom: 14px; }
+  .kicker { text-transform: uppercase; letter-spacing: .12em; font-size: 8.5pt; color: var(--accent); font-weight: 600; }
+  h1 { font-size: 26pt; margin: 2px 0 2px; line-height: 1.1; }
+  .subtitle { margin: 0 0 10px; color: var(--muted); font-size: 11pt; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 9pt; color: var(--muted); }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  h2 { font-size: 15pt; margin: 0 0 10px; padding-bottom: 3px; border-bottom: 2px solid var(--accent); break-after: avoid; }
+  h2 .n { color: var(--accent); margin-right: 6px; }
+  h3 { font-size: 11.5pt; margin: 16px 0 6px; break-after: avoid; }
+  h4 { font-size: 10pt; margin: 10px 0 4px; break-after: avoid; }
+  p { margin: 0 0 8px; }
+  section { margin-bottom: 20px; }
+  section.newpage { break-before: page; }
+  #changelog table { font-size: 8.5pt; }
+  ul, ol { margin: 0 0 8px; padding-left: 20px; }
+  li { margin-bottom: 3px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 9pt; }
+  th, td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  tr { break-inside: avoid; }
+  td.c, th.c { text-align: center; }
+  .nowrap { white-space: nowrap; }
+
+  figure { margin: 8px 0 14px; break-inside: avoid; }
+  figure svg { display: block; width: 100%; height: auto; }
+  #pinout figure svg { max-width: 130mm; margin: 0 auto; }
+  #case > figure svg { max-width: 150mm; margin: 0 auto; }
+  figcaption { font-size: 8.5pt; color: var(--muted); margin-top: 4px; }
+
+  code, pre, kbd { font-family: Consolas, "Cascadia Mono", monospace; font-size: 8.8pt; }
+  code { background: var(--soft); padding: 0 3px; border-radius: 3px; }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: #fff; }
+  pre { background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 6px 0 10px; white-space: pre-wrap; break-inside: avoid; }
+
+  .box { border-left: 4px solid; border-radius: 4px; padding: 8px 12px; margin: 10px 0; break-inside: avoid; }
+  .box > :last-child { margin-bottom: 0; }
+  .box.note { border-color: var(--info); background: var(--info-soft); }
+  .box.warn { border-color: #d4a72c; background: var(--warn-soft); }
+  .box.ok { border-color: var(--accent); background: var(--accent-soft); }
+  .box .label { font-weight: 700; margin-right: 4px; }
+
+  .qa { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; margin: 8px 0; break-inside: avoid; }
+  .qa .q { font-weight: 700; margin-bottom: 4px; }
+  .qa .a-short { display: inline-block; background: var(--accent); color: #fff; border-radius: 4px; padding: 0 6px; font-weight: 700; margin-right: 6px; font-size: 9pt; }
+
+  .toc { columns: 2; column-gap: 24px; font-size: 9.5pt; padding-left: 18px; margin-bottom: 12px; }
+  .toc a { color: var(--ink); text-decoration: none; }
+  .wire { display: inline-block; width: 22px; height: 6px; border-radius: 3px; vertical-align: middle; margin-right: 4px; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1px solid rgba(0,0,0,.25); }
+  .muted { color: var(--muted); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } .toc { columns: 1; } }
+
+  svg text { font-family: "Segoe UI", system-ui, sans-serif; }
+  svg .mono { font-family: Consolas, "Cascadia Mono", monospace; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="title">
+  <div class="kicker">Project documentation</div>
+  <h1>CO<sub>2</sub> Monitor</h1>
+  <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 0.96" OLED</p>
+  <div class="meta">
+    <span><b>Version</b> 0.7 &ndash; Step 1: measure and display</span>
+    <span><b>Updated</b> 25 Oct 2026</span>
+    <span><b>Status</b> breadboard prototype</span>
+  </div>
+</header>
+
+<ol class="toc">
+  <li><a href="#overview">Project overview</a></li>
+  <li><a href="#hardware">Hardware list</a></li>
+  <li><a href="#pinout">ESP32-C6 pin diagram</a></li>
+  <li><a href="#wiring">Wiring</a></li>
+  <li><a href="#ide">Arduino IDE setup</a></li>
+  <li><a href="#firmware">Firmware</a></li>
+  <li><a href="#testing">Testing</a></li>
+  <li><a href="#calibration">CO<sub>2</sub> calibration</a></li>
+  <li><a href="#notes">Hardware notes</a></li>
+  <li><a href="#troubleshooting">Troubleshooting</a></li>
+  <li><a href="#case">Case (design v3)</a></li>
+  <li><a href="#changelog">Change log</a></li>
+</ol>
+
+<!-- ============================================================ 1 -->
+<section id="overview">
+  <h2><span class="n">1</span>Project overview</h2>
+  <p><b>Step 1 goal:</b> the OLED shows the temperature and humidity from the <b>SHT45</b> and the CO<sub>2</sub> concentration from the <b>SCD-41</b>. To save power and prevent OLED burn-in, the display switches off after <b>30 seconds</b>. A <b>push button</b> wakes it for another 30 seconds. The sensors keep measuring while the display is off, and the dimmed <b>RGB LED</b> on the ESP32 board shows the CO<sub>2</sub> level all the time as a colour from green through yellow to red.</p>
+
+  <p>The ESP32 talks to all three modules over one shared <b>I&sup2;C bus</b>, made of four wires: 3.3&nbsp;V, GND, SDA (data) and SCL (clock). Each module has its own fixed address, so they don't get in each other's way. The button is a separate input on GPIO2.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 252" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="I2C bus topology">
+      <text x="380" y="22" text-anchor="middle" font-size="12" fill="#57606a">On the breadboard, rows 27&ndash;30 (left half) form this bus</text>
+      <text x="95" y="44" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">ESP32-C6-DevKitC-1</text>
+      <rect x="20" y="52" width="150" height="112" rx="8" fill="#e7f5ee" stroke="#1a7f37" stroke-width="1.5"/>
+      <g font-size="11" fill="#1f2328" text-anchor="end">
+        <text x="160" y="74">3V3</text>
+        <text x="160" y="99">GND</text>
+        <text x="160" y="124">GPIO23 (SDA)</text>
+        <text x="160" y="149">GPIO22 (SCL)</text>
+      </g>
+      <g stroke-width="3" fill="none">
+        <line x1="170" y1="70" x2="700" y2="70" stroke="#d32f2f"/>
+        <line x1="170" y1="95" x2="700" y2="95" stroke="#24292f"/>
+        <line x1="170" y1="120" x2="700" y2="120" stroke="#1e63d6"/>
+        <line x1="170" y1="145" x2="700" y2="145" stroke="#d4a000"/>
+      </g>
+      <g font-size="11" font-weight="600">
+        <text x="706" y="74" fill="#d32f2f">3.3 V</text>
+        <text x="706" y="99" fill="#24292f">GND</text>
+        <text x="706" y="124" fill="#1e63d6">SDA</text>
+        <text x="706" y="149" fill="#b08800">SCL</text>
+      </g>
+      <!-- OLED drops -->
+      <g stroke-width="2">
+        <line x1="250" y1="95" x2="250" y2="185" stroke="#24292f"/>
+        <line x1="280" y1="70" x2="280" y2="185" stroke="#d32f2f"/>
+        <line x1="310" y1="145" x2="310" y2="185" stroke="#d4a000"/>
+        <line x1="340" y1="120" x2="340" y2="185" stroke="#1e63d6"/>
+        <line x1="440" y1="95" x2="440" y2="185" stroke="#24292f"/>
+        <line x1="470" y1="70" x2="470" y2="185" stroke="#d32f2f"/>
+        <line x1="500" y1="145" x2="500" y2="185" stroke="#d4a000"/>
+        <line x1="530" y1="120" x2="530" y2="185" stroke="#1e63d6"/>
+      </g>
+      <g fill="#1f2328">
+        <circle cx="250" cy="95" r="4"/><circle cx="280" cy="70" r="4" fill="#d32f2f"/><circle cx="310" cy="145" r="4" fill="#d4a000"/><circle cx="340" cy="120" r="4" fill="#1e63d6"/>
+        <circle cx="440" cy="95" r="4"/><circle cx="470" cy="70" r="4" fill="#d32f2f"/><circle cx="500" cy="145" r="4" fill="#d4a000"/><circle cx="530" cy="120" r="4" fill="#1e63d6"/>
+      </g>
+      <rect x="225" y="185" width="140" height="44" rx="6" fill="#eef1f5" stroke="#57606a"/>
+      <text x="295" y="204" text-anchor="middle" font-size="12" font-weight="700">OLED display</text>
+      <text x="295" y="220" text-anchor="middle" font-size="10.5" fill="#57606a">address 0x3C</text>
+      <rect x="415" y="185" width="140" height="44" rx="6" fill="#eef1f5" stroke="#57606a"/>
+      <text x="485" y="204" text-anchor="middle" font-size="12" font-weight="700">SCD-41 (CO&#8322;)</text>
+      <text x="485" y="220" text-anchor="middle" font-size="10.5" fill="#57606a">address 0x62</text>
+      <rect x="605" y="185" width="135" height="44" rx="6" fill="#eef1f5" stroke="#57606a"/>
+      <text x="672" y="204" text-anchor="middle" font-size="12" font-weight="700">SHT45 (T / RH)</text>
+      <text x="672" y="220" text-anchor="middle" font-size="10.5" fill="#57606a">address 0x44</text>
+      <line x1="555" y1="207" x2="605" y2="207" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
+      <text x="580" y="246" text-anchor="middle" font-size="10" fill="#57606a">SHT45 is daisy-chained to the SCD-41 with a STEMMA QT cable (same bus)</text>
+    </svg>
+    <figcaption>Figure 1 &ndash; Every module hangs on the same four wires. A dot means "connected"; lines that cross without a dot are not connected.</figcaption>
+  </figure>
+
+  <h3>Project files</h3>
+  <table>
+    <tr><th>File</th><th>Purpose</th></tr>
+    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program (step 1): sensors &rarr; display, button wake, 30&nbsp;s timeout, CO<sub>2</sub> colour on the RGB LED, serial output.</td></tr>
+    <tr><td><code>firmware/i2c_scanner/i2c_scanner.ino</code></td><td>Wiring check: lists all I&sup2;C devices it finds. Run this first.</td></tr>
+    <tr><td><code>firmware/scd41_calibration/scd41_calibration.ino</code></td><td>Optional tool: forced recalibration (FRC) of the SCD-41 in fresh outdoor air.</td></tr>
+    <tr><td><code>docs/CO2_Monitor_Documentation.html</code></td><td>This document (source).</td></tr>
+    <tr><td><code>docs/CO2_Monitor_Documentation.pdf</code></td><td>PDF version, regenerated from the HTML after every change.</td></tr>
+    <tr><td><code>docs/build_pdf.ps1</code></td><td>Script that turns the HTML into the PDF (uses Chrome or Edge in headless mode).</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ 2 -->
+<section id="hardware">
+  <h2><span class="n">2</span>Hardware list</h2>
+  <table>
+    <tr><th class="c">#</th><th>Component</th><th>Role</th><th>Interface</th><th>Supply</th></tr>
+    <tr><td class="c">1</td><td><b>Espressif ESP32-C6-DevKitC-1-N8</b><br><span class="muted">ESP32-C6-WROOM-1-N8 module, 8&nbsp;MB flash</span></td><td>Microcontroller. Reads the sensors, drives the display.</td><td>2&times; USB-C</td><td>5&nbsp;V via USB &rarr; on-board 3.3&nbsp;V regulator</td></tr>
+    <tr><td class="c">2</td><td><b>Adafruit SCD-41</b> (STEMMA QT)<br><span class="muted">Sensirion SCD41</span></td><td>CO<sub>2</sub> sensor (photoacoustic NDIR)</td><td>I&sup2;C <code>0x62</code></td><td>3.3&ndash;5&nbsp;V (we use 3.3&nbsp;V)</td></tr>
+    <tr><td class="c">3</td><td><b>Adafruit SHT45</b> (STEMMA QT)<br><span class="muted">Sensirion SHT45</span></td><td>Temperature and relative humidity</td><td>I&sup2;C <code>0x44</code></td><td>3&ndash;5&nbsp;V (we use 3.3&nbsp;V)</td></tr>
+    <tr><td class="c">4</td><td><b>Joy-it 0.96" OLED</b> 128&times;64 (SBC-OLED01)<br><span class="muted">SSD1306 controller</span></td><td>Display</td><td>I&sup2;C <code>0x3C</code> (or <code>0x3D</code>)</td><td>3.3&ndash;5&nbsp;V (we use 3.3&nbsp;V)</td></tr>
+    <tr><td class="c">5</td><td>STEMMA QT &rarr; male header pins cable (4-pin)</td><td>Connects the breadboard bus to the SCD-41</td><td>JST SH 1.0&nbsp;mm</td><td>&ndash;</td></tr>
+    <tr><td class="c">6</td><td>STEMMA QT &harr; STEMMA QT cable</td><td>Daisy-chains SHT45 to the SCD-41</td><td>JST SH 1.0&nbsp;mm</td><td>&ndash;</td></tr>
+    <tr><td class="c">7</td><td>4-pin tactile push button</td><td>Wakes the display</td><td>GPIO2</td><td>&ndash;</td></tr>
+    <tr><td class="c">8</td><td>400-point breadboard</td><td>Carries the ESP32, OLED, button and the bus</td><td>&ndash;</td><td>&ndash;</td></tr>
+    <tr><td class="c">9</td><td>Male&ndash;male jumper wires, 5 (one of them long) <span class="muted">(needed, not in the original list)</span></td><td>Breadboard connections</td><td>&ndash;</td><td>&ndash;</td></tr>
+    <tr><td class="c">10</td><td>USB-C <b>data</b> cable <span class="muted">(needed)</span></td><td>Power and programming. Charge-only cables don't work.</td><td>&ndash;</td><td>&ndash;</td></tr>
+  </table>
+  <div class="box note"><span class="label">Planned:</span> more hardware will be added in later steps. Add new I&sup2;C devices to the same bus (check that their address is not already used); give anything else its own free GPIO from the pin diagram.</div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section id="pinout" class="newpage">
+  <h2><span class="n">3</span>ESP32-C6-DevKitC-1 pin diagram</h2>
+  <figure>
+    <svg id="pinout-svg" viewBox="0 0 760 692" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ESP32-C6-DevKitC-1 pinout">
+      <g id="pin-legend"></g>
+      <text x="380" y="30" text-anchor="middle" font-size="10" fill="#57606a">antenna &ndash; keep metal away</text>
+      <rect x="290" y="88" width="180" height="564" rx="8" fill="#22272e"/>
+      <rect x="318" y="40" width="124" height="200" rx="3" fill="#30363d" stroke="#57606a"/>
+      <path d="M332,82 h12 v-30 h12 v30 h12 v-30 h12 v30 h12 v-30 h12 v30 h12 v-30 h12 v30" fill="none" stroke="#d4a72c" stroke-width="2"/>
+      <rect x="326" y="98" width="108" height="134" rx="2" fill="#c9ced6"/>
+      <text x="380" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="#30363d">ESP32-C6</text>
+      <text x="380" y="176" text-anchor="middle" font-size="9.5" fill="#30363d">WROOM-1-N8</text>
+      <rect x="296" y="100" width="18" height="504" rx="2" fill="#0d1117"/>
+      <rect x="446" y="100" width="18" height="504" rx="2" fill="#0d1117"/>
+      <text x="380" y="400" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">ESP32-C6-DevKitC-1</text>
+      <text x="380" y="418" text-anchor="middle" font-size="10" fill="#c9d1d9">N8 &middot; 8 MB flash</text>
+      <text x="380" y="458" text-anchor="middle" font-size="9.5" fill="#c9d1d9">BOOT button = GPIO9</text>
+      <text x="380" y="474" text-anchor="middle" font-size="9.5" fill="#c9d1d9">RGB LED = GPIO8</text>
+      <text x="380" y="490" text-anchor="middle" font-size="9.5" fill="#c9d1d9">RESET button = EN</text>
+      <text x="305" y="622" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">J1</text>
+      <text x="455" y="622" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">J3</text>
+      <rect x="336" y="644" width="36" height="22" rx="5" fill="#b0b8c1" stroke="#6e7781"/>
+      <rect x="388" y="644" width="36" height="22" rx="5" fill="#b0b8c1" stroke="#6e7781"/>
+      <text x="380" y="684" text-anchor="middle" font-size="10" fill="#57606a">2 &times; USB-C, labelled "USB" (native USB) and "UART" (USB-serial bridge) on the PCB</text>
+      <g id="pin-rows"></g>
+    </svg>
+    <figcaption>Figure 2 &ndash; Top view, antenna up, USB down. Green = used in this project. "LP" = low-power GPIO (can wake the chip from deep sleep). The drawing is schematic, not to scale; the labels printed on your board are what counts.</figcaption>
+  </figure>
+
+  <h3>Pins used in step 1</h3>
+  <table>
+    <tr><th>Header pin</th><th>Signal</th><th>Used for</th><th>Breadboard hole &rarr; goes to</th></tr>
+    <tr><td>J1-1</td><td><b>3V3</b></td><td>3.3&nbsp;V supply for OLED, SCD-41, SHT45</td><td>j19 &rarr; c28 (3.3&nbsp;V bus row)</td></tr>
+    <tr><td>J1-12</td><td><b>GPIO2</b></td><td>Push button (internal pull-up, pressed = LOW)</td><td>j8 &rarr; j25 (button leg f25)</td></tr>
+    <tr><td>J3-5</td><td><b>GPIO23</b></td><td>I&sup2;C SDA (Arduino default for ESP32-C6)</td><td>a15 &rarr; c30 (SDA bus row)</td></tr>
+    <tr><td>J3-6</td><td><b>GPIO22</b></td><td>I&sup2;C SCL (Arduino default for ESP32-C6)</td><td>a14 &rarr; c29 (SCL bus row)</td></tr>
+    <tr><td>J3-1</td><td><b>GND</b></td><td>Ground</td><td>a19 &rarr; c27 (GND bus row)</td></tr>
+    <tr><td>(J1-9)</td><td><b>GPIO8</b></td><td>On-board RGB LED (CO<sub>2</sub> colour)</td><td>no wire, keep i11 empty</td></tr>
+  </table>
+
+  <h3>Pins to avoid (or use with care)</h3>
+  <ul>
+    <li><b>Strapping pins GPIO4, GPIO5, GPIO8, GPIO9, GPIO15:</b> their level during reset decides how the chip boots. A button or sensor pulling one of them low can stop the board from starting. GPIO8 also drives the on-board RGB LED, and GPIO9 is the BOOT button.</li>
+    <li><b>GPIO12 / GPIO13:</b> native USB (D&minus; / D+). Using them breaks the "USB" port.</li>
+    <li><b>GPIO16 / GPIO17:</b> UART0 TX/RX, used by the "UART" USB port and the Serial Monitor.</li>
+    <li><b>5V pin:</b> carries 5&nbsp;V from USB. <b>The GPIOs are not 5&nbsp;V tolerant.</b> Never connect 5&nbsp;V to a GPIO or to the breadboard bus.</li>
+    <li><b>Good free pins for later:</b> GPIO0, 1, 3, 6, 7 (low-power GPIOs, some with ADC), GPIO10, 11, 18, 19, 20, 21.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ 4 -->
+<section id="wiring" class="newpage">
+  <h2><span class="n">4</span>Wiring</h2>
+  <p>Breadboard holes are named <b>column letter + row number</b>, e.g. <code>j19</code> = column j, row 19. On a 400-point breadboard, each row's five holes a&ndash;e are connected together, and so are f&ndash;j (but not across the centre gap). The long power rails run along the edges.</p>
+
+  <figure>
+    <svg id="bb-svg" viewBox="0 0 760 624" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Breadboard layout">
+      <!-- sensors (off the board, on their cables) -->
+      <text x="200" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2328">Adafruit SHT45 &middot; 0x44</text>
+      <rect x="140" y="28" width="120" height="62" rx="6" fill="#1b1f3b"/>
+      <rect x="190" y="49" width="20" height="20" rx="2" fill="#d8dee4"/>
+      <rect x="256" y="48" width="12" height="22" rx="2" fill="#f0f0f0" stroke="#8c959f"/>
+      <path d="M392,59 C340,100 320,24 268,59" fill="none" stroke="#6e7781" stroke-width="7" stroke-linecap="round"/>
+      <text x="330" y="106" text-anchor="middle" font-size="10" fill="#57606a">STEMMA QT &harr; STEMMA QT</text>
+      <text x="485" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2328">Adafruit SCD-41 &middot; 0x62</text>
+      <rect x="400" y="24" width="170" height="70" rx="6" fill="#1b1f3b"/>
+      <rect x="452" y="34" width="66" height="50" rx="3" fill="#c9ced6"/>
+      <circle cx="485" cy="59" r="5" fill="#57606a"/>
+      <rect x="392" y="48" width="12" height="22" rx="2" fill="#f0f0f0" stroke="#8c959f"/>
+      <rect x="566" y="48" width="12" height="22" rx="2" fill="#f0f0f0" stroke="#8c959f"/>
+      <text x="630" y="98" font-size="10" fill="#57606a">STEMMA QT &rarr; pins</text>
+      <text x="630" y="111" font-size="10" fill="#57606a">into d27&ndash;d30</text>
+
+      <!-- breadboard body (power rails not used in this layout) -->
+      <rect x="40" y="120" width="640" height="380" rx="8" fill="#f5f1e8" stroke="#d6cdb8"/>
+      <rect x="44" y="286" width="632" height="28" fill="#ebe4d3"/>
+      <g stroke-width="2" opacity=".35">
+        <line x1="50" y1="131" x2="662" y2="131" stroke="#d32f2f"/>
+        <line x1="50" y1="169" x2="662" y2="169" stroke="#1e63d6"/>
+        <line x1="50" y1="431" x2="662" y2="431" stroke="#1e63d6"/>
+        <line x1="50" y1="469" x2="662" y2="469" stroke="#d32f2f"/>
+      </g>
+      <g id="bb-holes"></g>
+      <text x="686" y="147" font-size="10" fill="#8c959f">rails</text>
+      <text x="686" y="160" font-size="10" fill="#8c959f">not used</text>
+
+      <!-- push button, rows 25-27, straddling the gap -->
+      <rect x="540" y="262" width="60" height="76" rx="5" fill="#2d333b"/>
+      <circle cx="570" cy="300" r="16" fill="#57606a" stroke="#1f2328"/>
+      <g fill="#adbac7" stroke="#1f2328" stroke-width=".8"><rect x="546" y="266" width="8" height="8"/><rect x="586" y="266" width="8" height="8"/><rect x="546" y="326" width="8" height="8"/><rect x="586" y="326" width="8" height="8"/></g>
+      <circle cx="550" cy="270" r="6.5" fill="none" stroke="#2e9d4a" stroke-width="2.5"/>
+      <circle cx="590" cy="330" r="6.5" fill="none" stroke="#24292f" stroke-width="2.5"/>
+
+      <!-- ESP32-C6-DevKitC-1: pins in rows 4-19, J1 in column i, J3 in column b, USB end at the board edge -->
+      <rect x="34" y="200" width="408" height="200" rx="6" fill="#22272e" opacity=".95"/>
+      <rect x="291" y="229" width="201" height="142" rx="3" fill="#30363d" stroke="#57606a"/>
+      <path d="M450,246 h30 v14 h-30 v14 h30 v14 h-30 v14 h30 v14 h-30 v14 h30 v14 h-30 v14 h30" fill="none" stroke="#d4a72c" stroke-width="2"/>
+      <rect x="299" y="237" width="141" height="126" rx="2" fill="#c9ced6"/>
+      <text x="370" y="292" text-anchor="middle" font-size="10.5" font-weight="700" fill="#30363d">ESP32-C6</text>
+      <text x="370" y="306" text-anchor="middle" font-size="9" fill="#30363d">WROOM-1-N8</text>
+      <text x="165" y="296" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">ESP32-C6-DevKitC-1</text>
+      <text x="165" y="312" text-anchor="middle" font-size="9" fill="#c9d1d9">USB end flush with the board edge</text>
+      <text x="52" y="232" font-size="9" fill="#c9d1d9">J1</text>
+      <text x="52" y="376" font-size="9" fill="#c9d1d9">J3</text>
+      <rect x="14" y="236" width="22" height="28" rx="4" fill="#b0b8c1" stroke="#6e7781"/>
+      <rect x="14" y="336" width="22" height="28" rx="4" fill="#b0b8c1" stroke="#6e7781"/>
+      <text x="9" y="300" font-size="10" fill="#57606a" text-anchor="middle" transform="rotate(-90 9 300)">USB-C &rarr; PC</text>
+      <g id="bb-esp-pins"></g>
+      <!-- pin labels -->
+      <g font-size="8.5" font-weight="700" text-anchor="middle">
+        <g transform="translate(430,222) rotate(90)"><rect x="0" y="-6.5" width="30" height="13" rx="6.5" fill="#fff" stroke="#d32f2f"/><text x="15" y="3.2" fill="#d32f2f">3V3</text></g>
+        <g transform="translate(210,222) rotate(90)"><rect x="0" y="-6.5" width="40" height="13" rx="6.5" fill="#fff" stroke="#2e9d4a"/><text x="20" y="3.2" fill="#1a7f37">GPIO2</text></g>
+        <g transform="translate(430,378) rotate(-90)"><rect x="0" y="-6.5" width="30" height="13" rx="6.5" fill="#fff" stroke="#24292f"/><text x="15" y="3.2" fill="#24292f">GND</text></g>
+        <g transform="translate(350,378) rotate(-90)"><rect x="0" y="-6.5" width="46" height="13" rx="6.5" fill="#fff" stroke="#1e63d6"/><text x="23" y="3.2" fill="#1e63d6">SDA 23</text></g>
+        <g transform="translate(330,378) rotate(-90)"><rect x="0" y="-6.5" width="46" height="13" rx="6.5" fill="#fff" stroke="#b08800"/><text x="23" y="3.2" fill="#9a6700">SCL 22</text></g>
+      </g>
+
+      <!-- OLED lying flat, header in a27-a30, hanging over the board edge -->
+      <rect x="514" y="394" width="212" height="216" rx="6" fill="#1d3557"/>
+      <g fill="#d4a72c" stroke="#7d5a00" stroke-width=".8"><rect x="586" y="406" width="8" height="8"/><rect x="606" y="406" width="8" height="8"/><rect x="626" y="406" width="8" height="8"/><rect x="646" y="406" width="8" height="8"/></g>
+      <g font-size="7.5" fill="#fff" text-anchor="middle"><text x="590" y="427">GND</text><text x="610" y="427">VCC</text><text x="630" y="427">SCL</text><text x="650" y="427">SDA</text></g>
+      <rect x="532" y="440" width="176" height="112" rx="2" fill="#0b0f14"/>
+      <text x="540" y="458" font-size="10" fill="#9fe7ff" class="mono">CO2 ppm</text>
+      <text x="700" y="458" font-size="10" fill="#9fe7ff" class="mono" text-anchor="end">GOOD</text>
+      <text x="620" y="508" font-size="34" fill="#9fe7ff" class="mono" text-anchor="middle">612</text>
+      <rect x="532" y="517" width="176" height="1.5" fill="#9fe7ff"/>
+      <text x="540" y="542" font-size="12" fill="#9fe7ff" class="mono">22.4&#176;C</text>
+      <text x="700" y="542" font-size="12" fill="#9fe7ff" class="mono" text-anchor="end">45%</text>
+      <g font-size="10.5" text-anchor="end">
+        <text x="502" y="522" font-weight="700" fill="#1f2328">OLED lies flat, screen up, pins at the top:</text>
+        <text x="502" y="538" fill="#1f2328">a27 GND &middot; a28 VCC &middot; a29 SCL &middot; a30 SDA</text>
+        <text x="502" y="554" fill="#1f2328">It hangs over the board edge; nothing else</text>
+        <text x="502" y="570" fill="#1f2328">is plugged in underneath it.</text>
+      </g>
+
+      <!-- jumper wires -->
+      <g fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M430,410 Q430,420 440,420 L452,420 Q460,420 460,412 L460,384 Q460,376 468,376 L584,376 Q590,376 590,370" stroke="#24292f"/>
+        <path d="M430,190 C470,190 520,198 520,236 L520,352 Q520,360 528,360 L602,360 Q610,360 610,366 L610,370" stroke="#d32f2f"/>
+        <path d="M330,410 Q330,434 340,434 L492,434 Q500,434 500,426 L500,388 Q500,380 508,380 L624,380 Q630,380 630,374 L630,370" stroke="#e2b100"/>
+        <path d="M350,410 Q350,427 360,427 L472,427 Q480,427 480,419 L480,392 Q480,384 488,384 L644,384 Q650,384 650,376 L650,370" stroke="#1e63d6"/>
+        <path d="M210,190 C220,104 540,104 550,190" stroke="#2e9d4a"/>
+      </g>
+      <!-- STEMMA QT to pins cable from the SCD-41: d27 black, d28 red, d29 yellow, d30 blue -->
+      <path d="M578,59 C604,59 620,78 620,104 L620,314" fill="none" stroke="#6e7781" stroke-width="7" stroke-linecap="round"/>
+      <g fill="none" stroke-width="3.5" stroke-linecap="round">
+        <path d="M620,314 C620,330 592,328 590,350" stroke="#24292f"/>
+        <path d="M620,314 Q610,322 610,350" stroke="#d32f2f"/>
+        <path d="M620,314 Q630,322 630,350" stroke="#e2b100"/>
+        <path d="M620,314 Q650,318 650,350" stroke="#1e63d6"/>
+      </g>
+      <g id="wire-ends"></g>
+      <!-- wire numbers -->
+      <g font-size="8.5" font-weight="700" text-anchor="middle" fill="#fff">
+        <circle cx="460" cy="398" r="6.5" fill="#24292f" stroke="#fff"/><text x="460" y="401">1</text>
+        <circle cx="520" cy="300" r="7.5" fill="#d32f2f" stroke="#fff"/><text x="520" y="303">2</text>
+        <circle cx="500" cy="411" r="6.5" fill="#c99a00" stroke="#fff"/><text x="500" y="414">3</text>
+        <circle cx="480" cy="405" r="6.5" fill="#1e63d6" stroke="#fff"/><text x="480" y="408">4</text>
+        <circle cx="380" cy="126" r="7.5" fill="#2e9d4a" stroke="#fff"/><text x="380" y="129">5</text>
+      </g>
+    </svg>
+    <figcaption>Figure 3 &ndash; Breadboard layout (top view, seen from the column-a side). The ESP32 sits in rows 4&ndash;19 (3V3 pin in i19) with its USB end flush with the board edge; the antenna overhangs rows 20&ndash;22. Rows 27&ndash;30, left half, form the bus in the same order as the OLED's pins: <b>row 27 = GND, row 28 = 3.3&nbsp;V, row 29 = SCL, row 30 = SDA</b>. The OLED lies flat in a27&ndash;a30 and hangs over the board edge, the ESP32 wires go into column c, the SCD-41 cable into column d. The button's GND leg (e27) sits directly in the GND row. The power rails are not used.</figcaption>
+  </figure>
+
+  <h3>Connection list</h3>
+  <table>
+    <tr><th class="c">#</th><th>Wire</th><th>From</th><th>To</th><th>Signal</th></tr>
+    <tr><td class="c">1</td><td><span class="wire" style="background:#24292f"></span>black</td><td>a19 (J3-1 GND)</td><td>c27</td><td>GND &rarr; bus row 27</td></tr>
+    <tr><td class="c">2</td><td><span class="wire" style="background:#d32f2f"></span>red (long)</td><td>j19 (J1-1 3V3)</td><td>c28</td><td>3.3&nbsp;V &rarr; bus row 28</td></tr>
+    <tr><td class="c">3</td><td><span class="wire" style="background:#e2b100"></span>yellow</td><td>a14 (J3-6 GPIO22)</td><td>c29</td><td>SCL &rarr; bus row 29</td></tr>
+    <tr><td class="c">4</td><td><span class="wire" style="background:#1e63d6"></span>blue</td><td>a15 (J3-5 GPIO23)</td><td>c30</td><td>SDA &rarr; bus row 30</td></tr>
+    <tr><td class="c">5</td><td><span class="wire" style="background:#2e9d4a"></span>green</td><td>j8 (J1-12 GPIO2)</td><td>j25</td><td>Button, leg f25</td></tr>
+    <tr><td class="c">&ndash;</td><td>OLED header</td><td colspan="2">a27 GND &middot; a28 VCC &middot; a29 SCL &middot; a30 SDA (lying flat, pins at the top)</td><td>plugs straight into the bus rows</td></tr>
+    <tr><td class="c">&ndash;</td><td>STEMMA QT &rarr; pins</td><td colspan="2">d27 black (GND) &middot; d28 red (V+) &middot; d29 yellow (SCL) &middot; d30 blue (SDA); other end into the SCD-41</td><td>SCD-41 on the bus</td></tr>
+    <tr><td class="c">&ndash;</td><td>STEMMA QT &harr; STEMMA QT</td><td colspan="2">SCD-41 second connector &rarr; SHT45</td><td>SHT45 on the bus</td></tr>
+    <tr><td class="c">&ndash;</td><td>Button</td><td colspan="2">legs in e25, e27, f25, f27; leg e27 sits in the GND row, so it needs no wire of its own</td><td>GPIO2 &harr; GND</td></tr>
+  </table>
+  <p>Each bus row holds four things: the OLED pin (column a), the ESP32 wire (column c), the SCD-41 cable pin (column d) and, in row 27, the button leg (column e). The power rails are not used in this layout.</p>
+
+  <h3>Step by step (USB unplugged!)</h3>
+  <ol>
+    <li><b>ESP32:</b> pins in rows 4&ndash;19, USB-C ports flush with the end of the breadboard, antenna overhanging rows 20&ndash;22, the pin labelled <b>3V3</b> in <b>i19</b>. One free hole is left next to every pin: column <b>j</b> on the J1 side, column <b>a</b> on the J3 side.</li>
+    <li><b>OLED:</b> plug its header into <b>a27&ndash;a30</b> so that you can read the screen with the pins at the top: <b>GND &rarr; a27, VCC &rarr; a28, SCL &rarr; a29, SDA &rarr; a30</b>. The module lies flat, screen up, and hangs over the edge of the breadboard. Nothing else is plugged in underneath it.</li>
+    <li><b>ESP32 to the bus:</b> wire 1 (a19 &rarr; c27, GND), wire 3 (a14 &rarr; c29, SCL), wire 4 (a15 &rarr; c30, SDA). Then wire 2 (j19 &rarr; c28, 3.3&nbsp;V); it is the long one that crosses the board just past the antenna end.</li>
+    <li><b>SCD-41:</b> plug the STEMMA QT &rarr; pins cable into one of its connectors. Put the pins in d27 (black), d28 (red), d29 (yellow), d30 (blue): the same order as the OLED.</li>
+    <li><b>SHT45:</b> connect it to the SCD-41's second connector with the STEMMA QT &harr; STEMMA QT cable. Place it as far from the ESP32 and the SCD-41 as the cable allows.</li>
+    <li><b>Button:</b> place it across the centre gap in rows 25&ndash;27, legs in e25, e27, f25, f27. Then wire 5 (j8 &rarr; j25). The button's leg e27 is in the GND row and its diagonally opposite leg f25 is wired to GPIO2. Diagonal legs work whichever way round the button's internal leg pairs are.</li>
+    <li><b>Check before plugging in USB:</b> row 27 (GND) and row 28 (3.3&nbsp;V) are not connected to each other; nothing is connected to the 5V pin (J1-14, hole i6); the STEMMA colours are in the right rows.</li>
+  </ol>
+  <p class="muted">No pins pointing out of the back of your OLED, or not enough room? Connect it with four female&ndash;male jumper wires to the same rows instead (GND &rarr; row 27, VCC &rarr; 28, SCL &rarr; 29, SDA &rarr; 30) and put it wherever you like.</p>
+<div class="box warn"><span class="label">Power the sensors from 3.3&nbsp;V only.</span> The Adafruit boards would accept 5&nbsp;V, but their I&sup2;C pull-up resistors connect to their supply pin. At 5&nbsp;V they would pull SDA/SCL to 5&nbsp;V, and the ESP32-C6 pins are not 5&nbsp;V tolerant.</div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section id="ide">
+  <h2><span class="n">5</span>Arduino IDE setup</h2>
+  <div class="box ok"><span class="label">Already done on this PC:</span> Arduino IDE 2 is installed, and so is the board package <b>esp32 by Espressif Systems 3.3.12</b>. You still need to install the libraries (5.3) and the CP210x USB driver for the "UART" port (5.5).</div>
+
+  <h3>5.1 Arduino IDE</h3>
+  <p>Download <b>Arduino IDE 2.x</b> from <code>arduino.cc/en/software</code> and install it with the default options. Allow the USB driver installation if Windows asks.</p>
+
+  <h3>5.2 ESP32 board package</h3>
+  <ol>
+    <li><b>Tools &rarr; Board &rarr; Boards Manager&hellip;</b>, search <code>esp32</code>.</li>
+    <li>Install <b>"esp32 by Espressif Systems"</b>, version 3.x. (Not "Arduino ESP32 Boards", which is a different package for Arduino's own boards.)</li>
+    <li>If it isn't listed: <b>File &rarr; Preferences &rarr; Additional boards manager URLs</b>, add<br><code>https://espressif.github.io/arduino-esp32/package_esp32_index.json</code>, then search again.</li>
+  </ol>
+
+  <h3>5.3 Libraries</h3>
+  <p><b>Sketch &rarr; Include Library &rarr; Manage Libraries&hellip;</b> (or the books icon on the left). For each library, click <b>INSTALL</b>. When the IDE asks about dependencies, choose <b>INSTALL ALL</b>.</p>
+  <table>
+    <tr><th>Search for</th><th>Install</th><th>Pulls in automatically</th><th>Tested version</th></tr>
+    <tr><td><code>Adafruit SSD1306</code></td><td>Adafruit SSD1306 (by Adafruit)</td><td>Adafruit GFX Library, Adafruit BusIO</td><td>2.5.17 / GFX 1.13.0 / BusIO 1.17.4</td></tr>
+    <tr><td><code>Adafruit SHT4x</code></td><td>Adafruit SHT4x Library (by Adafruit)</td><td>Adafruit Unified Sensor (+ Adafruit SH110X, unused)</td><td>1.0.5 / Unified Sensor 1.1.15</td></tr>
+    <tr><td><code>Sensirion I2C SCD4x</code></td><td>Sensirion I2C SCD4x (by Sensirion)</td><td>Sensirion Core</td><td>1.1.0 / Core 0.7.3</td></tr>
+  </table>
+  <div class="box note">Use <b>Sensirion I2C SCD4x version 1.x</b>. Version 0.4 and older have a different API (class <code>SensirionI2CScd4x</code>), and the sketches won't compile with it.</div>
+
+  <h3>5.4 Board settings (Tools menu)</h3>
+  <table>
+    <tr><th>Setting</th><th>Value</th></tr>
+    <tr><td>Board</td><td><b>ESP32C6 Dev Module</b> (Tools &rarr; Board &rarr; esp32)</td></tr>
+    <tr><td>Port</td><td>the COM port that appears when you plug in the board</td></tr>
+    <tr><td>USB CDC On Boot</td><td><b>Disabled</b> if you use the port labelled <b>UART</b> &middot; <b>Enabled</b> if you use the port labelled <b>USB</b></td></tr>
+    <tr><td>Flash Size</td><td><b>8MB (64Mb)</b></td></tr>
+    <tr><td>Partition Scheme</td><td><b>8M with spiffs (3MB APP/1.5MB SPIFFS)</b></td></tr>
+    <tr><td>CPU Frequency</td><td>160MHz (WiFi)</td></tr>
+    <tr><td>Upload Speed</td><td>921600 (use 115200 if uploads fail)</td></tr>
+    <tr><td>Everything else</td><td>leave at default</td></tr>
+  </table>
+
+  <h3>5.5 Which USB port?</h3>
+  <p>Both USB-C ports can power and program the board. <b>Recommended: the port labelled "UART"</b> with <i>USB CDC On Boot = Disabled</i>. Serial output then appears from the first moment after reset. If you use the "USB" port, set <i>USB CDC On Boot = Enabled</i>, otherwise the Serial Monitor stays empty.</p>
+  <p><b>Drivers:</b> the "USB" port uses a driver built into Windows and works straight away. The "UART" port goes through a <b>Silicon Labs CP2102N</b> USB-to-UART chip, and <b>on this PC Windows had no driver for it</b>. Device Manager listed "CP2102N USB to UART Bridge Controller" under <i>Other devices</i> with error <i>Code&nbsp;28</i>, and no COM port appeared. Windows Update doesn't install this driver automatically for this chip, so install it once by hand:</p>
+  <ol>
+    <li>Download <b>CP210x Universal Windows Driver</b> (<code>CP210x_Universal_Windows_Driver.zip</code>) from <code>silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers</code>, tab <i>Downloads</i>.</li>
+    <li>Extract the ZIP completely. Installing from inside the ZIP fails.</li>
+    <li>Device Manager &rarr; right-click "CP2102N USB to UART Bridge Controller" &rarr; <b>Update driver</b> &rarr; <b>Browse my computer for drivers</b> &rarr; select the extracted folder &rarr; <b>Next</b>. Alternatively, right-click <code>silabser.inf</code> &rarr; <i>Show more options</i> &rarr; <b>Install</b>.</li>
+    <li>The device moves to <i>Ports (COM &amp; LPT)</i> as <b>"Silicon Labs CP210x USB to UART Bridge (COM<i>n</i>)"</b>. Select that COM<i>n</i> in the Arduino IDE. If it still shows the warning, unplug the board, plug it back in, or restart the PC.</li>
+  </ol>
+  <p>If no device appears at all, not even under <i>Other devices</i>, try another cable: many USB-C cables are charge-only.</p>
+
+  <h3>5.6 First upload test</h3>
+  <ol>
+    <li>Plug in the board, select board and port as above.</li>
+    <li><b>File &rarr; Examples &rarr; ESP32 &rarr; GPIO &rarr; BlinkRGB</b> and click <b>Upload</b> (&rarr; arrow).</li>
+    <li>The on-board RGB LED should cycle through colours. The toolchain works.</li>
+    <li>If the upload says <i>"Failed to connect"</i>: hold <kbd>BOOT</kbd>, tap <kbd>RESET</kbd>, release <kbd>BOOT</kbd>, then upload again. Press <kbd>RESET</kbd> after the upload finishes.</li>
+  </ol>
+
+  <h3>5.7 Open the project sketches</h3>
+  <p><b>File &rarr; Open&hellip;</b> and pick the <code>.ino</code> file inside <code>firmware/&lt;name&gt;/</code>. The Arduino IDE needs each sketch in a folder with the same name, which is how the project is laid out. Serial Monitor: <b>Tools &rarr; Serial Monitor</b>, set to <b>115200 baud</b>.</p>
+</section>
+
+<!-- ============================================================ 6 -->
+<section id="firmware">
+  <h2><span class="n">6</span>Firmware (<code>co2_monitor.ino</code>)</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="margin-top:0">What it does</h3>
+      <ul>
+        <li>Starts the I&sup2;C bus on GPIO23 (SDA) / GPIO22 (SCL).</li>
+        <li><b>SHT45</b>: high-precision reading every 2&nbsp;s, heater off.</li>
+        <li><b>SCD-41</b>: periodic measurement, a new CO<sub>2</sub> value every 5&nbsp;s. Altitude compensation is set at every start.</li>
+        <li><b>Display</b>: on for 30&nbsp;s after power-up and after every button press. Pressing while it's on restarts the 30&nbsp;s. When off, the panel is fully dark and the content is kept. Brightness is set by <code>OLED_BRIGHTNESS</code>.</li>
+        <li><b>RGB LED</b> (on the board, GPIO8): dimmed, always on, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value arrives.</li>
+        <li><b>Serial</b>: one line per CO<sub>2</sub> reading, usable in the Serial Monitor and the Serial Plotter.</li>
+        <li>A missing module is reported on Serial and on the display (<code>--.-</code> / "SCD-41 missing"). The rest keeps working.</li>
+      </ul>
+    </div>
+    <figure style="margin-top:4px">
+      <svg viewBox="0 0 300 172" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Display layout">
+        <rect x="2" y="2" width="296" height="168" rx="10" fill="#1d3557"/>
+        <rect x="22" y="20" width="256" height="128" fill="#05080c"/>
+        <g fill="#9fe7ff" class="mono">
+          <text x="26" y="36" font-size="13" class="mono">CO2 ppm</text>
+          <text x="274" y="36" font-size="13" text-anchor="end" class="mono">GOOD</text>
+          <text x="150" y="98" font-size="52" text-anchor="middle" class="mono">612</text>
+          <rect x="22" y="108" width="256" height="2"/>
+          <text x="26" y="142" font-size="28" class="mono">22.4</text>
+          <circle cx="104" cy="122" r="2.5" fill="none" stroke="#9fe7ff" stroke-width="1.6"/>
+          <text x="109" y="134" font-size="13" class="mono">C</text>
+          <text x="274" y="142" font-size="28" text-anchor="end" class="mono">45%</text>
+        </g>
+      </svg>
+      <figcaption>Figure 4 &ndash; Display layout: CO<sub>2</sub> and rating on top, temperature and humidity (from the SHT45) at the bottom.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Settings at the top of the sketch</h3>
+  <table>
+    <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>SENSOR_ALTITUDE_M</code></td><td>0</td><td><b>Set this to your altitude in metres above sea level.</b> The SCD-41 uses it for air-pressure compensation. Without it, readings at e.g. 500&nbsp;m are a few percent off.</td></tr>
+    <tr><td><code>OLED_ADDRESS</code></td><td>0x3C</td><td>0x3D if the address resistor on the back of the OLED was moved.</td></tr>
+    <tr><td><code>OLED_ROTATION</code></td><td>0</td><td>0 = normal, header pins at the top. Set 2 if the text appears upside down (e.g. if you mount the display the other way round).</td></tr>
+    <tr><td><code>OLED_BRIGHTNESS</code></td><td>207</td><td>Display brightness 0&ndash;255 (the SSD1306's contrast setting; 207 is the library default). The range is smaller than it sounds: even 0 stays readable, at roughly half brightness. Lower values also slow burn-in.</td></tr>
+    <tr><td><code>DISPLAY_ON_TIME_MS</code></td><td>30000</td><td>How long the display stays on (ms).</td></tr>
+    <tr><td><code>BUTTON_PIN</code></td><td>2</td><td>Button GPIO (other leg to GND).</td></tr>
+    <tr><td><code>I2C_SDA_PIN</code> / <code>I2C_SCL_PIN</code></td><td>23 / 22</td><td>I&sup2;C pins.</td></tr>
+    <tr><td><code>CO2_GOOD_BELOW</code>, <code>CO2_OK_BELOW</code>, <code>CO2_VENTILATE_BELOW</code></td><td>800 / 1000 / 2000</td><td>Limits for the rating shown at the top right, and the points where the LED is green, yellow and red.</td></tr>
+    <tr><td><code>LED_BRIGHTNESS</code></td><td>5</td><td>Brightness of the RGB LED, 1&ndash;255 (0 = off). 255 is glaring; the BlinkRGB example uses 64. Try 3&ndash;5 for a bedroom, 20&ndash;30 for a bright room.</td></tr>
+    <tr><td><code>LED_GREEN</code>, <code>LED_YELLOW</code>, <code>LED_RED</code></td><td>{0,255,0} / {255,160,0} / {255,0,0}</td><td>The three colours at full brightness, as {red, green, blue}. Yellow has less green because the green LED looks brighter than the red one. If yellow looks too green, lower its middle value.</td></tr>
+  </table>
+
+  <h3>CO<sub>2</sub> rating on the display and the LED</h3>
+  <table>
+    <tr><th>CO<sub>2</sub> (ppm)</th><th>Display</th><th>LED</th><th>Meaning</th></tr>
+    <tr><td>below 800</td><td><b>GOOD</b></td><td><span class="wire" style="background:#1fbf3a"></span>green</td><td>Well-ventilated room (outdoor air is about 420&ndash;430&nbsp;ppm).</td></tr>
+    <tr><td>800 &ndash; 999</td><td><b>OK</b></td><td><span class="wire" style="background:linear-gradient(90deg,#1fbf3a,#f2c200)"></span>green &rarr; yellow</td><td>Acceptable.</td></tr>
+    <tr><td>1000 &ndash; 1999</td><td><b>VENTILATE</b> (inverted)</td><td><span class="wire" style="background:linear-gradient(90deg,#f2c200,#f07800,#e02020)"></span>yellow &rarr; orange &rarr; red</td><td>Air is getting stale. Open a window. 1000&nbsp;ppm is the classic guideline (Pettenkofer value).</td></tr>
+    <tr><td>2000 and above</td><td><b>BAD AIR</b> (inverted)</td><td><span class="wire" style="background:#e02020"></span>red</td><td>Ventilate now. Tiredness and poor concentration are common at these levels.</td></tr>
+  </table>
+  <p class="muted">The LED colour changes smoothly with the CO<sub>2</sub> value; for example, 1500&nbsp;ppm is orange. It is updated with every new reading (every 5&nbsp;s) and stays on while the display is off.</p>
+</section>
+
+<!-- ============================================================ 7 -->
+<section id="testing">
+  <h2><span class="n">7</span>Testing</h2>
+  <p>Test in this order. Each step builds on the one before, so when something fails you know where to look.</p>
+
+  <h3>Step 1 &ndash; Power-on check</h3>
+  <p>Plug in USB. The ESP32's power LED lights up, and so do the green power LEDs on the Adafruit boards (if present). Nothing gets warm. If anything gets hot, unplug immediately and check for a short between + and &minus;.</p>
+
+  <h3>Step 2 &ndash; I&sup2;C scan (<code>i2c_scanner.ino</code>)</h3>
+  <p>Upload the scanner and open the Serial Monitor (115200). Every 5&nbsp;s you should see:</p>
+<pre>Scanning I2C bus (SDA = GPIO23, SCL = GPIO22) ...
+  0x3C  OLED display (SSD1306)
+  0x44  SHT45 temperature / humidity
+  0x62  SCD-41 CO2
+3 device(s) found. Expected: 0x3C (or 0x3D), 0x44, 0x62</pre>
+  <ul>
+    <li><b>Nothing found:</b> check wires 3 and 4 (SDA/SCL swapped?) and the power wires 1 and 2.</li>
+    <li><b>Only one module missing:</b> check that module's four connections (OLED pin order! STEMMA cable fully seated?).</li>
+    <li><b>SHT45 missing but SCD-41 found:</b> check the STEMMA&harr;STEMMA cable between them.</li>
+  </ul>
+
+  <h3>Step 3 &ndash; Main program (<code>co2_monitor.ino</code>)</h3>
+  <p>Set <code>SENSOR_ALTITUDE_M</code>, upload, open the Serial Monitor. Expected output:</p>
+<pre>CO2 monitor starting
+SHT45 found
+SCD-41 found, serial 0x...
+SCD-41 automatic self-calibration (ASC): enabled
+SCD-41 measuring, first CO2 value in about 5 s
+CO2_ppm:612 Temperature_C:22.41 Humidity_pct:45.3
+CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
+  <p>The display shows "starting&hellip;", then temperature/humidity, then CO<sub>2</sub> after about 5&nbsp;s ("warming up&hellip;" until then). The RGB LED on the board goes off at the start and lights up dimly in the CO<sub>2</sub> colour with the first value. In normal room air it is green or yellowish. If the text is upside down, change <code>OLED_ROTATION</code> (2 &harr; 0) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick Temperature and Humidity to see the CO<sub>2</sub> curve at a useful scale.</p>
+
+  <h3>Step 4 &ndash; Button and display timeout</h3>
+  <ol>
+    <li>After about 30&nbsp;s the display goes dark. Serial output continues, so the sensors are still running.</li>
+    <li>Press the button. The display turns on immediately with current values.</li>
+    <li>Press again after ~20&nbsp;s. The 30&nbsp;s start over.</li>
+  </ol>
+
+  <h3>Step 5 &ndash; Sensor plausibility</h3>
+  <ul>
+    <li><b>Warm-up:</b> let everything run for <b>5&ndash;10 minutes</b> before judging the values. The SCD-41 needs a few minutes to settle, and the SHT45 needs time to reach room temperature after you handled it.</li>
+    <li><b>CO<sub>2</sub> breath test:</b> breathe gently toward the SCD-41 from 20&ndash;30&nbsp;cm for a few seconds. Within 10&ndash;30&nbsp;s the value jumps to well over 1000&nbsp;ppm (several thousand is normal), then falls back over a few minutes. The LED goes through yellow and orange to red and back. This proves the sensor reacts. Don't breathe directly onto it from close up again and again; the moisture doesn't help it.</li>
+    <li><b>Humidity:</b> breathe near the SHT45. RH jumps by several percent and recovers within a minute.</li>
+    <li><b>Temperature:</b> hold a finger near (not on) the SHT45. Temperature rises slowly. Compare with another thermometer once it has settled; the SHT45 (&plusmn;0.1&nbsp;&deg;C) is usually the more accurate one.</li>
+  </ul>
+
+  <h3>Step 6 &ndash; Fresh-air reference check</h3>
+  <p>After the sensor has run for at least 10 minutes, take the setup <b>outdoors</b> (shade, not in direct wind, nobody breathing near it) on a power bank or laptop. Or air the room thoroughly: windows wide open, ideally a cross-draught, for 10&ndash;15 minutes. Outdoors it should read about <b>400&ndash;480&nbsp;ppm</b>.</p>
+  <ul>
+    <li>Expected accuracy: &plusmn;(40&nbsp;ppm + 5&nbsp;% of reading), roughly &plusmn;60&nbsp;ppm at 425&nbsp;ppm. Readings between about 370 and 490&nbsp;ppm outdoors are fine.</li>
+    <li>A ventilated room rarely reaches true outdoor levels. 450&ndash;550&nbsp;ppm indoors after airing is normal.</li>
+    <li>Clearly off outdoors (e.g. above 550 or below 350&nbsp;ppm): see <a href="#calibration">Calibration</a> (FRC).</li>
+  </ul>
+
+  <h3>Step 7 &ndash; Long run</h3>
+  <p>Leave it running for at least 24&nbsp;h, ideally a week. Typical pattern: CO<sub>2</sub> rises while people are in the room with the door and windows closed (a bedroom can reach 1500&ndash;2500&nbsp;ppm overnight), and drops quickly when you air the room. If values drift or seem stuck, check the Serial output for errors.</p>
+</section>
+
+<!-- ============================================================ 8 -->
+<section id="calibration">
+  <h2><span class="n">8</span>CO<sub>2</sub> calibration (SCD-41)</h2>
+  <p>The SCD-41 is <b>calibrated at the factory</b> by Sensirion and works out of the box. Over time, mechanical stress, soldering, shipping and ageing can shift its zero point (the "offset"). Two mechanisms correct this:</p>
+
+  <table>
+    <tr><th></th><th>ASC &ndash; automatic self-calibration</th><th>FRC &ndash; forced recalibration</th></tr>
+    <tr><td><b>Who does it</b></td><td>The <b>sensor itself</b> (firmware inside the SCD-41)</td><td><b>Your code</b> sends one command</td></tr>
+    <tr><td><b>Default</b></td><td><b>On</b> from the factory</td><td>Only when you trigger it</td></tr>
+    <tr><td><b>Code needed</b></td><td>None. Our main sketch leaves it as it is.</td><td>The optional <code>scd41_calibration.ino</code> tool</td></tr>
+    <tr><td><b>How it works</b></td><td>Watches the readings over days. Assumes the <b>lowest</b> level seen in each period was fresh outdoor air (target 400&nbsp;ppm) and slowly corrects the offset. First correction after ~<b>44&nbsp;h</b> of operation, then every ~<b>156&nbsp;h</b> (6.5 days).</td><td>You put the sensor in air of known CO<sub>2</sub> (outdoors &asymp; 425&nbsp;ppm), let it run &ge; 3 min, and tell it "this is 425&nbsp;ppm". The correction is applied immediately.</td></tr>
+    <tr><td><b>Requirement</b></td><td>The sensor sees fresh air (~400&nbsp;ppm) <b>at least once per week of operating time</b>, while running <b>&ge; 4&nbsp;hours in one go</b>.</td><td>Stable, known reference air, and the sensor running in its normal mode for &ge; 3 minutes beforehand.</td></tr>
+    <tr><td><b>Use when</b></td><td>Normal homes and offices that get aired regularly.</td><td>Readings are clearly off in fresh air, or the room never gets fresh air (then also switch ASC off).</td></tr>
+  </table>
+
+  <h3>Your questions, answered</h3>
+  <div class="qa">
+    <div class="q">Is the CO<sub>2</sub> sensor calibrated by the code or by the sensor itself?</div>
+    <p><span class="a-short">Both</span><b>Normally the sensor does it itself.</b> ASC runs inside the SCD-41 and is switched on at the factory, so no code is needed. Our main program doesn't touch the calibration; it only sends the altitude at every start. <b>FRC</b> is triggered by code when you know the true CO<sub>2</sub> level. The separate <code>scd41_calibration.ino</code> sketch does exactly that.</p>
+  </div>
+  <div class="qa">
+    <div class="q">How should I start testing &ndash; open the door and let fresh air in, or just plug it in?</div>
+    <p><span class="a-short">Just plug it in</span>No fresh air is needed to start. Give it 5&ndash;10 minutes, do the breath test (CO<sub>2</sub> must jump), then do the fresh-air check from Testing, step 6. That check tells you whether the factory calibration is still good; it doesn't calibrate anything by itself.</p>
+  </div>
+  <div class="qa">
+    <div class="q">Do I need fresh air every time I reconnect the board?</div>
+    <p><span class="a-short">No</span>The SCD-41 stores its calibration history (ASC and FRC) in its <b>own EEPROM automatically</b>, so it survives unplugging. You only need fresh air regularly <i>for ASC to keep working long term</i>: at least once per week of operating time, while the sensor runs for 4+ hours at a stretch. Normal airing of the room does that. Short sessions (unplugged after an hour) don't advance ASC, but they don't lose anything either.</p>
+  </div>
+
+  <h3>What is stored where</h3>
+  <table>
+    <tr><th>Item</th><th>Stored</th><th>After unplugging</th></tr>
+    <tr><td>Factory calibration, ASC history, FRC correction</td><td>Sensor EEPROM (automatically)</td><td><b>Kept</b></td></tr>
+    <tr><td>Altitude, ASC on/off, temperature offset, ASC target</td><td>Sensor RAM; EEPROM only after <code>persistSettings()</code></td><td>Lost, back to the saved values. Our code re-sends the altitude at every start, so there's no need to persist it.</td></tr>
+  </table>
+  <div class="box warn">The EEPROM is rated for only ~2000 writes. <b>Never call <code>persistSettings()</code> in <code>loop()</code></b>, only once after a deliberate settings change. Our sketches never call it.</div>
+
+  <h3>When ASC can go wrong</h3>
+  <ul>
+    <li><b>The room never gets fresh air</b> (always occupied, never aired). ASC then treats e.g. 700&nbsp;ppm as "400" and pulls all readings too low. Switch ASC off with <code>setAutomaticSelfCalibrationEnabled(0)</code> + <code>persistSettings()</code> and use FRC every few months instead.</li>
+    <li><b>Target 400 vs real outdoor air:</b> ASC assumes 400&nbsp;ppm, but outdoor air today is ~420&ndash;430&nbsp;ppm. ASC can therefore read ~25&nbsp;ppm low. That is well inside the sensor's accuracy, so it's fine for step 1. It could later be changed with <code>setAutomaticSelfCalibrationTarget()</code>.</li>
+  </ul>
+
+  <h3>FRC procedure (only if needed)</h3>
+  <ol>
+    <li>Upload <code>firmware/scd41_calibration/scd41_calibration.ino</code> (set <code>SENSOR_ALTITUDE_M</code> the same as in the main sketch).</li>
+    <li>Take the complete setup <b>outdoors</b> on a power bank or laptop: shade, away from roads, chimneys and people. Don't do it at an open window indoors; indoor air near a window is often 450&ndash;600&nbsp;ppm.</li>
+    <li>Wait. The display counts down 5 minutes and shows the CO<sub>2</sub> value and the <b>spread</b> (max &minus; min) of the last minute. A spread under ~20&nbsp;ppm means stable air.</li>
+    <li>When it shows "press button", press the button (or send <code>c</code> in the Serial Monitor).</li>
+    <li>The display shows "Done! corr &plusmn;xx ppm". The new reading should now be close to 425&nbsp;ppm. The correction is stored in the sensor automatically.</li>
+    <li>Upload <code>co2_monitor.ino</code> again.</li>
+  </ol>
+  <div class="box note">The target is <code>FRC_TARGET_PPM = 425</code> (global outdoor background in 2026 is about 420&ndash;430&nbsp;ppm). A wrong reference makes the sensor worse, not better, so only run FRC in genuinely fresh air.</div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section id="notes">
+  <h2><span class="n">9</span>Hardware notes</h2>
+
+  <h3>ESP32-C6-DevKitC-1-N8</h3>
+  <ul>
+    <li><b>Chip:</b> ESP32-C6 (in the ESP32-C6-WROOM-1-N8 module). 32-bit RISC-V main core up to 160&nbsp;MHz plus a 20&nbsp;MHz low-power core, 512&nbsp;KB SRAM, <b>8&nbsp;MB flash</b>.</li>
+    <li><b>Radio:</b> Wi-Fi 6 (2.4&nbsp;GHz only), Bluetooth 5 LE, IEEE 802.15.4 (Zigbee / Thread / Matter). Not used yet. Keep the antenna end free of metal.</li>
+    <li><b>3.3&nbsp;V logic, GPIOs not 5&nbsp;V tolerant.</b> The 5V pin carries USB voltage. Never connect it to a GPIO or to the sensors' bus.</li>
+    <li><b>Two USB-C ports:</b> "USB" = native USB (Serial/JTAG, GPIO12/13), "UART" = USB-to-serial bridge (GPIO16/17). Either one powers and programs the board.</li>
+    <li><b>On board:</b> BOOT button (GPIO9), RESET button, addressable RGB LED (GPIO8), power LED. Jumper <b>J5</b> (2-pin header next to the "3V3" marking) carries the 3.3&nbsp;V supply to the ESP32 module. It is fitted at the factory and <b>must stay fitted</b>; it is only removed to measure the module's current with an ammeter. Without it, the USB chip still shows up on the PC, but the ESP32 itself has no power.</li>
+    <li><b>Strapping pins</b> GPIO4, 5, 8, 9, 15: don't connect buttons or pull-downs to them.</li>
+    <li><b>Breadboard fit:</b> 25.4&nbsp;&times;&nbsp;51.8&nbsp;mm, pin rows 22.86&nbsp;mm (9 holes) apart. In columns b and i it leaves one free hole per pin on each side. The PCB extends ~12&nbsp;mm past pin 16 (USB end) and the module overhangs ~8&nbsp;mm past pin 1 (antenna end). With pins in rows 4&ndash;19, the USB ports end flush with the breadboard and the antenna covers rows 20&ndash;22, which leaves rows 23&ndash;30 free for the button and the bus.</li>
+  </ul>
+
+  <h3>Adafruit SCD-41 (Sensirion SCD41)</h3>
+  <ul>
+    <li><b>Principle:</b> photoacoustic NDIR. It measures real CO<sub>2</sub>, unlike cheap "eCO<sub>2</sub>" gas sensors that only estimate it.</li>
+    <li><b>Range / accuracy:</b> 400&ndash;5000&nbsp;ppm specified at &plusmn;(40&nbsp;ppm + 5&nbsp;% of reading); outputs up to 40&nbsp;000&nbsp;ppm. (The SCD-40 is only specified to 2000&nbsp;ppm.)</li>
+    <li><b>Modes:</b> periodic (every 5&nbsp;s, ~17&nbsp;mA; used here), low-power periodic (every 30&nbsp;s), single shot (SCD-41 only, ~0.5&nbsp;mA at one reading per 5&nbsp;min; useful for battery operation later).</li>
+    <li><b>I&sup2;C address 0x62</b> (fixed). 3.3&ndash;5&nbsp;V supply; the breakout has a regulator and level shifting. A clean, stable supply matters for accuracy.</li>
+    <li><b>Built-in T/RH:</b> the SCD-41 always measures temperature and humidity; it needs them internally to compensate the CO<sub>2</sub> value, and this cannot be switched off. Every reading returns all three values. The code reads them and simply ignores T/RH, because the sensor warms itself slightly and the SHT45 is more accurate. Ignoring them has <b>no effect on CO<sub>2</sub> accuracy</b>, and neither does its temperature offset setting (it only shifts the reported T/RH). The SCD-41 cannot take temperature or humidity from the SHT45.</li>
+    <li><b>Air pressure:</b> this <i>does</i> affect CO<sub>2</sub> accuracy, so set your altitude in the code. Weather changes air pressure by a few percent; a pressure sensor added later could feed live values with <code>setAmbientPressure()</code>, which works during periodic measurement.</li>
+    <li><b>Handling:</b> the weak spot is the <b>white membrane on top of the metal cap</b>. It keeps dust and water out and lets CO<sub>2</sub> in. Sensirion: don't remove, damage, imprint or cover it. So don't touch or press it, and don't tape over it, clean it, or blow compressed air at it. The sensor is an optical system: avoid strong force on the cap, especially sideways, and drops onto hard floors. ESD rating is only 2&nbsp;kV (HBM), so touch something metal first. Chemical fumes don't affect the CO<sub>2</sub> measurement the way they affect the SHT45's humidity reading. Keep dust, direct sunlight and strong drafts off it. Leave space for air to reach it. If it ever reads clearly wrong in fresh air after a knock, a forced recalibration fixes the offset (section 8). Calibration persists in its EEPROM.</li>
+  </ul>
+
+  <h3>Sensor choice: SCD-41 vs SCD-30</h3>
+  <table>
+    <tr><th style="width:22%"></th><th>SCD-41 (used)</th><th>SCD-30</th></tr>
+    <tr><td>Principle</td><td>Photoacoustic NDIR</td><td>Dual-channel NDIR (reference channel for long-term stability)</td></tr>
+    <tr><td>Specified range</td><td>400&ndash;5000&nbsp;ppm</td><td>400&ndash;10&nbsp;000&nbsp;ppm</td></tr>
+    <tr><td>Accuracy</td><td>&plusmn;(40&nbsp;ppm + 5&nbsp;%) &rarr; &plusmn;90&nbsp;ppm at 1000&nbsp;ppm</td><td>&plusmn;(30&nbsp;ppm + 3&nbsp;%) &rarr; &plusmn;60&nbsp;ppm at 1000&nbsp;ppm</td></tr>
+    <tr><td>Sensor size</td><td>10.1 &times; 10.1 &times; 6.5&nbsp;mm</td><td>35 &times; 23 &times; 7&nbsp;mm</td></tr>
+    <tr><td>Power</td><td>~17&nbsp;mA (every 5&nbsp;s); single-shot mode ~0.5&nbsp;mA (every 5&nbsp;min)</td><td>~19&nbsp;mA (every 2&nbsp;s); no low-power single-shot mode</td></tr>
+    <tr><td>I&sup2;C</td><td>Standard, up to 400&nbsp;kHz</td><td>Max 100&nbsp;kHz, needs clock stretching (up to 150&nbsp;ms), a known source of trouble with some microcontrollers</td></tr>
+    <tr><td>Self-calibration</td><td>Fresh air once per week of operation, runs of &ge; 4&nbsp;h</td><td>7 days continuous operation, &ge; 1&nbsp;h fresh air per day</td></tr>
+    <tr><td>Adafruit breakout</td><td>STEMMA QT, 0x62</td><td>STEMMA QT, 0x61; $58.95 and often out of stock</td></tr>
+  </table>
+  <p><b>Conclusion:</b> for a room monitor the SCD-41 is the better fit. It is small, has trouble-free I&sup2;C, and offers a low-power mode for a later battery version, and indoor air stays well inside 400&ndash;5000&nbsp;ppm. The SCD-30 wins on paper accuracy, range and long-term stability. Choose it for mains-powered builds that may exceed 5000&nbsp;ppm (greenhouse, grow tent, fermentation room) or where the best absolute accuracy matters more than size and power.</p>
+
+  <h3>Adafruit SHT45 (Sensirion SHT45)</h3>
+  <ul>
+    <li><b>Accuracy:</b> &plusmn;0.1&nbsp;&deg;C typical (5&ndash;60&nbsp;&deg;C), &plusmn;1.0&nbsp;%RH typical (20&ndash;70&nbsp;%RH). Range &minus;40&hellip;125&nbsp;&deg;C, 0&hellip;100&nbsp;%RH.</li>
+    <li><b>I&sup2;C address 0x44</b> (fixed). 3&ndash;5&nbsp;V supply; the breakout has a regulator, level shifting and pull-ups.</li>
+    <li><b>Built-in heater:</b> for drying the sensor after condensation. While it runs, temperature readings are useless, so the code keeps it <b>off</b>.</li>
+    <li><b>Placement is everything:</b> the ESP32, the SCD-41, the display and your hand all give off heat. Mount the SHT45 at the end of the cable, away from warm parts and out of direct sunlight. Airflow improves response time.</li>
+  </ul>
+
+  <h3>Sensor handling: what can harm them</h3>
+  <table>
+    <tr><th style="width:30%">Source</th><th style="width:34%">Effect</th><th>What to do</th></tr>
+    <tr><td>Cleaning sprays (ammonia, bleach, alcohol), solvents (acetone / nail polish remover, paint, varnish), glue, silicone or epoxy while curing</td><td><b>Permanent damage possible.</b> The SHT45's humidity reading drifts, in most cases for good. Sensirion names acetone, ethanol, isopropanol, toluene, ammonia and acids.</td><td>Don't spray or wipe near the sensors. Take them out of the room while painting or gluing, and air the room until the smell is gone.</td></tr>
+    <tr><td>Aerosols (hairspray, deodorant, spray paint), cooking grease, smoke</td><td>Coat the sensor openings.</td><td>Not in the kitchen or bathroom, no spraying nearby.</td></tr>
+    <tr><td>Water: spills, condensation (bathroom steam, cold window sill)</td><td>A short circuit can kill the boards. The SCD-41 is only rated for non-condensing air.</td><td>Keep everything dry. Unplug at once after a spill.</td></tr>
+    <tr><td>Static electricity</td><td>Can destroy the chips.</td><td>Touch something metal first (e.g. a radiator), hold the boards by their edges.</td></tr>
+    <tr><td>Pressing, dropping, pulling on cables</td><td>Broken connectors or solder joints.</td><td>Don't press on or poke into the SCD-41's sensor. Pull STEMMA plugs by the plug.</td></tr>
+    <tr><td>Vibration, loud bass (on top of a subwoofer or speaker)</td><td>No damage. Can make the SCD-41's readings noisier; Sensirion recommends keeping it decoupled from vibration.</td><td>Put it on a shelf or desk, not on the speaker.</td></tr>
+    <tr><td>Magnets (speakers, subwoofers, monitors, phone cases)</td><td><b>No effect.</b> Neither sensor uses or reacts to magnetic fields.</td><td>Nothing.</td></tr>
+    <tr><td>Heat: sun, radiator, monitor, laptop vent, the ESP32, your hand</td><td>No damage at room conditions, but temperature reads too high and humidity too low.</td><td>See placement below.</td></tr>
+  </table>
+  <p><b>How likely is it?</b> Sensirion's rule of thumb: air that people can breathe for a long time without harm won't contaminate the sensor. Normal cleaning, cooking or a candle across the room is fine. The real risks are high concentration and long exposure: the sensor right next to curing glue or silicone, painting in a closed room, wiping the sensor with alcohol, or storing it in a box with solvents. Chemicals only affect the <b>humidity</b> reading; temperature isn't affected.</p>
+
+  <h3>If the SHT45 does get contaminated</h3>
+  <ol>
+    <li><b>Check it with the salt test.</b> Put a spoonful of table salt with a few drops of water (a damp paste, not dissolved) in a bottle cap. Put the cap and the SHT45 board in an airtight container or a zip bag, and run the STEMMA cable out through the seal. Make sure the salt doesn't touch the board. After 8&ndash;12&nbsp;h at a steady room temperature the air inside is at <b>75&nbsp;%RH</b>. The SHT45 should read 74&ndash;77&nbsp;%RH. If it does, it's fine.</li>
+    <li><b>Mild drift:</b> air the room well and leave the sensor running for a few days. Part of the contamination outgasses by itself.</li>
+    <li><b>Heat it with its built-in heater.</b> In Sensirion's test, SHT4x sensors were exposed to saturated acetone for 20&nbsp;h, far worse than anything at home. Heating with the on-chip heater (110&nbsp;mW, 80&nbsp;min, about 110&nbsp;&deg;C) brought them fully back within specification. The heater runs for at most 1&nbsp;s per command and must stay below a 10&nbsp;% duty cycle. On the Adafruit board the thicker PCB carries heat away, so the sensor gets less hot and the treatment has to run longer. Then let it rehydrate in the salt container (12&nbsp;h at 75&nbsp;%RH, the second half of Sensirion's reconditioning procedure).</li>
+    <li><b>Oven baking</b> (Sensirion's full reconditioning: 10&nbsp;h at 100&ndash;105&nbsp;&deg;C, then 12&nbsp;h at 75&nbsp;%RH) is <b>not recommended</b> for the breakout: the STEMMA QT connectors are only rated up to 85&nbsp;&deg;C, and a kitchen oven can't hold 100&nbsp;&deg;C accurately.</li>
+    <li><b>Last resort:</b> correct a known, stable offset in software, or replace the board. It plugs in with the STEMMA cable, with no soldering.</li>
+  </ol>
+
+  <p><b>Touching</b> is fine if you hold the boards by their edges after touching something metal. A finger on the SHT45 shows up as a temperature and humidity rise that disappears within a minute. Don't put fingers on the sensor openings, because skin oil stays there.</p>
+
+  <h3>Sensor placement</h3>
+  <ul>
+    <li>In the room where you spend the most time (bedroom or office), at about <b>desk to head height (0.8&ndash;1.5&nbsp;m)</b>.</li>
+    <li><b>About 1&nbsp;m away from people's faces.</b> Directly in front of you on the desk, every breath reaches the sensor and the CO<sub>2</sub> value jumps around.</li>
+    <li>Not near windows, doors, air vents, radiators, the stove, a humidifier, or in direct sunlight.</li>
+    <li>Free air on all sides: not in a drawer, a closed shelf or behind the monitor.</li>
+    <li>The SHT45 beside or below the ESP32, never above it (hot air rises), and at least 5&ndash;10&nbsp;cm from the ESP32, the SCD-41 and the monitor.</li>
+    <li>Air the room now and then: the SCD-41's self-calibration needs fresh-air levels at least once a week (section 8).</li>
+  </ul>
+
+  <h3>Joy-it 0.96" OLED (SBC-OLED01)</h3>
+  <ul>
+    <li>128&times;64 monochrome OLED, <b>SSD1306</b> controller, I&sup2;C. Address <b>0x3C</b> as delivered; <b>0x3D</b> after moving the resistor on the back.</li>
+    <li>3.3&ndash;5&nbsp;V supply, 3.3&nbsp;V logic. Pin order on this module: <b>GND, VCC, SCL, SDA</b> from left to right, header at the top edge. With the pins pointing out of the back, it lies flat when plugged into the breadboard.</li>
+    <li>OLEDs <b>burn in</b> like OLED TVs and phones, but without their protection features: pixels that are lit for thousands of hours age faster and leave a faint ghost image. The fixed parts of the layout (the "CO2 ppm" label, the line, the &deg;C sign) would show first. The 30&nbsp;s timeout keeps the total on-time to minutes per day. If the display is ever kept on permanently, lower <code>OLED_BRIGHTNESS</code>, shift the image by a pixel every few minutes, or switch it off at night.</li>
+    <li><b>Brightness:</b> the SSD1306 contrast setting (command 0x81, 0&ndash;255) changes brightness only roughly 2&times; between 0 and 255. Darker than that needs extra settings (pre-charge period and V<sub>COMH</sub> level).</li>
+    <li>"Display off" (SSD1306 command 0xAE) turns the panel off and keeps its content; the controller then draws only a few &micro;A.</li>
+  </ul>
+
+  <h3>Push button (4 legs)</h3>
+  <ul>
+    <li>The four legs form two internally connected pairs; pressing the button joins the pairs. Using two <b>diagonally opposite</b> legs always works.</li>
+    <li>No resistor is needed: the code enables the ESP32's internal pull-up (<code>INPUT_PULLUP</code>). Released = HIGH, pressed = LOW. The code debounces it (30&nbsp;ms).</li>
+  </ul>
+
+  <h3>STEMMA QT cables</h3>
+  <ul>
+    <li>4-pin JST SH, 1.0&nbsp;mm pitch, same as SparkFun Qwiic. Colours: <b>black = GND, red = V+, blue = SDA, yellow = SCL</b>.</li>
+    <li>Each Adafruit board has two connectors, so modules can be chained. The connectors are small; pull them out by the plug, not the wires.</li>
+  </ul>
+
+  <h3>400-point breadboard</h3>
+  <ul>
+    <li>30 rows &times; 2 &times; 5 holes plus 4 power rails. Holes a&ndash;e of a row are connected, f&ndash;j are connected, not across the gap.</li>
+    <li>Some breadboards have rails that are split in the middle. Check with a multimeter, or bridge the halves if yours is like that.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ 10 -->
+<section id="troubleshooting">
+  <h2><span class="n">10</span>Troubleshooting</h2>
+  <table>
+    <tr><th style="width:34%">Symptom</th><th>Cause / fix</th></tr>
+    <tr><td>No COM port appears</td><td>Charge-only cable &rarr; use a data cable. Missing driver for the "UART" port &rarr; see the next row. Try the other USB-C port.</td></tr>
+    <tr><td>"CP2102N USB to UART Bridge Controller" under <i>Other devices</i>, Code&nbsp;28</td><td>The CP210x driver isn't installed &rarr; install the Silicon Labs CP210x Universal Windows Driver (5.5). Or use the "USB" port with <i>USB CDC On Boot = Enabled</i>, which needs no driver.</td></tr>
+    <tr><td>Upload: "Failed to connect to ESP32-C6"</td><td>Hold BOOT, tap RESET, release BOOT, upload again. Select the right port. Try Upload Speed 115200. Check that the J5 jumper is fitted.</td></tr>
+    <tr><td>Serial Monitor shows nothing</td><td>Baud must be 115200. "USB CDC On Boot" must match the port (UART port &rarr; Disabled, USB port &rarr; Enabled). Press RESET.</td></tr>
+    <tr><td>Serial Monitor shows garbage</td><td>Wrong baud rate.</td></tr>
+    <tr><td>Scanner finds no devices</td><td>SDA/SCL swapped (GPIO23 = SDA, GPIO22 = SCL). No 3.3&nbsp;V or GND on the bus rows (wires 1 and 2). OLED or STEMMA pins in the wrong rows.</td></tr>
+    <tr><td>Display found but stays dark</td><td>It timed out &rarr; press the button. Check <code>OLED_ADDRESS</code> (0x3C vs 0x3D, see scanner output).</td></tr>
+    <tr><td>Display text is upside down</td><td>Change <code>OLED_ROTATION</code> in the sketch (2 &harr; 0).</td></tr>
+    <tr><td>Display shows noise or a picture shifted by 2 pixels</td><td>The module has an SH1106 controller, not an SSD1306 (common on 1.3" modules). Switch the code to the <i>Adafruit SH110X</i> library.</td></tr>
+    <tr><td>Button does nothing</td><td>Button not across the gap, or both wires on the same internal leg pair &rarr; use diagonal legs f25 / e27. Check wire 5 (j8 = next to GPIO2).</td></tr>
+    <tr><td>"warming up&hellip;" never goes away</td><td>SCD-41 is not delivering values; check Serial for "SCD-41 not found" and the STEMMA cable.</td></tr>
+    <tr><td>CO<sub>2</sub> fluctuates by 10&ndash;30&nbsp;ppm</td><td>Normal. People nearby, drafts and doors cause real changes too.</td></tr>
+    <tr><td>Temperature reads 1&ndash;3&nbsp;&deg;C too high</td><td>SHT45 too close to the ESP32, SCD-41, display, or in sunlight. Move it away.</td></tr>
+    <tr><td>Outdoor CO<sub>2</sub> clearly not ~420&nbsp;ppm</td><td>Let ASC work for a week with regular airing, or run the FRC tool outdoors.</td></tr>
+    <tr><td>Board doesn't start after adding hardware</td><td>Something is connected to a strapping pin (GPIO4/5/8/9/15). Move it to a free GPIO.</td></tr>
+    <tr><td>Compile error about <code>SensirionI2cScd4x</code></td><td>Old SCD4x library (0.x) installed &rarr; update to 1.x in the Library Manager.</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ 11 -->
+<section id="case">
+  <h2><span class="n">11</span>Case (design v3)</h2>
+  <div class="box ok"><span class="label">Approved design, 25 Oct 2026.</span> The drawings use datasheet sizes and the Berrybase breadboard (83 &times; 55&nbsp;mm). The printable model follows once the measurements at the end of this section are in.</div>
+
+  <h3>The design</h3>
+  <ul>
+    <li><b>Side by side, about 105 &times; 86 &times; 43&nbsp;mm</b> including feet. The breadboard goes in unchanged; the USB cable leaves at the back (row-1 end).</li>
+    <li><b>Sensor chamber along the column-a side</b>, behind a <b>double wall with an air gap</b>. The ESP32's warmth rises out through the lid instead of reaching the sensors. BMP390, SCD-41 and SHT45 stand upright, sensors facing the side vents. The SHT45 is at the front and low: the point farthest from the ESP32 module, and more than 10&nbsp;mm from the SCD-41, which warms itself slightly. Nothing can touch the SCD-41's membrane, and dust can't settle on it.</li>
+    <li><b>Vents:</b> the sensor chamber breathes through its outer side wall, its part of the front face and the floor (the case stands on feet). There are no vents in the top over the sensors, so no dust falls in. The electronics take cooling air in through the column-j side wall and let warm air out through lid vents directly above the ESP32 module. No fan.</li>
+    <li><b>Front face:</b> OLED behind a window. The light sensor (right-angle VEML7700) lies under the display behind a small window and measures the light falling on the display face. The RGB LED sits above the panel button, on the far side from the light sensor so it can't fool it.</li>
+    <li><b>Speaker</b> under the lid at the back with a grille in the lid: as far from the SCD-41 as possible, in a spot without wires. A <b>spare place</b> at the front takes one more STEMMA QT board later, for example an air-quality sensor.</li>
+  </ul>
+
+  <figure>
+    <svg id="case-iso" viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, isometric view"></svg>
+    <figcaption>Figure 5 &ndash; Closed case seen from the front and the sensor-chamber side. (1) OLED window; (2) light-sensor window; (3) RGB LED; (4) panel button; (5) side vents and (6) front vents of the sensor chamber; (7) lid vents above the ESP32 module; (8) speaker grille; (9) lid screws, 4 &times; M3; (10) feet, with floor vents under the chamber between them; (11) back with the USB-C ports (Figure 8).</figcaption>
+  </figure>
+
+  <figure>
+    <svg id="case-top" viewBox="0 0 760 525" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, top view with the lid removed"></svg>
+    <figcaption>Figure 6 &ndash; Top view, lid removed, same orientation as Figure 3 (back with USB on the left, front on the right). (1) breadboard, unchanged; (2) ESP32 with both USB-C cut-outs; (3) speaker, hanging under the lid; (4) lid vents above the module (dashed red); (5) OLED behind the front window; (6) light sensor lying under the OLED; (7) spare place; (8) panel button; (9) sealed cable slot in the double wall; (10) SHT45, (11) SCD-41 and (12) BMP390 standing upright, sensors facing the outer wall; (13) side and floor vents of the chamber; (14) lid screw bosses; (15) intake vents for the electronics.</figcaption>
+  </figure>
+
+  <figure>
+    <svg id="case-front" viewBox="0 0 680 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, front face and cross-section"></svg>
+    <figcaption>Figure 7 &ndash; Top: front face. Bottom: cut across the case through the SCD-41 and the ESP32, seen from the front. Blue: fresh and cooling air. Red: warm air from the ESP32 leaves through the lid, while the double wall keeps it out of the sensor chamber.</figcaption>
+  </figure>
+
+  <div class="two-col">
+    <div>
+      <h3 style="margin-top:0">Printed parts</h3>
+      <table>
+        <tr><th class="c">#</th><th>Part</th><th>Printed</th></tr>
+        <tr><td class="c">1</td><td><b>Base:</b> floor, walls, double wall, breadboard pocket, sensor slots, OLED bracket, light-sensor holder, screw bosses, vents, USB cut-outs, feet</td><td>upright</td></tr>
+        <tr><td class="c">2</td><td><b>Lid</b> with vents, speaker grille and speaker holder</td><td>upside down</td></tr>
+        <tr><td class="c">3</td><td><b>3 sensor clips</b> that hold the upright boards at the top</td><td>flat</td></tr>
+      </table>
+      <p class="muted">All parts print without supports.</p>
+    </div>
+    <figure style="margin-top:4px">
+      <svg id="case-back" viewBox="0 0 380 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, back view"></svg>
+      <figcaption>Figure 8 &ndash; Back, seen from outside. Both USB-C ports get a cut-out big enough for the plug's moulding; normally you use the "UART" one.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Parts to buy for the case</h3>
+  <table>
+    <tr><th>Part</th><th>For</th><th>Notes</th></tr>
+    <tr><td>Adafruit <b>STEMMA Speaker</b> (3885)</td><td>alarm beeps</td><td>37 &times; 30.5 &times; 7.2&nbsp;mm, class-D amplifier, 3&ndash;5&nbsp;V, 3-pin JST PH input</td></tr>
+    <tr><td>Adafruit <b>BMP390</b> (4816, also sold as BMP390L)</td><td>air pressure; feeds the SCD-41's pressure compensation</td><td>STEMMA QT, I&sup2;C 0x77</td></tr>
+    <tr><td>Adafruit <b>VEML7700 right angle</b> (5378)</td><td>ambient light; dims display and LED at night</td><td>STEMMA QT, I&sup2;C 0x10, sees light along the board</td></tr>
+    <tr><td>Panel push button, Berrybase 10131</td><td>replaces the breadboard button</td><td>M7 &times; 0.75 thread, 27.5&nbsp;mm long</td></tr>
+    <tr><td>5&nbsp;mm LED holder, 3 &times; 220&nbsp;&Omega; resistors</td><td>your 4-leg RGB LED in the front wall</td><td>find out first whether the LED is common anode or common cathode</td></tr>
+    <tr><td>4 female&ndash;male jumper wires</td><td>OLED to rows 27&ndash;30</td><td>&ndash;</td></tr>
+    <tr><td>JST PH 3-pin to male-pin cable</td><td>speaker to the breadboard</td><td>&ndash;</td></tr>
+    <tr><td>2 STEMMA QT cables, 50&ndash;100&nbsp;mm</td><td>BMP390 and VEML7700</td><td>&ndash;</td></tr>
+    <tr><td>4 &times; M3 &times; 10 screws</td><td>lid</td><td>self-tapping into the base</td></tr>
+    <tr><td>Filter fleece (optional)</td><td>behind the chamber vents</td><td>keeps dust and splashes out, lets gases through</td></tr>
+  </table>
+
+  <h3>Planned pins</h3>
+  <table>
+    <tr><th>Signal</th><th>GPIO</th><th>Breadboard</th><th>Note</th></tr>
+    <tr><td>Panel button</td><td>GPIO2</td><td>row 25 (as now)</td><td>replaces the breadboard button; other contact to GND</td></tr>
+    <tr><td>RGB LED red / green / blue</td><td>GPIO18 / 19 / 20</td><td>a10 / a11 / a12</td><td>each through a 220&nbsp;&Omega; resistor; common leg to GND or 3.3&nbsp;V depending on the LED type</td></tr>
+    <tr><td>Speaker signal</td><td>GPIO21</td><td>a13</td><td>PWM tones. Power 3.3&nbsp;V, or 5&nbsp;V from the 5V pin (free hole j6) for more volume; the 5&nbsp;V goes to the speaker only.</td></tr>
+    <tr><td>OLED, BMP390, VEML7700</td><td>I&sup2;C (23 / 22)</td><td>rows 27&ndash;30 / STEMMA chain</td><td>new addresses 0x77 and 0x10 don't clash with 0x3C, 0x44, 0x62</td></tr>
+  </table>
+  <p class="muted">GPIO18&ndash;21 are free, not strapping pins, and have free holes next to them in column a.</p>
+
+  <h3>Design rules behind it</h3>
+  <ul>
+    <li>Sensirion's design-in rules: sensors close to large openings with little dead air around them, decoupled from heat sources (the ESP32 module and its voltage regulator, both in the middle of the board), the temperature sensor low because warm air rises.</li>
+    <li>The SHT45 sits at least 10&nbsp;mm from the SCD-41 and never above it.</li>
+    <li>The speaker is far from the SCD-41, which measures acoustically and doesn't like vibration.</li>
+    <li>Walls, floor and lid 2&nbsp;mm; double wall 2 &times; 1.2&nbsp;mm with a 1.6&nbsp;mm air gap; vent slots 2&ndash;3&nbsp;mm wide (air gets in, fingers don't).</li>
+  </ul>
+
+  <h3>Needed for the printable model</h3>
+  <ol>
+    <li><b>Breadboard:</b> height including the adhesive layer, and how far the side latches stick out.</li>
+    <li><b>Tallest wire or cable:</b> press the jumper wires and cable pins down as flat as they go, then measure the highest point above the breadboard surface.</li>
+    <li><b>Panel button:</b> usable thread length, and the nut and washer you got with it.</li>
+    <li><b>OLED:</b> where the lit area is, the mounting holes (diameter and spacing) and how far the header pins stick out. A photo from straight above with a ruler next to it is enough.</li>
+    <li><b>LED holder:</b> which one, and the hole size it needs.</li>
+    <li><b>STEMMA QT cables</b> you have and their lengths.</li>
+    <li><b>3D printer:</b> bed size, material (PLA or PETG) and nozzle size.</li>
+    <li><b>Screws:</b> M3 available? Otherwise the lid gets snap hooks.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ 12 -->
+<section id="changelog">
+  <h2><span class="n">12</span>Change log</h2>
+  <table>
+    <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.7</td><td>25 Oct 2026</td><td>Section 11 now shows the approved case design v3: side by side, sensor chamber along the column-a side behind a double wall, display, light sensor, RGB LED and panel button on the front, speaker under the lid. New drawings, parts list, planned pins (RGB LED GPIO18&ndash;20, speaker GPIO21) and the measurements needed for the printable model.</td></tr>
+    <tr><td>0.6</td><td>25 Oct 2026</td><td>New section 11: concept for a 3D-printed case (flat box, display deck over the OLED, vented sensor chamber behind an inner wall), with four drawings, a parts list and the measurements needed for the printable files.</td></tr>
+    <tr><td>0.5</td><td>25 Oct 2026</td><td>New setting <code>OLED_BRIGHTNESS</code> (display brightness 0&ndash;255, default 207). RGB LED default brightness lowered to 5. More about OLED burn-in in section 9.</td></tr>
+    <tr><td>0.4.1</td><td>25 Oct 2026</td><td>Added sensor handling (what can harm the sensors, magnets, touching), placement advice, and how to check and restore a contaminated SHT45 (salt test, heater decontamination) to section 9. Expanded the SCD-41 handling note (membrane, mechanical force, ESD).</td></tr>
+    <tr><td>0.4</td><td>25 Oct 2026</td><td>The on-board RGB LED (GPIO8) now shows the CO<sub>2</sub> level, dimmed (<code>LED_BRIGHTNESS</code> = 10). Its colour changes smoothly from green (below 800&nbsp;ppm) through yellow (1000) to red (2000 and above). It also turns off a colour left over from the BlinkRGB test at start-up.</td></tr>
+    <tr><td>0.3.1</td><td>25 Oct 2026</td><td>The "UART" USB port's CP2102N chip needed the Silicon Labs CP210x driver on this PC (Device Manager Code&nbsp;28). Added the install steps (5.5) and a troubleshooting row. Clarified that the J5 jumper must stay fitted.</td></tr>
+    <tr><td>0.3</td><td>25 Oct 2026</td><td>Bus rows reordered to match the OLED's pins (row 27 GND, 28 3.3&nbsp;V, 29 SCL, 30 SDA). OLED now lies flat in a27&ndash;a30, readable with the pins at the top; <code>OLED_ROTATION</code> back to 0. ESP32 wired straight to the bus rows (5 wires, power rails no longer used); button moved to rows 25&ndash;27 with its GND leg in the GND row.</td></tr>
+    <tr><td>0.2</td><td>25 Oct 2026</td><td>New breadboard layout: ESP32 in rows 4&ndash;19 with the USB ports flush with the board edge, bus moved to rows 27&ndash;30, button to rows 24&ndash;26. New <code>OLED_ROTATION</code> setting. Added SCD-41 vs SCD-30 comparison and notes on the SCD-41's internal T/RH.</td></tr>
+    <tr><td>0.1</td><td>25 Oct 2026</td><td>Initial setup: ESP32-C6 + SHT45 + SCD-41 + OLED on breadboard; button wakes display for 30&nbsp;s; I&sup2;C scanner; optional FRC calibration tool; this documentation.</td></tr>
+  </table>
+</section>
+
+</main>
+
+<script>
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    parent.appendChild(e);
+    return e;
+  }
+
+  // ---------- Figure 2: pin diagram ----------
+  (function () {
+    const svg = document.getElementById('pinout-svg');
+    const rows = document.getElementById('pin-rows');
+    const legend = document.getElementById('pin-legend');
+    const STYLE = {
+      used:     { fill: '#1a7f37', text: '#fff',    label: 'Used in this project' },
+      power:    { fill: '#c62828', text: '#fff',    label: 'Power (3V3 / 5V)' },
+      gnd:      { fill: '#24292f', text: '#fff',    label: 'Ground' },
+      strap:    { fill: '#e9b730', text: '#1f2328', label: 'Strapping pin – avoid' },
+      reserved: { fill: '#6f42c1', text: '#fff',    label: 'Reserved: USB / Serial' },
+      free:     { fill: '#fff',    text: '#1f2328', label: 'Free GPIO', stroke: '#8c959f' },
+      ctrl:     { fill: '#8c959f', text: '#fff' },
+      nc:       { fill: '#eaeef2', text: '#8c959f' }
+    };
+    // [name, type, note, usedHere]
+    const J1 = [
+      ['3V3', 'power', '→ bus row 28 (3.3 V out)', true],
+      ['RST', 'ctrl', 'reset (EN)'],
+      ['GPIO4', 'strap', 'strapping · ADC1_CH4 · LP'],
+      ['GPIO5', 'strap', 'strapping · ADC1_CH5 · LP'],
+      ['GPIO6', 'free', 'ADC1_CH6 · LP I²C SDA'],
+      ['GPIO7', 'free', 'LP I²C SCL · LP'],
+      ['GPIO0', 'free', 'ADC1_CH0 · 32k XTAL · LP'],
+      ['GPIO1', 'free', 'ADC1_CH1 · 32k XTAL · LP'],
+      ['GPIO8', 'strap', 'strapping · RGB LED = CO2 colour'],
+      ['GPIO10', 'free', ''],
+      ['GPIO11', 'free', ''],
+      ['GPIO2', 'used', '→ BUTTON · ADC1_CH2 · LP', true],
+      ['GPIO3', 'free', 'ADC1_CH3 · LP'],
+      ['5V', 'power', '5 V from USB – not used'],
+      ['GND', 'gnd', ''],
+      ['NC', 'nc', 'not connected']
+    ];
+    const J3 = [
+      ['GND', 'gnd', '→ bus row 27 (ground)', true],
+      ['GPIO16', 'reserved', 'TX · Serial (UART0)'],
+      ['GPIO17', 'reserved', 'RX · Serial (UART0)'],
+      ['GPIO15', 'strap', 'strapping'],
+      ['GPIO23', 'used', '→ I²C SDA', true],
+      ['GPIO22', 'used', '→ I²C SCL', true],
+      ['GPIO21', 'free', 'SPI SCK (default)'],
+      ['GPIO20', 'free', 'SPI MISO (default)'],
+      ['GPIO19', 'free', 'SPI MOSI (default)'],
+      ['GPIO18', 'free', 'SPI SS (default)'],
+      ['GPIO9', 'strap', 'strapping · BOOT button'],
+      ['GND', 'gnd', ''],
+      ['GPIO13', 'reserved', 'USB D+'],
+      ['GPIO12', 'reserved', 'USB D−'],
+      ['GND', 'gnd', ''],
+      ['NC', 'nc', 'not connected']
+    ];
+    const Y = n => 112 + (n - 1) * 32;
+
+    function side(pins, headerX, dir) {
+      pins.forEach(([name, type, note, used], i) => {
+        const n = i + 1, y = Y(n), s = STYLE[type];
+        el('rect', { x: headerX - 5, y: y - 5, width: 10, height: 10, fill: '#d4a72c', stroke: '#7d5a00' }, rows);
+        el('text', { x: headerX + dir * 21, y: y + 3.5, 'font-size': 9.5, fill: '#8c959f', 'text-anchor': dir < 0 ? 'end' : 'start' }, rows, n);
+        const pillX = dir < 0 ? 196 : 492;
+        const pill = el('rect', { x: pillX, y: y - 9, width: 72, height: 18, rx: 9, fill: s.fill }, rows);
+        if (s.stroke) pill.setAttribute('stroke', s.stroke);
+        if (used && type !== 'used') { pill.setAttribute('stroke', '#1a7f37'); pill.setAttribute('stroke-width', 3); }
+        el('text', { x: pillX + 36, y: y + 4, 'font-size': 11, 'font-weight': 700, fill: s.text, 'text-anchor': 'middle' }, rows, name);
+        if (note) {
+          el('text', {
+            x: dir < 0 ? 188 : 572, y: y + 4, 'font-size': 10.5, 'text-anchor': dir < 0 ? 'end' : 'start',
+            fill: used ? '#1a7f37' : '#57606a', 'font-weight': used ? 700 : 400
+          }, rows, note);
+        }
+      });
+    }
+    side(J1, 305, -1);
+    side(J3, 455, 1);
+
+    ['used', 'power', 'gnd', 'strap', 'reserved', 'free'].forEach((key, i) => {
+      const s = STYLE[key], x = i < 3 ? 20 : 560, y = 14 + (i % 3) * 22;
+      const r = el('rect', { x, y, width: 16, height: 14, rx: 4, fill: s.fill }, legend);
+      if (s.stroke) r.setAttribute('stroke', s.stroke);
+      el('text', { x: x + 22, y: y + 11, 'font-size': 10.5, fill: '#1f2328' }, legend, s.label);
+    });
+  })();
+
+  // ---------- Figure 3: breadboard holes, ESP32 pins, wire ends ----------
+  (function () {
+    const holes = document.getElementById('bb-holes');
+    const X = r => 70 + (r - 1) * 20;
+    const COLS = { j: 190, i: 210, h: 230, g: 250, f: 270, e: 330, d: 350, c: 370, b: 390, a: 410 };
+    for (let r = 1; r <= 30; r++) {
+      for (const c in COLS) el('rect', { x: X(r) - 3, y: COLS[c] - 3, width: 6, height: 6, rx: 1, fill: '#a39b88' }, holes);
+    }
+    const railRows = [];
+    for (const start of [2, 8, 14, 20, 26]) for (let k = 0; k < 5; k++) railRows.push(start + k);
+    // the power rails are not used in this layout
+    for (const y of [140, 160, 440, 460]) {
+      for (const r of railRows) el('rect', { x: X(r) - 3, y: y - 3, width: 6, height: 6, rx: 1, fill: '#a39b88', opacity: 0.45 }, holes);
+    }
+    // column letters on the right (b and a are hidden there by the OLED, a is shown on the left)
+    for (const c of ['j', 'i', 'h', 'g', 'f', 'e', 'd', 'c']) el('text', { x: 668, y: COLS[c] + 3.5, 'font-size': 9, fill: '#8c7f63', 'text-anchor': 'middle' }, holes, c);
+    el('text', { x: 52, y: COLS.a + 3.5, 'font-size': 9, fill: '#8c7f63', 'text-anchor': 'middle' }, holes, 'a');
+    for (const r of [1, 5, 10, 15, 20, 30]) el('text', { x: X(r), y: 181, 'font-size': 8.5, fill: '#8c7f63', 'text-anchor': 'middle' }, holes, r);
+
+    const pins = document.getElementById('bb-esp-pins');
+    for (let r = 4; r <= 19; r++) {
+      for (const y of [210, 390]) el('rect', { x: X(r) - 4, y: y - 4, width: 8, height: 8, fill: '#d4a72c', stroke: '#7d5a00', 'stroke-width': 0.8 }, pins);
+    }
+
+    const ends = document.getElementById('wire-ends');
+    const dots = [
+      [430, 410, '#24292f'], [590, 370, '#24292f'], [430, 190, '#d32f2f'], [610, 370, '#d32f2f'],
+      [330, 410, '#e2b100'], [630, 370, '#e2b100'], [350, 410, '#1e63d6'], [650, 370, '#1e63d6'],
+      [210, 190, '#2e9d4a'], [550, 190, '#2e9d4a'],
+      [590, 350, '#24292f'], [610, 350, '#d32f2f'], [630, 350, '#e2b100'], [650, 350, '#1e63d6']
+    ];
+    for (const [cx, cy, color] of dots) el('circle', { cx, cy, r: 4, fill: color, stroke: '#fff', 'stroke-width': 1.2 }, ends);
+  })();
+</script>
+
+<script>
+  // Case drawings (section 11, design v3). One set of sizes in mm feeds all four views.
+  // x along the breadboard (0 = inside of the back wall at the USB end), y across (+ = column j side,
+  // - = column a side with the sensor chamber), z up (0 = underside of the floor).
+  (() => {
+    const SVGNS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs, parent, text) => {
+      const e = document.createElementNS(SVGNS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (text !== undefined) e.textContent = text;
+      parent.appendChild(e);
+      return e;
+    };
+    const P = {
+      x0: -2, x1: 103, y0: -54, y1: 32, h: 40, lidZ: 38, bbTop: 10.5,
+      bay: [0, -30, 101, 30], chamber: [0, -52, 101, -34], airGap: [-32.8, -31.2],
+      bb: [0, -27.5, 83, 27.5],
+      pcb: [0.2, -12.7, 52, 12.7], module: [32.8, -9, 58.3, 9],
+      usb: [[7.2, 'UART'], [-7.2, 'USB']], usbZ: 16.2,
+      oled: [87, -26.75, 101, 0.75],
+      oledWin: [-25.5, 16.5, -0.5, 30.5],        // y0, z0, y1, z1 on the front face
+      veml: [83.3, -26.5, 101, -1], vemlWin: [-16, 4, -11, 6.5],
+      spare: [83.3, 1, 101, 22],
+      button: [14, 16], led: [14, 30],           // y, z on the front face
+      speaker: [2, -27, 32.5, 10],
+      lidVents: [36, -12, 62, 12], lidVentX: [37, 41.5, 46, 50.5, 55, 59.5],
+      cableSlot: [85, 89],
+      // name, x0, x1, z0, z1 - upright boards, sensors facing the outer wall
+      sensors: [['BMP390', 6, 31.5, 4, 21.7], ['SCD-41', 34, 59.5, 4, 26.8], ['SHT45', 70, 95.5, 3, 20.7]],
+      bosses: [[2.5, -49.5], [98.5, -49.5], [2.5, -32], [98.5, 28]],
+      feet: [[5, -49], [98, -49], [5, 27], [98, 27]],
+      ventsZ: [6, 11, 16, 21, 26, 31],
+      ventsSideX: Array.from({ length: 16 }, (_, i) => 4 + 6 * i)
+    };
+    const C = { top: '#eef1f4', side: '#cfd7df', front: '#b9c4cf', slot: '#57606a', line: '#57606a', wall: '#c9d3dd', light: '#f6f8fa', blue: '#0969da' };
+    const callout = (svg, n, ax, ay, lx, ly) => {
+      mk('line', { x1: ax, y1: ay, x2: lx, y2: ly, stroke: '#1f2328', 'stroke-width': 0.8 }, svg);
+      mk('circle', { cx: ax, cy: ay, r: 1.8, fill: '#1f2328' }, svg);
+      mk('circle', { cx: lx, cy: ly, r: 9, fill: C.blue, stroke: '#fff', 'stroke-width': 1.5 }, svg);
+      mk('text', { x: lx, y: ly + 3.6, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: '#fff' }, svg, n);
+    };
+    const dimH = (svg, xa, xb, y, t) => {
+      mk('line', { x1: xa, y1: y, x2: xb, y2: y, stroke: C.line, 'stroke-width': 0.8 }, svg);
+      for (const x of [xa, xb]) mk('line', { x1: x, y1: y - 4, x2: x, y2: y + 4, stroke: C.line, 'stroke-width': 0.8 }, svg);
+      mk('text', { x: (xa + xb) / 2, y: y - 4, 'text-anchor': 'middle', 'font-size': 9, fill: C.line }, svg, t);
+    };
+    const dimV = (svg, x, ya, yb, t) => {
+      mk('line', { x1: x, y1: ya, x2: x, y2: yb, stroke: C.line, 'stroke-width': 0.8 }, svg);
+      for (const y of [ya, yb]) mk('line', { x1: x - 4, y1: y, x2: x + 4, y2: y, stroke: C.line, 'stroke-width': 0.8 }, svg);
+      const cy = (ya + yb) / 2;
+      mk('text', { x: x - 5, y: cy, 'text-anchor': 'middle', 'font-size': 9, fill: C.line, transform: `rotate(-90 ${x - 5} ${cy})` }, svg, t);
+    };
+    const arrowDefs = (svg, prefix) => {
+      const defs = mk('defs', {}, svg);
+      for (const [id, col] of [[prefix + '-b', C.blue], [prefix + '-r', '#cf222e']]) {
+        const m = mk('marker', { id, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+        mk('path', { d: 'M0,0 L10,5 L0,10 z', fill: col }, m);
+      }
+      return defs;
+    };
+    // solid wall segments between vent gaps (each gap is z .. z + 2)
+    const solids = (from, to, gaps) => {
+      const out = [];
+      let z = from;
+      for (const g of gaps) { out.push([z, g]); z = g + 2; }
+      out.push([z, to]);
+      return out;
+    };
+
+    // ---- Figure 5: isometric view of the closed case, seen from the front and the chamber side
+    {
+      const svg = document.getElementById('case-iso');
+      const k = 3.6, c30 = Math.cos(Math.PI / 6), OX = 234.6, OY = 225.2;
+      const pt = (x, y, z) => [OX + (x + y) * c30 * k, OY + ((x - y) / 2 - z) * k];
+      const face = (pts, attrs) => mk('path', Object.assign({
+        d: 'M' + pts.map(p => pt(...p).map(v => v.toFixed(1)).join(',')).join('L') + 'Z',
+        stroke: C.line, 'stroke-width': 0.9, 'stroke-linejoin': 'round'
+      }, attrs), svg);
+      const onZ = (x0, y0, x1, y1, z, a) => face([[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], a);
+      const onX = (x, y0, z0, y1, z1, a) => face([[x, y0, z0], [x, y1, z0], [x, y1, z1], [x, y0, z1]], a);
+      const onY = (y, x0, z0, x1, z1, a) => face([[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]], a);
+      const ring = (f, r) => Array.from({ length: 32 }, (_, i) => f(r * Math.cos(i * Math.PI / 16), r * Math.sin(i * Math.PI / 16)));
+      const discZ = (cx, cy, r, z, a) => face(ring((u, v) => [cx + u, cy + v, z], r), a);
+      const discX = (x, cy, cz, r, a) => face(ring((u, v) => [x, cy + u, cz + v], r), a);
+      const seam = (p, q) => {
+        const a = pt(...p), b = pt(...q);
+        mk('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: C.line, 'stroke-width': 0.7, 'stroke-dasharray': '3 2' }, svg);
+      };
+      const { x0, x1, y0, y1, h } = P, slot = { fill: C.slot, stroke: 'none' };
+
+      for (const [cx, cy] of [[5, -49], [98, -49], [98, 27]]) {   // feet; the fourth one is hidden
+        onY(cy - 4, cx - 4, -3, cx + 4, 0, { fill: '#8c959f' });
+        onX(cx + 4, cy - 4, -3, cy + 4, 0, { fill: '#6e7781' });
+      }
+      onZ(x0, y1, x1, y0, h, { fill: C.top });
+      onY(y0, x0, 0, x1, h, { fill: C.side });
+      onX(x1, y0, 0, y1, h, { fill: C.front });
+      seam([x0, y0, P.lidZ], [x1, y0, P.lidZ]);
+      seam([x1, y0, P.lidZ], [x1, y1, P.lidZ]);
+
+      for (const x of P.lidVentX) onZ(x, P.lidVents[1], x + 2, P.lidVents[3], h, slot);
+      for (let gx = 6; gx <= 28; gx += 4) for (let gy = -22; gy <= 6; gy += 4) discZ(gx, gy, 0.9, h, slot);   // speaker grille
+      for (const [sx, sy] of P.bosses) discZ(sx, sy, 2.6, h, { fill: '#8c959f' });
+      for (const x of P.ventsSideX) for (const z of P.ventsZ) onY(y0, x, z, x + 3, z + 2, slot);
+      for (const z of P.ventsZ) onX(x1, -51, z, -35, z + 2, slot);
+
+      const [wy0, wz0, wy1, wz1] = P.oledWin;
+      onX(x1, wy0, wz0, wy1, wz1, { fill: '#0b0f14', stroke: '#30363d' });
+      onX(x1, -22, 25.5, -4, 27.5, { fill: '#9fe7ff', stroke: 'none' });    // hint of the screen content
+      onX(x1, -19, 19.5, -8, 23.5, { fill: '#9fe7ff', stroke: 'none', opacity: 0.8 });
+      const [vy0, vz0, vy1, vz1] = P.vemlWin;
+      onX(x1, vy0, vz0, vy1, vz1, { fill: '#1d3557' });
+      const [ly, lz] = P.led, [by, bz] = P.button;
+      discX(x1, ly, lz, 4, { fill: '#d0d7de' });
+      discX(x1, ly, lz, 2.5, { fill: '#3fb950', stroke: '#1a7f37' });
+      discX(x1, by, bz, 5.05, { fill: '#6e7781' });
+      for (const x of [104, 105.5, 107, 108.5]) discX(x, by, bz, 3.25, { fill: '#8c959f' });
+
+      const c = (n, p, bxs, bys) => callout(svg, n, ...pt(...p), bxs, bys);
+      c(1, [x1, -13, 23.5], 600, 470);
+      c(2, [x1, -13.5, 5.25], 540, 512);
+      c(3, [x1, ly, lz], 700, 232);
+      c(4, [108.5, by, bz], 705, 330);
+      c(5, [50, y0, 20], 150, 432);
+      c(6, [x1, -43, 20], 425, 535);
+      c(7, [49, 0, h], 460, 60);
+      c(8, [17, -8, h], 150, 60);
+      c(9, [...P.bosses[3], h], 712, 165);
+      c(10, [98, -49, -3], 330, 540);
+      c(11, [x0, 0, h], 245, 30);
+    }
+
+    // ---- Figure 6: top view with the lid removed (same orientation as Figure 3)
+    {
+      const svg = document.getElementById('case-top');
+      const s = 5, X = x => 60 + (x + 2) * s, Y = y => 30 + (32 - y) * s;
+      const R = (x0, y0, x1, y1, a) => mk('rect', Object.assign({ x: X(Math.min(x0, x1)), y: Y(Math.max(y0, y1)), width: Math.abs(x1 - x0) * s, height: Math.abs(y1 - y0) * s }, a), svg);
+      const T = (x, y, t, a) => mk('text', Object.assign({ x: X(x), y: Y(y), 'text-anchor': 'middle', 'font-size': 9, fill: '#1f2328' }, a), svg, t);
+      const slot = { fill: C.slot };
+
+      R(P.x0, P.y0, P.x1, P.y1, { fill: C.wall, stroke: C.line, rx: 10 });
+      R(...P.bay, { fill: C.light, stroke: C.line, 'stroke-width': 0.6 });
+      R(...P.chamber, { fill: '#eef6ee', stroke: C.line, 'stroke-width': 0.6 });
+      for (let x = 6; x <= 96; x += 6) R(x, -50, x + 2, -36, { fill: '#d3e5d3', stroke: 'none' });   // floor vents
+      R(P.chamber[0], P.airGap[0], P.chamber[2], P.airGap[1], { fill: C.light, stroke: 'none' });       // air gap in the double wall
+      R(P.cableSlot[0], -34, P.cableSlot[1], -30, { fill: C.light, stroke: 'none' });
+
+      const [bx0, by0, bx1, by1] = P.bb;
+      R(bx0, by0, bx1, by1, { fill: '#f5f1e8', stroke: '#d6cdb8' });
+      R(bx0, -1.6, bx1, 1.6, { fill: '#ebe4d3', stroke: 'none' });
+      for (const [y, col] of [[24.6, '#d32f2f'], [21.4, '#1e63d6'], [-21.4, '#1e63d6'], [-24.6, '#d32f2f']])
+        mk('line', { x1: X(1.5), y1: Y(y), x2: X(81.5), y2: Y(y), stroke: col, 'stroke-width': 1, opacity: 0.35 }, svg);
+      for (const r of [1, 10, 20, 30]) T(4.67 + (r - 1) * 2.54, 25.6, r, { 'font-size': 7.5, fill: '#8c7f63' });
+
+      for (const [y] of P.usb) R(-2, y - 6.25, 0, y + 6.25, { fill: C.light, stroke: C.line, 'stroke-width': 0.6 });
+      R(...P.pcb, { fill: '#22272e', rx: 4 });
+      for (let r = 4; r <= 19; r++) for (const y of [11.43, -11.43]) {
+        const x = 4.67 + (r - 1) * 2.54;
+        R(x - 0.55, y - 0.55, x + 0.55, y + 0.55, { fill: '#d4a72c' });
+      }
+      R(...P.module, { fill: '#c9ced6', stroke: '#8c959f' });
+      T(45.5, -0.8, 'ESP32-C6', { 'font-size': 8.5, 'font-weight': 700, fill: '#30363d' });
+      for (const [y, name] of P.usb) {
+        R(-0.2, y - 4.3, 7.1, y + 4.3, { fill: '#b0b8c1', stroke: '#6e7781', rx: 3 });
+        T(11, y - 0.8, name, { 'font-size': 7.5, fill: '#c9d1d9', 'text-anchor': 'start' });
+      }
+      R(...P.speaker, { fill: 'rgba(216,90,48,.06)', stroke: '#d85a30', 'stroke-width': 1.2, 'stroke-dasharray': '5 3', rx: 3 });
+      T(17.25, -21.5, 'speaker (under the lid)', { fill: '#a33d1a', 'font-size': 8.5 });
+      R(...P.lidVents, { fill: 'none', stroke: '#cf222e', 'stroke-width': 1.2, 'stroke-dasharray': '5 3', rx: 3 });
+
+      ['#24292f', '#d32f2f', '#e2b100', '#1e63d6'].forEach((col, i) => R(69.81 + i * 2.54, -7.25, 71.61 + i * 2.54, -5.45, { fill: col }));   // SCD-41 cable pins in d27-d30
+      const cable = { fill: 'none', stroke: '#6e7781', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.85 };
+      mk('path', Object.assign({ d: `M${X(79)},${Y(-6.35)} C${X(83)},${Y(-6.35)} ${X(85)},${Y(-8)} ${X(86)},${Y(-10)}` }, cable), svg);
+
+      R(...P.spare, { fill: 'none', stroke: C.line, 'stroke-dasharray': '4 3', rx: 3 });
+      T(92.15, 3, 'spare', { fill: C.line });
+      R(...P.veml, { fill: '#1b4d5c', rx: 2 });
+      R(...P.oled, { fill: '#1d3557', rx: 3 });
+      T(94, -13.8, 'OLED', { fill: '#fff', 'font-weight': 700 });
+      R(101, P.oledWin[0], 103, P.oledWin[2], { fill: '#9fe7ff', stroke: C.line, 'stroke-width': 0.5 });
+      const [btY] = P.button;
+      R(81, btY - 4.85, 101, btY + 4.85, { fill: '#e8a37e', stroke: '#a33d1a', 'stroke-width': 0.6, rx: 2 });
+      R(103, btY - 3, 108.5, btY + 3, { fill: '#e8a37e', stroke: '#a33d1a', 'stroke-width': 0.6, rx: 2 });
+      T(91, btY - 0.8, 'button', { fill: '#5a2410', 'font-size': 8.5 });
+      mk('path', Object.assign({ d: `M${X(87)},${Y(-24)} L${X(87)},${Y(-41)}` }, cable), svg);   // through the cable slot to the SHT45
+
+      for (const [name, sx0, sx1] of P.sensors) {
+        R(sx0 - 1.5, -44.5, sx0 - 0.3, -39.5, { fill: '#8c959f' });            // holder rails
+        R(sx1 + 0.3, -44.5, sx1 + 1.5, -39.5, { fill: '#8c959f' });
+        R(sx0, -42.6, sx1, -41, { fill: '#1b1f3b' });
+        const cx = (sx0 + sx1) / 2;
+        if (name === 'SCD-41') {
+          R(cx - 5.05, -49.1, cx + 5.05, -42.6, { fill: '#c9ced6', stroke: '#8c959f' });
+          R(cx - 2, -49.1, cx + 2, -48.3, { fill: '#fff', stroke: '#8c959f', 'stroke-width': 0.4 });   // membrane
+        } else {
+          R(cx - 1.5, -44, cx + 1.5, -42.6, { fill: '#c9ced6' });
+        }
+        T(cx, -37.8, name, { 'font-weight': 700 });
+      }
+      mk('path', Object.assign({ d: `M${X(70)},${Y(-41.8)} L${X(59.5)},${Y(-41.8)}` }, cable), svg);
+      mk('path', Object.assign({ d: `M${X(34)},${Y(-41.8)} L${X(31.5)},${Y(-41.8)}` }, cable), svg);
+
+      for (const x of P.ventsSideX) R(x, -53.6, x + 3, -52.4, slot);               // outer chamber wall
+      for (const y of [-50, -45, -40]) R(101.4, y, 102.6, y + 3, slot);           // front of the chamber
+      for (let x = 10; x <= 66; x += 8) R(x, 30.4, x + 4, 31.6, slot);              // intake, column j side
+      for (const [x, y] of P.bosses) {
+        mk('circle', { cx: X(x), cy: Y(y), r: 3 * s, fill: C.wall, stroke: C.line }, svg);
+        mk('circle', { cx: X(x), cy: Y(y), r: 1.25 * s, fill: '#fff', stroke: C.line, 'stroke-width': 0.6 }, svg);
+      }
+
+      dimH(svg, X(P.x0), X(P.x1), 512, '105 mm');
+      dimV(svg, 610, Y(P.y1), Y(P.y0), '86 mm');
+      const c = (n, x, y, bxs, bys) => callout(svg, n, X(x), Y(y), bxs, bys);
+      c(1, 70, 22, 420, 13);
+      c(2, -1, -7.2, 28, 226);
+      c(3, 17, 8, 155, 13);
+      c(4, 49, 12, 300, 13);
+      c(5, 95, -13, 650, 255);
+      c(6, 85, -22, 650, 300);
+      c(7, 97.5, 6, 650, 175);
+      c(8, 106, 14, 650, 120);
+      c(9, 87, -32, 650, 350);
+      c(10, 83, -45.8, 650, 415);
+      c(11, 47, -45.8, 305, 484);
+      c(12, 19, -45.8, 165, 484);
+      c(13, 60, -53, 440, 484);
+      c(14, ...P.bosses[0], 28, 437.5);
+      c(15, 30, 31, 225, 13);
+    }
+
+    // ---- Figure 7: front face (top) and a cut across the case through the SCD-41 and the ESP32 (bottom)
+    {
+      const svg = document.getElementById('case-front');
+      const s = 3.4, X = y => 150 + (y + 54) * s, Zf = z => 60 + (40 - z) * s, Zc = z => 290 + (40 - z) * s;
+      arrowDefs(svg, 'case-fr');
+      const T = (x, y, t, a) => mk('text', Object.assign({ x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 10, fill: '#1f2328' }, a), svg, t);
+      const leader = (x1, y1, x2, y2) => mk('line', { x1, y1, x2, y2, stroke: '#8c959f', 'stroke-width': 0.8, 'stroke-dasharray': '3 2' }, svg);
+      const box = (ya, za, yb, zb, Z, a) => mk('rect', Object.assign({ x: X(Math.min(ya, yb)), y: Z(Math.max(za, zb)), width: Math.abs(yb - ya) * s, height: Math.abs(zb - za) * s }, a), svg);
+      const wall = { fill: C.wall, stroke: C.line, 'stroke-width': 0.6 };
+
+      // front face
+      T(296, 32, 'Front face', { 'font-size': 12, 'font-weight': 700 });
+      box(P.y0, 0, P.y1, P.h, Zf, { fill: C.front, stroke: C.line, rx: 4 });
+      for (const [, fy] of [P.feet[1], P.feet[3]]) box(fy - 4, -3, fy + 4, 0, Zf, { fill: '#8c959f' });
+      for (const z of P.ventsZ) box(-51, z, -35, z + 2, Zf, { fill: 'none', stroke: C.slot, 'stroke-width': 0.9, rx: 3.4 });
+      const [wy0, wz0, wy1, wz1] = P.oledWin;
+      box(wy0, wz0, wy1, wz1, Zf, { fill: '#0b0f14', stroke: '#30363d', rx: 2 });
+      T(X((wy0 + wy1) / 2), Zf((wz0 + wz1) / 2), 'OLED', { fill: '#9fe7ff', 'font-weight': 700, 'font-size': 12 });
+      const [vy0, vz0, vy1, vz1] = P.vemlWin;
+      box(vy0, vz0, vy1, vz1, Zf, { fill: '#1d3557', rx: 1 });
+      const [ly, lz] = P.led, [by, bz] = P.button;
+      mk('circle', { cx: X(ly), cy: Zf(lz), r: 4 * s, fill: '#d0d7de', stroke: C.line, 'stroke-width': 0.6 }, svg);
+      mk('circle', { cx: X(ly), cy: Zf(lz), r: 2.5 * s, fill: '#3fb950', stroke: '#1a7f37' }, svg);
+      mk('circle', { cx: X(by), cy: Zf(bz), r: 5.05 * s, fill: '#6e7781', stroke: C.line, 'stroke-width': 0.6 }, svg);
+      mk('circle', { cx: X(by), cy: Zf(bz), r: 3.25 * s, fill: '#d0d7de', stroke: C.line, 'stroke-width': 0.6 }, svg);
+      leader(X(-51) - 2, Zf(19), 146, Zf(19));
+      T(142, Zf(19), 'chamber vents', { 'text-anchor': 'end' });
+      leader(X(ly) + 4 * s + 2, Zf(lz), 452, Zf(lz));
+      T(456, Zf(lz), 'RGB LED', { 'text-anchor': 'start' });
+      leader(X(by) + 5.05 * s + 2, Zf(bz), 452, Zf(bz));
+      T(456, Zf(bz), 'panel button', { 'text-anchor': 'start' });
+      leader(X(vy1) + 1, Zf(5.25), 452, Zf(5.25));
+      T(456, Zf(5.25), 'light-sensor window', { 'text-anchor': 'start' });
+
+      // cross-section
+      T(296, 240, 'Cut through the SCD-41 and the ESP32', { 'font-size': 12, 'font-weight': 700 });
+      for (const [za, zb] of solids(2, P.lidZ, P.ventsZ)) box(-54, za, -52, zb, Zc, wall);   // outer chamber wall with vents
+      for (const [za, zb] of [[2, 12], [20, P.lidZ]]) box(30, za, 32, zb, Zc, wall);         // column j wall with intake vents
+      for (const [ya, yb] of [[-54, -50], [-47, -45], [-42, -40], [-37, 32]]) box(ya, 0, yb, 2, Zc, wall);   // floor with vents
+      for (const [ya, yb] of [[-54, P.lidVents[1]], [P.lidVents[3], 32]]) box(ya, P.lidZ, yb, P.h, Zc, wall); // lid, vents above the module
+      for (const [, fy] of [P.feet[1], P.feet[3]]) box(fy - 4, -3, fy + 4, 0, Zc, { fill: '#8c959f' });
+      box(-34, 2, -32.8, P.lidZ, Zc, wall);                                                   // double wall
+      box(-31.2, 2, -30, P.lidZ, Zc, wall);
+      box(-27.5, 2, 27.5, P.bbTop, Zc, { fill: '#f5f1e8', stroke: '#d6cdb8' });
+      T(X(0), Zc(6.25), 'breadboard', { fill: '#57606a' });
+      for (const y of [-11.43, 11.43]) box(y - 1, P.bbTop, y + 1, 13, Zc, { fill: '#2d333b' });   // header plastic
+      box(-12.7, 13, 12.7, 14.6, Zc, { fill: '#22272e' });
+      box(-9, 14.6, 9, 17.8, Zc, { fill: '#c9ced6', stroke: '#8c959f' });
+      T(X(14), Zc(20.5), 'ESP32', { 'text-anchor': 'start' });
+      box(-44.5, 2, -43.1, 5, Zc, { fill: '#8c959f' });                                         // rails holding the SCD-41
+      box(-40.5, 2, -39.1, 5, Zc, { fill: '#8c959f' });
+      box(-42.6, 4, -41, 26.8, Zc, { fill: '#1b1f3b' });
+      box(-49.1, 10.35, -42.6, 20.45, Zc, { fill: '#c9ced6', stroke: '#8c959f' });
+      box(-49.1, 13.4, -48.5, 17.4, Zc, { fill: '#fff', stroke: '#8c959f', 'stroke-width': 0.4 });  // membrane
+      T(X(-43), Zc(31), 'SCD-41');
+
+      const arrow = (d, red) => mk('path', { d, fill: 'none', stroke: red ? '#cf222e' : C.blue, 'stroke-width': 1.6, 'marker-end': `url(#case-fr-${red ? 'r' : 'b'})` }, svg);
+      arrow(`M112,${Zc(27)} L154,${Zc(27)}`);
+      arrow(`M112,${Zc(17)} L154,${Zc(17)}`);
+      arrow(`M${X(-48.5)},${Zc(-9)} L${X(-48.5)},${Zc(1)}`);
+      arrow(`M478,${Zc(16)} L${X(32) + 2},${Zc(16)}`);
+      arrow(`M${X(0)},${Zc(19)} L${X(0)},${Zc(45)}`, true);
+      T(X(0), Zc(49.5), 'warm air out', { fill: '#cf222e' });
+      leader(X(-32), Zc(P.h) - 1, X(-33), Zc(46.5));
+      T(X(-34), Zc(48.5), 'double wall, air gap', { 'text-anchor': 'end' });
+      T(104, Zc(22), 'fresh air in', { 'text-anchor': 'end', fill: C.blue });
+      T(484, Zc(16), 'cooling air in', { 'text-anchor': 'start', fill: C.blue });
+      T(142, Zc(8), 'sensor chamber', { 'text-anchor': 'end', 'font-weight': 700 });
+      T(484, Zc(5), 'electronics', { 'text-anchor': 'start', 'font-weight': 700 });
+    }
+
+    // ---- Figure 8: back, seen from outside (column j side on the left)
+    {
+      const svg = document.getElementById('case-back');
+      const s = 3.4, H = y => 40 + (32 - y) * s, V = z => 30 + (40 - z) * s;
+      const R = (y0, z0, y1, z1, a) => mk('rect', Object.assign({ x: H(Math.max(y0, y1)), y: V(Math.max(z0, z1)), width: Math.abs(y1 - y0) * s, height: Math.abs(z1 - z0) * s }, a), svg);
+      for (const [, fy] of [P.feet[0], P.feet[2]]) R(fy - 4, -3, fy + 4, 0, { fill: '#8c959f' });
+      R(P.y1, 0, P.y0, P.h, { fill: C.front, stroke: C.line, rx: 3 });
+      mk('line', { x1: H(P.y1), y1: V(P.lidZ), x2: H(P.y0), y2: V(P.lidZ), stroke: C.line, 'stroke-width': 0.7, 'stroke-dasharray': '3 2' }, svg);
+      for (const [y, name] of P.usb) {
+        R(y - 6.25, P.usbZ - 3.75, y + 6.25, P.usbZ + 3.75, { fill: '#24292f', rx: 2.5 * s });
+        R(y - 4.3, P.usbZ - 1.6, y + 4.3, P.usbZ + 1.6, { fill: '#8c959f', rx: 1.6 * s });
+        mk('text', { x: H(y), y: V(P.usbZ) + 26, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 700, fill: '#1f2328' }, svg, name);
+      }
+      mk('text', { x: H(7.2), y: V(P.usbZ) + 37, 'text-anchor': 'middle', 'font-size': 8, fill: C.line }, svg, '(use this one)');
+      mk('text', { x: H(P.y1), y: 18, 'font-size': 8, fill: C.line }, svg, '← column j side');
+      mk('text', { x: H(P.y0), y: 18, 'text-anchor': 'end', 'font-size': 8, fill: C.line }, svg, 'sensor chamber →');
+      dimH(svg, H(P.y1), H(P.y0), 200, '86 mm');
+      dimV(svg, 352, V(P.h), V(-3), '43 mm');
+    }
+  })();
+</script>
+</body>
+</html>
