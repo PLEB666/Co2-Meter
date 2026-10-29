@@ -1,13 +1,20 @@
 /*
-  CO2 Monitor - step 1
+  CO2 Monitor - step 2
   ESP32-C6-DevKitC-1 + Adafruit SHT45 + Adafruit SCD-41 + Joy-it 0.96" OLED (SSD1306)
 
   - SHT45  -> temperature and humidity (more accurate than the SCD-41's own values)
   - SCD-41 -> CO2 in periodic mode (a new value every 5 s)
+  - Warm-up: for the first 30 s after start-up the sensors measure, but no value
+    is shown, printed or saved. The display counts down meanwhile.
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
   - The RGB LED on the board shows the CO2 level all the time, dimmed:
     green -> yellow -> red.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
+  - Wi-Fi gets the time from the internet. The values are stored in the flash
+    as 1-minute, 5-minute and hourly averages (history.h explains how).
+  - A web page on the home network shows the live values, graphs of any stored
+    day and CSV downloads (web.h explains how).
+  - Serial Monitor commands: status, files, csv m1|m5|h1 [days], save
 
   The sensors keep measuring while the display is off. This matters for the
   SCD-41's automatic self-calibration, which needs uninterrupted operation.
@@ -15,13 +22,24 @@
   Libraries (Arduino IDE -> Library Manager):
     Adafruit SSD1306, Adafruit SHT4x Library, Sensirion I2C SCD4x
   Board: "ESP32C6 Dev Module" (esp32 by Espressif Systems)
+    Flash Size "8MB", Partition Scheme "8M with spiffs (3MB APP/1.5MB SPIFFS)"
+  Wi-Fi: copy secrets_example.h to secrets.h and enter your network there.
 */
 
 #include <Wire.h>
+#include <WiFi.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_SHT4x.h>
 #include <SensirionI2cScd4x.h>
+#include "history.h"
+#include "web.h"
+
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#error "secrets.h is missing: copy secrets_example.h to secrets.h and enter your Wi-Fi name and password"
+#endif
 
 // ---------- Pins ----------
 constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 5
@@ -43,6 +61,9 @@ constexpr uint32_t DISPLAY_ON_TIME_MS = 30000;
 // Height of your location above sea level in metres. The SCD-41 uses it to
 // compensate the CO2 reading for air pressure. Find it on any map / GPS app.
 constexpr uint16_t SENSOR_ALTITUDE_M = 0;
+// After start-up the sensors measure this long before any value is shown, printed
+// or saved. Values measured during the warm-up are thrown away.
+constexpr uint32_t WARMUP_TIME_MS = 30000;
 constexpr uint32_t SHT_INTERVAL_MS = 2000;
 constexpr uint32_t SCD_POLL_INTERVAL_MS = 1000;
 
@@ -64,6 +85,13 @@ constexpr LedColour LED_GREEN = {0, 255, 0};
 constexpr LedColour LED_YELLOW = {255, 160, 0};
 constexpr LedColour LED_RED = {255, 0, 0};
 
+// ---------- Wi-Fi and clock ----------
+// The name the monitor shows in your router's list of devices
+constexpr char WIFI_HOSTNAME[] = "co2-monitor";
+// Internet time servers. The clock runs on UTC; the web page shows local time.
+constexpr char NTP_SERVER_1[] = "pool.ntp.org";
+constexpr char NTP_SERVER_2[] = "time.google.com";
+
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 Adafruit_SHT4x sht4;
 SensirionI2cScd4x scd4x;
@@ -75,10 +103,13 @@ bool scdFound = false;
 bool displayOn = false;
 uint32_t displayOnSince = 0;
 
+bool warmingUp = true;
+uint32_t warmupStart = 0;  // when the sensors started measuring
+
 float temperatureC = NAN;
 float humidityPct = NAN;
 uint16_t co2Ppm = 0;  // 0 = no valid reading yet
-bool newData = false;
+bool newData = false;  // something on the display has changed
 
 uint32_t lastShtRead = 0;
 uint32_t lastScdPoll = 0;
@@ -137,6 +168,19 @@ void updateLed() {
   rgbLedWrite(RGB_BUILTIN, dimmed(colour.r), dimmed(colour.g), dimmed(colour.b));
 }
 
+// Seconds of warm-up left, rounded up. 0 once it is over.
+uint8_t warmupSecondsLeft() {
+  uint32_t elapsed = millis() - warmupStart;
+  return elapsed >= WARMUP_TIME_MS ? 0 : (WARMUP_TIME_MS - elapsed + 999) / 1000;
+}
+
+// The built-in font is 6 pixels wide per character at size 1
+void printCentred(const char *text, uint8_t size, int16_t y) {
+  display.setTextSize(size);
+  display.setCursor((OLED_WIDTH - (int16_t)strlen(text) * 6 * size) / 2, y);
+  display.print(text);
+}
+
 void drawScreen() {
   char text[12];
   display.clearDisplay();
@@ -157,15 +201,17 @@ void drawScreen() {
   display.setTextColor(SSD1306_WHITE);
 
   // CO2 value, large and centred
-  if (co2Ppm > 0) {
+  if (!scdFound) {
+    printCentred("SCD-41 missing", 1, 24);
+  } else if (warmingUp) {
+    printCentred("warming up", 1, 13);
+    snprintf(text, sizeof text, "%u s", warmupSecondsLeft());
+    printCentred(text, 2, 26);
+  } else if (co2Ppm > 0) {
     snprintf(text, sizeof text, "%u", co2Ppm);
-    display.setTextSize(3);
-    display.setCursor((OLED_WIDTH - strlen(text) * 18) / 2, 15);
-    display.print(text);
+    printCentred(text, 3, 15);
   } else {
-    display.setTextSize(1);
-    display.setCursor(22, 24);
-    display.print(scdFound ? F("warming up...") : F("SCD-41 missing"));
+    printCentred("measuring...", 1, 24);  // first value after the warm-up, within 5 s
   }
 
   display.drawFastHLine(0, 44, OLED_WIDTH, SSD1306_WHITE);
@@ -259,13 +305,118 @@ void readScd41() {
   float scdHumidity = 0;
   if (scd4x.readMeasurement(co2, scdTemperature, scdHumidity) != 0) return;
   if (co2 == 0) return;  // the sensor reports 0 for an invalid sample
+  if (warmingUp) return;  // read anyway, so the next value is a new one
 
   co2Ppm = co2;
   newData = true;
   updateLed();
+  historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);  // no pressure sensor yet
 
   // "name:value" pairs can be read by people and by the Serial Plotter
   Serial.printf("CO2_ppm:%u Temperature_C:%.2f Humidity_pct:%.1f\n", co2Ppm, temperatureC, humidityPct);
+}
+
+// Counts the warm-up down on the display and ends it after WARMUP_TIME_MS
+void updateWarmup() {
+  static uint8_t secondsShown = 0;
+  if (!warmingUp) return;
+
+  uint8_t left = warmupSecondsLeft();
+  if (left > 0) {
+    if (left != secondsShown) {
+      secondsShown = left;
+      newData = true;
+    }
+    return;
+  }
+
+  warmingUp = false;
+  Serial.println(F("Warm-up done, values are shown and saved from now on"));
+  if (shtFound) {
+    lastShtRead = millis();
+    readSht45();
+  }
+  displayWake();  // shows the first values for DISPLAY_ON_TIME_MS
+}
+
+void startWifi() {
+  if (strlen(WIFI_SSID) == 0 || strcmp(WIFI_SSID, "your-wifi-name") == 0) {
+    Serial.println(F("Wi-Fi: enter your network in secrets.h - no internet time, so no history"));
+    return;
+  }
+  WiFi.setHostname(WIFI_HOSTNAME);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);  // connects in the background and reconnects by itself
+  Serial.printf("Wi-Fi: connecting to \"%s\"\n", WIFI_SSID);
+}
+
+// Reports connection changes and starts the internet time and the web page once Wi-Fi is up
+void updateWifi() {
+  static bool wasConnected = false;
+  static bool timeStarted = false;
+
+  bool connected = WiFi.status() == WL_CONNECTED;
+  if (connected == wasConnected) return;
+  wasConnected = connected;
+  if (connected) {
+    Serial.printf("Wi-Fi connected, web page at http://%s/\n", WiFi.localIP().toString().c_str());
+    if (!timeStarted) {
+      configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);  // UTC, updated every 3 hours
+      timeStarted = true;
+    }
+    webBegin(CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW);  // only the first time
+  } else {
+    Serial.println(F("Wi-Fi lost, reconnecting"));
+  }
+}
+
+void printStatus() {
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("Wi-Fi: connected to \"%s\", signal %d dBm, web page at http://%s/\n", WIFI_SSID, WiFi.RSSI(),
+                  WiFi.localIP().toString().c_str());
+  } else {
+    Serial.println(F("Wi-Fi: not connected"));
+  }
+  if (warmingUp) Serial.printf("Warm-up: %u s left\n", warmupSecondsLeft());
+  historyPrintStatus(Serial);
+}
+
+// Commands typed in the Serial Monitor (line ending: New Line, Carriage Return or Both)
+void runCommand(char *line) {
+  const char *command = strtok(line, " ");
+  const char *level = strtok(nullptr, " ");
+  const char *days = strtok(nullptr, " ");
+  if (!command) return;
+
+  if (strcmp(command, "status") == 0) {
+    printStatus();
+  } else if (strcmp(command, "files") == 0) {
+    historyPrintFiles(Serial);
+  } else if (strcmp(command, "csv") == 0) {
+    if (!level || !historyPrintCsv(Serial, level, days ? atoi(days) : 1)) {
+      Serial.println(F("Use: csv m1|m5|h1 [days], for example \"csv m1 1\""));
+    }
+  } else if (strcmp(command, "save") == 0) {
+    Serial.println(historySave() ? F("History saved") : F("Not saved - see \"status\""));
+  } else {
+    Serial.println(F("Commands: status, files, csv m1|m5|h1 [days], save"));
+  }
+}
+
+void readSerialCommands() {
+  static char line[32];
+  static uint8_t length = 0;
+
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      line[length] = '\0';
+      if (length > 0) runCommand(line);
+      length = 0;
+    } else if (length < sizeof line - 1) {
+      line[length++] = c;
+    }
+  }
 }
 
 void setup() {
@@ -273,6 +424,9 @@ void setup() {
   uint32_t start = millis();
   while (!Serial && millis() - start < 2000) delay(10);  // don't hang when no PC is connected
   Serial.println(F("\nCO2 monitor starting"));
+
+  historyBegin();
+  startWifi();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
@@ -304,25 +458,31 @@ void setup() {
     sht4.setPrecision(SHT4X_HIGH_PRECISION);
     sht4.setHeater(SHT4X_NO_HEATER);
     Serial.println(F("SHT45 found"));
-    readSht45();
   } else {
     Serial.println(F("SHT45 not found - check wiring"));
   }
 
   scdFound = initScd41();
   if (scdFound) {
-    Serial.println(F("SCD-41 measuring, first CO2 value in about 5 s"));
+    Serial.println(F("SCD-41 measuring"));
   } else {
     Serial.println(F("SCD-41 not found - check wiring"));
   }
 
+  warmupStart = millis();
+  Serial.printf("Warm-up: the first values follow in %lu s\n", (unsigned long)(WARMUP_TIME_MS / 1000));
   displayWake();
 }
 
 void loop() {
   if (buttonPressed()) displayWake();
+  readSerialCommands();
+  updateWifi();
+  historyLoop();
+  updateWarmup();
+  webLoop({co2Ppm, temperatureC, humidityPct, warmupSecondsLeft()});
 
-  if (shtFound && millis() - lastShtRead >= SHT_INTERVAL_MS) {
+  if (shtFound && !warmingUp && millis() - lastShtRead >= SHT_INTERVAL_MS) {
     lastShtRead = millis();
     readSht45();
   }

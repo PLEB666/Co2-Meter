@@ -1,0 +1,716 @@
+<!doctype html>
+<!--
+  CO2 monitor web page. The firmware serves a compressed copy (web_page.h).
+  After changing this file, run make_web_page.ps1 and upload the firmware again.
+  To try changes without uploading, open this file in a browser with the monitor's
+  address added: index.html?device=192.168.178.40
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>CO2 monitor</title>
+<script>
+// Light or dark before anything is drawn: the saved choice, otherwise the device setting
+var themeChoice = 'auto';
+try { themeChoice = localStorage.getItem('theme') || 'auto'; } catch (e) {}
+function applyTheme() {
+  var dark = themeChoice === 'dark' || (themeChoice === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+}
+applyTheme();
+</script>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#15181c;--sub:#5d6573;--line:#e1e4e8;--grid:#edf0f2;--acc:#2a78d6;--on-acc:#fff;
+--co2:#2a78d6;--tmp:#eb6834;--hum:#1baf7a;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
+--good:#e3f3e8;--good-tx:#1e6b34;--ok:#fbf0cf;--ok-tx:#7a5300;--vent:#fde4d4;--vent-tx:#93400f;--bad:#fbe0e0;--bad-tx:#a32d2d;color-scheme:light}
+:root[data-theme=dark]{--bg:#0f1216;--card:#171b21;--ink:#e6e8eb;--sub:#9aa2ad;--line:#2a3039;--grid:#20262e;--acc:#4b93ea;--on-acc:#fff;
+--co2:#4b93ea;--tmp:#f07a45;--hum:#22b886;--err:#ff8a80;
+--good:#17351f;--good-tx:#9fd9ae;--ok:#3a2f10;--ok-tx:#f0cf74;--vent:#42230f;--vent-tx:#f5ad80;--bad:#451a1a;--bad-tx:#f2a0a0;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 28px}
+section{margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.lbl{font-size:13px;color:var(--sub);margin:0 0 6px}
+.sub{color:var(--sub)}
+button,input,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px}
+button{cursor:pointer}
+button:hover:not(:disabled){border-color:var(--sub)}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:22px;font-weight:600;margin:0}
+.status{font-size:13px;color:var(--sub)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--sub)}
+.dot.on{background:var(--live)}.dot.off{background:var(--dead)}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:2px;gap:2px}
+.seg button{border:0;background:none;height:28px;color:var(--sub)}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px}
+.big{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.badge{font-size:12px;padding:2px 8px;border-radius:6px;margin-left:auto;background:var(--bg);color:var(--sub)}
+.badge:empty{display:none}
+.good{background:var(--good);color:var(--good-tx)}.ok{background:var(--ok);color:var(--ok-tx)}
+.vent{background:var(--vent);color:var(--vent-tx)}.bad{background:var(--bad);color:var(--bad-tx)}
+.row{display:grid;grid-template-columns:280px minmax(0,1fr);gap:12px}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:600}
+.calhead button{width:34px;padding:0;font-size:18px;line-height:1}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.wd{font-size:12px;color:var(--sub);margin-bottom:2px}
+.cal button{height:36px;padding:0;border-color:transparent;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-variant-numeric:tabular-nums}
+.cal button i,.legend i{display:block;width:5px;height:5px;border-radius:50%}
+.cal .has i,.legend .m{background:var(--acc)}
+.cal .hourly i,.legend .h{background:none;box-shadow:inset 0 0 0 1.5px var(--acc);width:6px;height:6px}
+.cal .today{border-color:var(--line)}
+.cal .sel{background:var(--acc);color:var(--on-acc)}
+.cal .sel.has i{background:var(--on-acc)}
+.cal .sel.hourly i{background:none;box-shadow:inset 0 0 0 1.5px var(--on-acc)}
+.legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:8px 0 0}
+.legend i{display:inline-block;margin-left:6px}
+.legend i:first-child{margin-left:0}
+.controls{display:flex;flex-direction:column;gap:14px}
+.day{font-size:17px;font-weight:600}
+.line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.line+.line{margin-top:8px}
+.hint{font-size:13px;color:var(--sub);margin:6px 0 0;min-height:1.5em}
+.hint.err{color:var(--err)}
+.chip{display:inline-flex;align-items:center;gap:7px}
+.chip[aria-pressed=false]{color:var(--sub);background:none}
+.chip[aria-pressed=false] .sq{background:none!important;box-shadow:inset 0 0 0 1.5px var(--sub)}
+.sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.chip .sq{margin:0}
+.b-co2{background:var(--co2)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}
+.charttop{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-bottom:8px}
+.wintext{font-size:16px;font-weight:600}
+.charthead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin-bottom:4px}
+#wrap{position:relative;min-height:140px;touch-action:pan-y}
+#chart{display:block;width:100%;overflow:visible}
+#chart text{font-size:11px;fill:var(--sub);font-variant-numeric:tabular-nums}
+#chart .pl{font-size:12px;fill:var(--ink)}
+#chart .gl{stroke:var(--grid)}
+#chart .lim{stroke:var(--sub);stroke-dasharray:3 4;opacity:.7}
+#chart .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+#chart .s-co2{stroke:var(--co2)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}
+#chart .f-co2{fill:var(--co2);opacity:.16}#chart .f-tmp{fill:var(--tmp);opacity:.16}#chart .f-hum{fill:var(--hum);opacity:.16}
+#cross{stroke:var(--sub);display:none}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
+#msg:empty{display:none}
+#tip{position:absolute;top:12px;display:none;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+#tip b{font-weight:600}
+#tip .tt{color:var(--sub);margin-bottom:2px}
+footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
+@media (max-width:720px){
+  .row{grid-template-columns:minmax(0,1fr)}
+  .row .controls{order:-1}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles .card:first-child{grid-column:1/-1}
+  .big{font-size:26px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1>CO<sub>2</sub> monitor</h1>
+    <div class="status"><span id="dot" class="dot"></span><span id="status">Connecting…</span></div>
+  </div>
+  <div class="seg" id="theme" role="group" aria-label="Colour theme">
+    <button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+  </div>
+</header>
+
+<section class="tiles">
+  <div class="card"><p class="lbl">CO<sub>2</sub></p><div class="val"><span id="co2" class="big">–</span><span class="sub">ppm</span><span id="badge" class="badge"></span></div></div>
+  <div class="card"><p class="lbl">Temperature</p><div class="val"><span id="tmp" class="big">–</span><span class="sub">°C</span></div></div>
+  <div class="card"><p class="lbl">Humidity</p><div class="val"><span id="hum" class="big">–</span><span class="sub">%</span></div></div>
+</section>
+
+<section class="card">
+  <div class="charttop">
+    <div id="wintext" class="wintext"></div>
+    <div class="line"><span class="sub">Last</span>
+      <div class="seg" id="last" role="group" aria-label="Show the last hours">
+        <button data-h="1">1 h</button><button data-h="3">3 h</button><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">24 h</button>
+      </div>
+    </div>
+  </div>
+  <div class="charthead"><span id="res"></span><span>Local time</span></div>
+  <div id="wrap"><svg id="chart" height="0" role="img" aria-label="Graphs of the chosen values over the chosen time"></svg><p id="msg"></p><div id="tip"></div></div>
+</section>
+
+<section class="row">
+  <div class="card">
+    <div class="calhead"><button id="prev" aria-label="Previous month">‹</button><span id="month"></span><button id="next" aria-label="Next month">›</button></div>
+    <div class="cal wd" id="wd"></div>
+    <div class="cal" id="cal"></div>
+    <p class="legend"><i class="m"></i>Values stored <i class="h"></i>Hourly values only</p>
+  </div>
+  <div class="card controls">
+    <div><p class="lbl">Day</p><div id="daylabel" class="day"></div></div>
+    <div>
+      <p class="lbl">Time range, up to 24 hours</p>
+      <div class="line"><input type="time" id="from" value="00:00" aria-label="From"><span class="sub">to</span><input type="time" id="to" value="00:00" aria-label="To"></div>
+      <div class="line"><button id="whole">Whole day</button><button id="night">Night 22–08</button></div>
+      <p id="span" class="hint"></p>
+    </div>
+    <div>
+      <p class="lbl">Show</p>
+      <div class="line" id="toggles">
+        <button class="chip" data-s="co2" aria-pressed="true"><i class="sq b-co2"></i>CO₂</button>
+        <button class="chip" data-s="tmp" aria-pressed="true"><i class="sq b-tmp"></i>Temperature</button>
+        <button class="chip" data-s="hum" aria-pressed="true"><i class="sq b-hum"></i>Humidity</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <p class="lbl">Download values as a CSV file</p>
+  <div class="line">
+    <input type="date" id="dlfrom" aria-label="Start date"><span class="sub">to</span><input type="date" id="dlto" aria-label="End date">
+    <select id="dlres" aria-label="Detail">
+      <option value="best">Best available detail</option>
+      <option value="1">1-minute values (last 7 days)</option>
+      <option value="5">5-minute values (last 90 days)</option>
+      <option value="60">Hourly average, minimum, maximum</option>
+    </select>
+    <button id="dl" class="primary">Download CSV</button>
+  </div>
+  <p id="dlnote" class="hint"></p>
+</section>
+<footer id="foot"></footer>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const DAY = 86400;
+const DEVICE = new URLSearchParams(location.search).get('device');
+const SERIES = [
+  {key: 'co2', name: 'CO₂', unit: 'ppm', dec: 0, minRange: 100},
+  {key: 'tmp', name: 'Temperature', unit: '°C', dec: 1, minRange: 1},
+  {key: 'hum', name: 'Humidity', unit: '%', dec: 1, minRange: 5},
+];
+const RATINGS = [['Good', 'good'], ['OK', 'ok'], ['Ventilate', 'vent'], ['Bad air', 'bad']];
+const LEVEL_NAMES = {1: '1-minute values', 5: '5-minute values', 60: 'hourly values'};
+
+let info = null;              // /api/info: state of the history
+let live = null, liveAt = 0;  // /api/now and when it arrived
+let marks = {};               // day of the shown month -> 'has' or 'has hourly'
+let points = [];              // values in the graph
+let win = {start: 0, end: 0}; // time range of the graph, UTC seconds
+let geo = null;               // graph layout, for the tooltip
+let lastHours = 0;            // > 0 while "Last … h" is chosen; the range then moves with the time
+let show = {co2: true, tmp: true, hum: true};
+try { Object.assign(show, JSON.parse(localStorage.getItem('show'))); } catch (e) {}
+
+const now = () => Date.now() / 1000;
+const today = () => { const d = new Date(); return {y: d.getFullYear(), m: d.getMonth(), d: d.getDate()}; };
+let sel = today();                  // chosen day
+let view = {y: sel.y, m: sel.m};    // month shown in the calendar
+
+const pad = n => String(n).padStart(2, '0');
+const dayStart = (y, m, d) => new Date(y, m, d).getTime() / 1000;
+const isoDate = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const clock = t => new Date(t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+const dateText = (t, o) => new Date(t * 1000).toLocaleDateString([], o || {day: 'numeric', month: 'long', year: 'numeric'});
+const fmt = (v, dec) => v == null ? '–' : v.toLocaleString([], {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function get(path) {
+  const r = await fetch((DEVICE ? 'http://' + DEVICE : '') + path, {cache: 'no-store'});
+  if (!r.ok) throw new Error(path + ': ' + r.status);
+  return r;
+}
+
+// Turns the binary records of /api/data into objects (layout in history.cpp)
+function parse(buffer, res) {
+  const v = new DataView(buffer), size = res === 60 ? 26 : 12, out = [];
+  const co2 = o => v.getUint16(o, true) || null;
+  const tmp = o => { const x = v.getInt16(o, true); return x === -32768 ? null : x / 100; };
+  const hum = o => { const x = v.getUint16(o, true); return x === 65535 ? null : x / 100; };
+  const pres = o => { const x = v.getUint16(o, true); return x ? x / 10 : null; };
+  for (let o = 0; o + size <= buffer.byteLength; o += size) {
+    const t = v.getUint32(o, true), p = {t, r: res, m: t + res * 30};  // m = middle of the period
+    if (res === 60) {
+      Object.assign(p, {co2: co2(o + 4), co2Lo: co2(o + 6), co2Hi: co2(o + 8), tmp: tmp(o + 10), tmpLo: tmp(o + 12),
+        tmpHi: tmp(o + 14), hum: hum(o + 16), humLo: hum(o + 18), humHi: hum(o + 20), pres: pres(o + 22), minutes: v.getUint8(o + 24)});
+    } else {
+      Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10)});
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+const getRecords = async (res, from, to) => parse(await (await get(`/api/data?res=${res}&from=${from}&to=${to}`)).arrayBuffer(), res);
+
+// Oldest stored time over all levels, 0 if nothing is stored
+function oldestData() {
+  const v = info && info.oldest ? Object.values(info.oldest).filter(Boolean) : [];
+  return v.length ? Math.min(...v) : 0;
+}
+
+// ---------- Live values ----------
+
+async function loadLive() {
+  try { live = await (await get('/api/now')).json(); liveAt = Date.now(); } catch (e) {}
+  showLive();
+}
+
+function showLive() {
+  const ok = live && Date.now() - liveAt < 15000;
+  $('dot').className = 'dot ' + (ok ? 'on' : live ? 'off' : '');
+  let s = live ? 'No connection to the monitor, retrying' : 'Connecting…';
+  if (ok) {
+    const age = Math.round((Date.now() - liveAt) / 1000);
+    s = 'Live, updated ' + (age < 2 ? 'just now' : age + ' s ago');
+    if (!live.clock) s += ', waiting for the internet time';
+  }
+  $('status').textContent = s;
+  if (!live) return;
+
+  const warm = live.warmup > 0;
+  $('co2').textContent = fmt(warm ? null : live.co2, 0);
+  $('tmp').textContent = fmt(warm ? null : live.temperature, 1);
+  $('hum').textContent = fmt(warm ? null : live.humidity, 0);
+  const b = $('badge');
+  if (warm || live.co2 == null) {
+    b.textContent = warm ? 'Warming up, ' + live.warmup + ' s' : '';
+    b.className = 'badge';
+  } else {
+    let i = 0;
+    while (i < 3 && live.co2 >= live.limits[i]) i++;
+    b.textContent = RATINGS[i][0];
+    b.className = 'badge ' + RATINGS[i][1];
+  }
+
+  const up = live.uptime, d = Math.floor(up / DAY), h = Math.floor(up % DAY / 3600), m = Math.floor(up % 3600 / 60);
+  const parts = ['Wi-Fi signal ' + live.rssi + ' dBm'];
+  if (info && info.on) parts.push(`History ${fmt(info.usedKB, 0)} of ${fmt(info.totalKB, 0)} KB used`);
+  parts.push('Running for ' + (d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`));
+  $('foot').textContent = parts.join(' · ');
+}
+
+// ---------- Calendar ----------
+
+let monthToken = 0;
+async function loadMonth() {
+  const token = ++monthToken, {y, m} = view;
+  drawCalendar();
+  if (!info || !info.clock) return;
+  try {
+    const days = await (await get(`/api/days?from=${dayStart(y, m, 0)}&to=${dayStart(y, m + 1, 2)}`)).json();
+    if (token !== monthToken) return;
+    // The monitor counts days in UTC; mark every local day that overlaps one with values
+    const found = {}, n = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= n; d++) {
+      const s = dayStart(y, m, d), e = dayStart(y, m, d + 1);
+      for (const x of days) {
+        if (x.first < e && x.last + x.res * 60 > s) found[d] = found[d] === 'has' || x.res < 60 ? 'has' : 'has hourly';
+      }
+    }
+    marks = found;
+  } catch (e) {}
+  drawCalendar();
+}
+
+function drawCalendar() {
+  const {y, m} = view, t = today(), oldest = oldestData();
+  $('month').textContent = new Date(y, m, 1).toLocaleDateString([], {month: 'long', year: 'numeric'});
+  const first = (new Date(y, m, 1).getDay() + 6) % 7, n = new Date(y, m + 1, 0).getDate();
+  let h = '<span></span>'.repeat(first);
+  for (let d = 1; d <= n; d++) {
+    const c = [marks[d] || '', y === t.y && m === t.m && d === t.d ? 'today' : '', y === sel.y && m === sel.m && d === sel.d ? 'sel' : ''];
+    const label = new Date(y, m, d).toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'}) + (marks[d] ? ', has values' : '');
+    const future = new Date(y, m, d) > new Date(t.y, t.m, t.d);
+    h += `<button class="${c.join(' ').trim()}" data-d="${d}" aria-label="${label}"${future ? ' disabled' : ''}>${d}<i></i></button>`;
+  }
+  $('cal').innerHTML = h;
+  $('prev').disabled = !oldest || dayStart(y, m, 1) <= oldest;
+  $('next').disabled = y > t.y || (y === t.y && m >= t.m);
+  $('daylabel').textContent = new Date(sel.y, sel.m, sel.d).toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+}
+
+function moveMonth(step) {
+  const d = new Date(view.y, view.m + step, 1);
+  view = {y: d.getFullYear(), m: d.getMonth()};
+  marks = {};
+  loadMonth();
+}
+
+function selectDay(d) {
+  sel = {y: d.getFullYear(), m: d.getMonth(), d: d.getDate()};
+  if (view.y !== sel.y || view.m !== sel.m) {
+    view = {y: sel.y, m: sel.m};
+    marks = {};
+    loadMonth();
+  } else {
+    drawCalendar();
+  }
+}
+
+// ---------- Graph ----------
+
+function windowTimes() {
+  const read = id => ($(id).value || '00:00').split(':').map(Number);
+  const [fh, fm] = read('from'), [th, tm] = read('to');
+  const start = new Date(sel.y, sel.m, sel.d, fh, fm).getTime() / 1000;
+  let end = new Date(sel.y, sel.m, sel.d, th, tm).getTime() / 1000;
+  if (end <= start) end = new Date(sel.y, sel.m, sel.d + 1, th, tm).getTime() / 1000;
+  return {start, end};
+}
+
+// Values for a time range. The newest part comes from the 1-minute values, older
+// parts from the 5-minute and then the hourly values, as far as each level goes back.
+async function fetchRange(start, end) {
+  const o = info.oldest, parts = [];
+  for (const [res, from] of [[1, o.m1 || start], [5, o.m5], [60, o.h1]]) {
+    if (start >= end) break;
+    if (!from || end <= from) continue;
+    const s = Math.max(start, from);
+    parts.unshift(await getRecords(res, s, end));
+    end = s;
+  }
+  return parts.flat();
+}
+
+// Shows the last few hours, up to now
+function showLast(hours) {
+  lastHours = hours;
+  const n = new Date(), s = new Date(n.getTime() - hours * 3600000), hhmm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+  selectDay(s);
+  $('from').value = hhmm(s);
+  $('to').value = hhmm(n);
+  loadChart();
+}
+
+// The time shown in the graph, in words
+function windowText() {
+  const s = new Date(win.start * 1000), e = new Date(win.end * 1000), times = `${clock(win.start)}–${clock(win.end)}`;
+  const day = d => d.toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'});
+  if (lastHours) return `Last ${lastHours} h, ${times}`;
+  if (s.getHours() + s.getMinutes() + e.getHours() + e.getMinutes() === 0) return s.toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'});
+  return s.getDate() === e.getDate() || (e.getHours() + e.getMinutes() === 0) ? `${day(s)}, ${times}` : `${day(s)} ${clock(win.start)} – ${day(e)} ${clock(win.end)}`;
+}
+
+function message(text) {
+  $('msg').textContent = text;
+  if (!text) return;
+  $('chart').innerHTML = '';
+  $('chart').setAttribute('height', 0);
+  geo = null;
+  hideTip();
+}
+
+let chartToken = 0;
+async function loadChart() {
+  const token = ++chartToken;
+  win = windowTimes();
+  const hours = Math.round((win.end - win.start) / 360) / 10, end = new Date(win.end * 1000);
+  const endsNextDay = end.getDate() !== sel.d && (end.getHours() > 0 || end.getMinutes() > 0);
+  $('span').textContent = (endsNextDay ? `Until ${clock(win.end)} the next day, ` : '') + fmt(hours, hours % 1 ? 1 : 0) + ' h';
+  $('wintext').textContent = windowText();
+  document.querySelectorAll('#last button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.h === lastHours));
+  if (!info) return;
+  if (!info.on) return message('The history is off. The Serial Monitor shows why.');
+  if (!info.clock) return message('The monitor is waiting for the internet time. The graphs appear once its clock is set.');
+  if (win.start >= now()) { points = []; return message('This time is still to come.'); }
+  $('res').textContent = 'Loading…';
+  try {
+    const p = await fetchRange(win.start, win.end);
+    if (token !== chartToken) return;
+    points = p;
+    drawChart();
+  } catch (e) {
+    if (token !== chartToken) return;
+    $('res').textContent = '';
+    message('Couldn’t reach the monitor. It tries again in a minute.');
+  }
+}
+
+function niceStep(x) {
+  const p = Math.pow(10, Math.floor(Math.log10(x)));
+  for (const f of [1, 2, 2.5, 5, 10]) if (f * p >= x) return f * p;
+}
+
+function drawChart() {
+  const svg = $('chart'), act = SERIES.filter(s => show[s.key]);
+  hideTip();
+  geo = null;
+  const kinds = [...new Set(points.map(p => p.r))].sort((a, b) => a - b);
+  const desc = kinds.map(r => r === 60 ? 'hourly averages, band from minimum to maximum' : LEVEL_NAMES[r]).join(' and ');
+  $('res').textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
+  if (!act.length) return message('Choose at least one value to show.');
+  if (!points.length) return message('No values stored for this time.');
+  message('');
+
+  const W = $('wrap').clientWidth, narrow = W < 520, L = narrow ? 38 : 46, R = 10, PH = narrow ? 100 : 124, G = 42, T0 = 22;
+  const H = T0 + act.length * (PH + G) - G + 26;
+  const X = t => L + (t - win.start) / (win.end - win.start) * (W - L - R);
+  let o = '';
+  act.forEach((s, i) => {
+    const top = T0 + i * (PH + G), k = s.key, vals = [];
+    for (const p of points) for (const v of [p[k], p[k + 'Lo'], p[k + 'Hi']]) if (v != null) vals.push(v);
+    o += `<text class="pl" x="${L}" y="${top - 9}">${s.name} (${s.unit})</text>`;
+    if (!vals.length) {
+      o += `<text x="${L}" y="${top + PH / 2}">No values</text>`;
+      return;
+    }
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < s.minRange) { const mid = (hi + lo) / 2; lo = mid - s.minRange / 2; hi = mid + s.minRange / 2; }
+    const step = niceStep((hi - lo) / 4), dec = (String(+step.toFixed(6)).split('.')[1] || '').length;
+    lo = Math.floor(lo / step) * step;
+    hi = Math.ceil(hi / step) * step;
+    const Y = v => (top + PH - (v - lo) / (hi - lo) * PH).toFixed(1), px = p => X(p.m).toFixed(1);
+    for (let v = lo; v <= hi + step / 2; v += step) {
+      o += `<line class="gl" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 6}" y="${+Y(v) + 4}" text-anchor="end">${fmt(v, dec)}</text>`;
+    }
+    if (k === 'co2' && live) for (const lim of live.limits) if (lim > lo && lim < hi) o += `<line class="lim" x1="${L}" x2="${W - R}" y1="${Y(lim)}" y2="${Y(lim)}"/>`;
+
+    // Lines break where values are missing for more than 2.5 periods
+    const runs = [];
+    let run = [];
+    for (const p of points) {
+      const prev = run[run.length - 1];
+      if (p[k] == null || (prev && p.t - prev.t > Math.max(p.r, prev.r) * 150)) { if (run.length) runs.push(run); run = []; }
+      if (p[k] != null) run.push(p);
+    }
+    if (run.length) runs.push(run);
+    for (const r of runs) {
+      const band = r.filter(p => p[k + 'Lo'] != null);
+      if (band.length > 1) {
+        o += `<path class="f-${k}" d="M${band.map(p => px(p) + ' ' + Y(p[k + 'Hi'])).join('L')}L${band.reverse().map(p => px(p) + ' ' + Y(p[k + 'Lo'])).join('L')}Z"/>`;
+      }
+      o += `<path class="ln s-${k}" d="M${r.map(p => px(p) + ' ' + Y(p[k])).join('L')}${r.length === 1 ? 'l0 0' : ''}"/>`;
+    }
+  });
+
+  // Time labels at full hours, as many as fit (every 30 min to 12 h)
+  const span = win.end - win.start, fit = Math.max(2, Math.floor((W - L - R) / (clock(win.start).length * 6.5 + 16)));
+  const step = [1800, 3600, 7200, 10800, 21600, 43200].find(s => span / s <= fit) || 43200;
+  const offset = -new Date(win.start * 1000).getTimezoneOffset() * 60;
+  for (let t = Math.ceil((win.start + offset) / step) * step - offset; t <= win.end; t += step) {
+    const x = X(t), d = new Date(t * 1000), midnight = t > win.start && d.getHours() === 0 && d.getMinutes() === 0;
+    const anchor = x < L + 18 ? 'start' : x > W - R - 18 ? 'end' : 'middle';
+    o += `<text x="${x.toFixed(1)}" y="${H - 4}" text-anchor="${anchor}"${midnight ? ' class="pl"' : ''}>${midnight ? d.toLocaleDateString([], {weekday: 'short'}) : clock(t)}</text>`;
+  }
+  o += `<line id="cross" y1="${T0 - 4}" y2="${H - 22}"/>`;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+  svg.innerHTML = o;
+  geo = {L, R, W, X, act};
+}
+
+function showTip(e) {
+  if (!geo || !points.length) return;
+  const x = e.clientX - $('chart').getBoundingClientRect().left;
+  if (x < geo.L - 4 || x > geo.W - geo.R + 4) return hideTip();
+  const t = win.start + (x - geo.L) / (geo.W - geo.L - geo.R) * (win.end - win.start);
+  let i = 0, j = points.length - 1;
+  while (i < j) { const mid = (i + j) >> 1; if (points[mid].m < t) i = mid + 1; else j = mid; }
+  if (i > 0 && Math.abs(points[i - 1].m - t) < Math.abs(points[i].m - t)) i--;
+  const p = points[i];
+  if (Math.abs(p.m - t) > p.r * 90) return hideTip();
+
+  const cx = geo.X(p.m), cross = $('cross');
+  cross.setAttribute('x1', cx);
+  cross.setAttribute('x2', cx);
+  cross.style.display = 'block';
+  const twoDays = new Date(win.start * 1000).getDate() !== new Date((win.end - 1) * 1000).getDate();
+  let h = `<div class="tt">${twoDays ? dateText(p.t, {weekday: 'short'}) + ' ' : ''}${clock(p.t)}${p.r > 1 ? '–' + clock(p.t + p.r * 60) : ''}</div>`;
+  for (const s of geo.act) {
+    const v = p[s.key];
+    h += `<div><i class="sq b-${s.key}"></i>${s.name} <b>${fmt(v, s.dec)}</b> ${v == null ? '' : s.unit}`;
+    if (p[s.key + 'Lo'] != null) h += ` <span class="sub">(${fmt(p[s.key + 'Lo'], s.dec)} to ${fmt(p[s.key + 'Hi'], s.dec)})</span>`;
+    h += '</div>';
+  }
+  const tip = $('tip');
+  tip.innerHTML = h;
+  tip.style.display = 'block';
+  const w = tip.offsetWidth;
+  tip.style.left = (cx + 14 + w > geo.W ? Math.max(0, cx - 14 - w) : cx + 14) + 'px';
+}
+
+function hideTip() {
+  $('tip').style.display = 'none';
+  const cross = $('cross');
+  if (cross) cross.style.display = 'none';
+}
+
+// ---------- Download ----------
+
+// Start of the time a level keeps (the monitor deletes older files), 0 = until the flash is full
+function keptFrom(res) {
+  const days = info.keepDays[{1: 'm1', 5: 'm5', 60: 'h1'}[res]];
+  return days ? Math.floor(now() / DAY - days) * DAY : 0;
+}
+
+// Finest level that still keeps the start date. The monitor's days are UTC days,
+// so a local day may begin up to a day earlier.
+function bestLevel(start) {
+  for (const res of [1, 5]) if (start + DAY > keptFrom(res)) return res;
+  return 60;
+}
+
+function toCsv(rows, res) {
+  // The browser's number format, so Excel splits the columns (22,5 and ; in German, for example)
+  const comma = (1.5).toLocaleString().includes(','), sep = comma ? ';' : ',';
+  const num = (v, d) => v == null ? '' : comma ? v.toFixed(d).replace('.', ',') : v.toFixed(d);
+  const local = t => { const d = new Date(t * 1000); return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const utc = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  const cols = res === 60
+    ? [['co2_avg_ppm', 'co2', 0], ['co2_min_ppm', 'co2Lo', 0], ['co2_max_ppm', 'co2Hi', 0], ['temperature_avg_c', 'tmp', 2],
+       ['temperature_min_c', 'tmpLo', 2], ['temperature_max_c', 'tmpHi', 2], ['humidity_avg_pct', 'hum', 2],
+       ['humidity_min_pct', 'humLo', 2], ['humidity_max_pct', 'humHi', 2]]
+    : [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2]];
+  if (rows.some(p => p.pres != null)) cols.push([res === 60 ? 'pressure_avg_hpa' : 'pressure_hpa', 'pres', 1]);
+  if (res === 60) cols.push(['minutes', 'minutes', 0]);
+  const lines = [['time_local', 'time_utc', ...cols.map(c => c[0])].join(sep)];
+  for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2]))].join(sep));
+  return lines.join('\r\n') + '\r\n';
+}
+
+function saveFile(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type: 'text/csv'}));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function setDownloadDates() {
+  const t = new Date(), oldest = oldestData(), min = oldest ? isoDate(new Date(oldest * 1000)) : '';
+  for (const id of ['dlfrom', 'dlto']) {
+    $(id).max = isoDate(t);
+    $(id).min = min;
+  }
+  if (!$('dlto').value) {
+    $('dlto').value = isoDate(t);
+    const from = isoDate(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 6));
+    $('dlfrom').value = min && from < min ? min : from;
+  }
+}
+
+async function download() {
+  const note = $('dlnote'), fail = text => { note.textContent = text; note.className = 'hint err'; };
+  note.className = 'hint';
+  const a = $('dlfrom').value, b = $('dlto').value;
+  if (!a || !b) return fail('Choose a start and an end date.');
+  if (a > b) return fail('The start date must be on or before the end date.');
+  if (!info || !info.on || !info.clock) return fail('The monitor has no stored values yet.');
+  const [ay, am, ad] = a.split('-').map(Number), [by, bm, bd] = b.split('-').map(Number);
+  const start = dayStart(ay, am - 1, ad), end = dayStart(by, bm - 1, bd + 1);
+  const choice = $('dlres').value, res = choice === 'best' ? bestLevel(start) : +choice;
+  if (start + DAY <= keptFrom(res)) return fail(`The ${LEVEL_NAMES[res]} only go back to ${dateText(keptFrom(res))}. Choose a later start date or less detail.`);
+
+  const chunk = {1: DAY, 5: 14 * DAY, 60: 92 * DAY}[res], total = Math.ceil((end - start) / chunk), rows = [];
+  $('dl').disabled = true;
+  try {
+    for (let t = start, i = 1; t < end; t += chunk, i++) {
+      note.textContent = `Loading part ${i} of ${total}…`;
+      for (const p of await getRecords(res, t, Math.min(t + chunk, end))) rows.push(p);
+    }
+  } catch (e) {
+    return fail('Couldn’t reach the monitor. Try again.');
+  } finally {
+    $('dl').disabled = false;
+  }
+  if (!rows.length) return fail('No values stored between these dates.');
+  const name = `co2_${a}_${b}_${res === 60 ? 'hourly' : res + 'min'}.csv`;
+  saveFile(name, toCsv(rows, res));
+  note.textContent = `Saved ${name}, ${fmt(rows.length, 0)} rows of ${LEVEL_NAMES[res]}.`;
+}
+
+// ---------- Start ----------
+
+function setup() {
+  const showTheme = () => document.querySelectorAll('#theme button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === themeChoice));
+  document.querySelectorAll('#theme button').forEach(b => b.onclick = () => {
+    themeChoice = b.dataset.v;
+    try { localStorage.setItem('theme', themeChoice); } catch (e) {}
+    applyTheme();
+    showTheme();
+  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  showTheme();
+
+  for (let i = 0; i < 7; i++) $('wd').innerHTML += '<span>' + new Date(2024, 0, 1 + i).toLocaleDateString([], {weekday: 'short'}).slice(0, 2) + '</span>';
+  $('prev').onclick = () => moveMonth(-1);
+  $('next').onclick = () => moveMonth(1);
+  $('cal').onclick = e => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    selectDay(new Date(view.y, view.m, +b.dataset.d));
+    if (lastHours) $('from').value = $('to').value = '00:00';  // a day after "Last … h": the whole day
+    lastHours = 0;
+    loadChart();
+  };
+
+  const setRange = (from, to) => { $('from').value = from; $('to').value = to; lastHours = 0; loadChart(); };
+  $('whole').onclick = () => setRange('00:00', '00:00');
+  $('night').onclick = () => setRange('22:00', '08:00');
+  $('from').onchange = $('to').onchange = () => { lastHours = 0; loadChart(); };
+  document.querySelectorAll('#last button').forEach(b => b.onclick = () => showLast(+b.dataset.h));
+
+  document.querySelectorAll('#toggles .chip').forEach(b => {
+    b.setAttribute('aria-pressed', show[b.dataset.s]);
+    b.onclick = () => {
+      show[b.dataset.s] = !show[b.dataset.s];
+      b.setAttribute('aria-pressed', show[b.dataset.s]);
+      try { localStorage.setItem('show', JSON.stringify(show)); } catch (e) {}
+      if (geo || points.length) drawChart();
+    };
+  });
+
+  const wrap = $('wrap');
+  wrap.onpointermove = wrap.onpointerdown = showTip;
+  wrap.onpointerleave = hideTip;
+  let resizeTimer;
+  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (geo) drawChart(); }, 150); });
+
+  $('dl').onclick = download;
+  for (const id of ['dlfrom', 'dlto', 'dlres']) $(id).oninput = () => { $('dlnote').textContent = ''; };
+}
+
+async function start() {
+  setup();
+  drawCalendar();
+  loadLive();
+  setInterval(loadLive, 5000);
+  setInterval(showLive, 1000);
+  for (;;) {
+    try { info = await (await get('/api/info')).json(); break; } catch (e) {}
+    message('Couldn’t reach the monitor. Retrying…');
+    await sleep(5000);
+  }
+  setDownloadDates();
+  loadMonth();
+  loadChart();
+
+  // Every minute: follow new values while the graph shows the current time.
+  // "Last … h" moves along, so it keeps ending now.
+  let minutes = 0;
+  setInterval(async () => {
+    minutes++;
+    const clockWasSet = info.clock;
+    try { info = await (await get('/api/info')).json(); } catch (e) {}
+    if (!clockWasSet && info.clock) { setDownloadDates(); loadMonth(); }
+    else if (minutes % 10 === 0) loadMonth();
+    if (lastHours) showLast(lastHours);
+    else if (win.end > now() - 120 && win.start < now()) loadChart();
+  }, 60000);
+}
+
+start();
+</script>
+</body>
+</html>
