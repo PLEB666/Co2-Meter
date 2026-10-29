@@ -11,3 +11,6 @@ build/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Wi-Fi password
+secrets.h

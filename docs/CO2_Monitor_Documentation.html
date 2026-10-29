@@ -99,8 +99,8 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 0.96" OLED</p>
   <div class="meta">
-    <span><b>Version</b> 0.7 &ndash; Step 1: measure and display</span>
-    <span><b>Updated</b> 25 Oct 2026</span>
+    <span><b>Version</b> 0.11 &ndash; Step 3: web page</span>
+    <span><b>Updated</b> 29 Oct 2026</span>
     <span><b>Status</b> breadboard prototype</span>
   </div>
 </header>
@@ -112,6 +112,8 @@
   <li><a href="#wiring">Wiring</a></li>
   <li><a href="#ide">Arduino IDE setup</a></li>
   <li><a href="#firmware">Firmware</a></li>
+  <li><a href="#history">History storage</a></li>
+  <li><a href="#webpage">Web page</a></li>
   <li><a href="#testing">Testing</a></li>
   <li><a href="#calibration">CO<sub>2</sub> calibration</a></li>
   <li><a href="#notes">Hardware notes</a></li>
@@ -124,6 +126,10 @@
 <section id="overview">
   <h2><span class="n">1</span>Project overview</h2>
   <p><b>Step 1 goal:</b> the OLED shows the temperature and humidity from the <b>SHT45</b> and the CO<sub>2</sub> concentration from the <b>SCD-41</b>. To save power and prevent OLED burn-in, the display switches off after <b>30 seconds</b>. A <b>push button</b> wakes it for another 30 seconds. The sensors keep measuring while the display is off, and the dimmed <b>RGB LED</b> on the ESP32 board shows the CO<sub>2</sub> level all the time as a colour from green through yellow to red.</p>
+
+  <p><b>Step 2:</b> the monitor joins your Wi-Fi, gets the time from the internet and keeps a <b>history</b> of the values in its own flash memory: 1-minute values for 7 days, 5-minute values for 90 days and hourly values for about 3&frac12; years (<a href="#history">section 7</a>).</p>
+
+  <p><b>Step 3 (this version):</b> the monitor serves its own <b>web page</b>. Any browser on the home network shows the live values, graphs of any stored day and time range, and a CSV download, in light or dark mode (<a href="#webpage">section 8</a>). Next step: Matter for the Alexa Echo.</p>
 
   <p>The ESP32 talks to all three modules over one shared <b>I&sup2;C bus</b>, made of four wires: 3.3&nbsp;V, GND, SDA (data) and SCL (clock). Each module has its own fixed address, so they don't get in each other's way. The button is a separate input on GPIO2.</p>
 
@@ -180,16 +186,24 @@
     <figcaption>Figure 1 &ndash; Every module hangs on the same four wires. A dot means "connected"; lines that cross without a dot are not connected.</figcaption>
   </figure>
 
+  <div style="break-inside: avoid">
   <h3>Project files</h3>
   <table>
     <tr><th>File</th><th>Purpose</th></tr>
-    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program (step 1): sensors &rarr; display, button wake, 30&nbsp;s timeout, CO<sub>2</sub> colour on the RGB LED, serial output.</td></tr>
+    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program (step 3): sensors &rarr; display, button wake, 30&nbsp;s timeout, CO<sub>2</sub> colour on the RGB LED, serial output, Wi-Fi and internet time, Serial Monitor commands.</td></tr>
+    <tr><td><code>firmware/co2_monitor/history.h</code>, <code>history.cpp</code></td><td>History storage in the flash (section 7). The Arduino IDE shows them as tabs next to the main program.</td></tr>
+    <tr><td><code>firmware/co2_monitor/web.h</code>, <code>web.cpp</code></td><td>Web server: the page and the data addresses it uses (section 8).</td></tr>
+    <tr><td><code>firmware/co2_monitor/web/index.html</code>, <code>make_web_page.ps1</code>, <code>../web_page.h</code></td><td>The web page; the script packs it into <code>web_page.h</code>, the compressed copy the firmware serves (8.6).</td></tr>
+    <tr><td><code>firmware/co2_monitor/secrets_example.h</code></td><td>Template for <code>secrets.h</code>.</td></tr>
+    <tr><td><code>firmware/co2_monitor/secrets.h</code></td><td>Your Wi-Fi name and password (5.8). Not stored in git.</td></tr>
     <tr><td><code>firmware/i2c_scanner/i2c_scanner.ino</code></td><td>Wiring check: lists all I&sup2;C devices it finds. Run this first.</td></tr>
     <tr><td><code>firmware/scd41_calibration/scd41_calibration.ino</code></td><td>Optional tool: forced recalibration (FRC) of the SCD-41 in fresh outdoor air.</td></tr>
     <tr><td><code>docs/CO2_Monitor_Documentation.html</code></td><td>This document (source).</td></tr>
     <tr><td><code>docs/CO2_Monitor_Documentation.pdf</code></td><td>PDF version, regenerated from the HTML after every change.</td></tr>
     <tr><td><code>docs/build_pdf.ps1</code></td><td>Script that turns the HTML into the PDF (uses Chrome or Edge in headless mode).</td></tr>
+    <tr><td><code>docs/web_page.png</code></td><td>Screenshot of the web page (Figure 6).</td></tr>
   </table>
+  </div>
 </section>
 
 <!-- ============================================================ 2 -->
@@ -437,11 +451,13 @@
     <tr><td>Port</td><td>the COM port that appears when you plug in the board</td></tr>
     <tr><td>USB CDC On Boot</td><td><b>Disabled</b> if you use the port labelled <b>UART</b> &middot; <b>Enabled</b> if you use the port labelled <b>USB</b></td></tr>
     <tr><td>Flash Size</td><td><b>8MB (64Mb)</b></td></tr>
-    <tr><td>Partition Scheme</td><td><b>8M with spiffs (3MB APP/1.5MB SPIFFS)</b></td></tr>
+    <tr><td>Partition Scheme</td><td><b>8M with spiffs (3MB APP/1.5MB SPIFFS)</b>. The history lives in its 1.5&nbsp;MB data area (section 7).</td></tr>
     <tr><td>CPU Frequency</td><td>160MHz (WiFi)</td></tr>
     <tr><td>Upload Speed</td><td>921600 (use 115200 if uploads fail)</td></tr>
+    <tr><td>Erase All Flash Before Sketch Upload</td><td><b>Disabled</b> (the default). Enabled deletes the stored history.</td></tr>
     <tr><td>Everything else</td><td>leave at default</td></tr>
   </table>
+  <div class="box warn"><span class="label">Keep Flash Size and Partition Scheme as shown.</span> Normal uploads keep the stored history. Changing either setting moves the data area, so the history can't be read any more. The firmware checks the layout at every start: with a different scheme it prints <code>History OFF: wrong partition scheme</code> and records nothing.</div>
 
   <h3>5.5 Which USB port?</h3>
   <p>Both USB-C ports can power and program the board. <b>Recommended: the port labelled "UART"</b> with <i>USB CDC On Boot = Disabled</i>. Serial output then appears from the first moment after reset. If you use the "USB" port, set <i>USB CDC On Boot = Enabled</i>, otherwise the Serial Monitor stays empty.</p>
@@ -464,6 +480,17 @@
 
   <h3>5.7 Open the project sketches</h3>
   <p><b>File &rarr; Open&hellip;</b> and pick the <code>.ino</code> file inside <code>firmware/&lt;name&gt;/</code>. The Arduino IDE needs each sketch in a folder with the same name, which is how the project is laid out. Serial Monitor: <b>Tools &rarr; Serial Monitor</b>, set to <b>115200 baud</b>.</p>
+
+  <h3>5.8 Wi-Fi name and password (<code>secrets.h</code>)</h3>
+  <p>The monitor needs Wi-Fi for the clock, and later for the web page. Your network name and password go in <code>firmware/co2_monitor/secrets.h</code>. Git ignores this file, so the password never ends up in the repository. The IDE shows it as a tab next to <code>co2_monitor.ino</code>.</p>
+  <ol>
+    <li>If <code>secrets.h</code> is missing (for example in a fresh copy of the project), copy <code>secrets_example.h</code> and rename the copy to <code>secrets.h</code>. Without it the sketch doesn't compile.</li>
+    <li>Replace <code>your-wifi-name</code> and <code>your-wifi-password</code>. Keep the quotes.</li>
+    <li>The ESP32-C6 only uses <b>2.4&nbsp;GHz</b> Wi-Fi. A router that sends 2.4 and 5&nbsp;GHz under one name is fine.</li>
+  </ol>
+<pre>constexpr char WIFI_SSID[] = "MyNetwork";
+constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
+  <p>The monitor shows up in your router's device list as <b>co2-monitor</b>. For the web page, reserve a fixed address for it in the router later (DHCP reservation).</p>
 </section>
 
 <!-- ============================================================ 6 -->
@@ -476,9 +503,13 @@
         <li>Starts the I&sup2;C bus on GPIO23 (SDA) / GPIO22 (SCL).</li>
         <li><b>SHT45</b>: high-precision reading every 2&nbsp;s, heater off.</li>
         <li><b>SCD-41</b>: periodic measurement, a new CO<sub>2</sub> value every 5&nbsp;s. Altitude compensation is set at every start.</li>
-        <li><b>Display</b>: on for 30&nbsp;s after power-up and after every button press. Pressing while it's on restarts the 30&nbsp;s. When off, the panel is fully dark and the content is kept. Brightness is set by <code>OLED_BRIGHTNESS</code>.</li>
-        <li><b>RGB LED</b> (on the board, GPIO8): dimmed, always on, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value arrives.</li>
-        <li><b>Serial</b>: one line per CO<sub>2</sub> reading, usable in the Serial Monitor and the Serial Plotter.</li>
+        <li><b>Warm-up</b>: for the first 30&nbsp;s after start-up the sensors measure, but no value is shown, printed or saved. The values from this time are thrown away. The display counts down ("warming up", 30&nbsp;s &hellip; 1&nbsp;s).</li>
+        <li><b>Display</b>: on during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press. Pressing while it's on restarts the 30&nbsp;s. When off, the panel is fully dark and the content is kept. Brightness is set by <code>OLED_BRIGHTNESS</code>.</li>
+        <li><b>RGB LED</b> (on the board, GPIO8): dimmed, always on, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value after the warm-up.</li>
+        <li><b>Serial</b>: one line per CO<sub>2</sub> reading after the warm-up, usable in the Serial Monitor and the Serial Plotter.</li>
+        <li><b>Wi-Fi and clock</b>: connects with the details in <code>secrets.h</code> and reconnects by itself. Gets the time (UTC) from the internet and updates it every 3&nbsp;hours.</li>
+        <li><b>History</b>: stores 1-minute, 5-minute and hourly values in the flash (section 7). You can view them with commands in the Serial Monitor (7.6).</li>
+        <li><b>Web page</b>: live values, graphs and CSV downloads in a browser on the home network (section 8).</li>
         <li>A missing module is reported on Serial and on the display (<code>--.-</code> / "SCD-41 missing"). The rest keeps working.</li>
       </ul>
     </div>
@@ -505,6 +536,7 @@
   <table>
     <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
     <tr><td><code>SENSOR_ALTITUDE_M</code></td><td>0</td><td><b>Set this to your altitude in metres above sea level.</b> The SCD-41 uses it for air-pressure compensation. Without it, readings at e.g. 500&nbsp;m are a few percent off.</td></tr>
+    <tr><td><code>WARMUP_TIME_MS</code></td><td>30000</td><td>Warm-up after start-up (ms): the sensors measure, but nothing is shown, printed or saved.</td></tr>
     <tr><td><code>OLED_ADDRESS</code></td><td>0x3C</td><td>0x3D if the address resistor on the back of the OLED was moved.</td></tr>
     <tr><td><code>OLED_ROTATION</code></td><td>0</td><td>0 = normal, header pins at the top. Set 2 if the text appears upside down (e.g. if you mount the display the other way round).</td></tr>
     <tr><td><code>OLED_BRIGHTNESS</code></td><td>207</td><td>Display brightness 0&ndash;255 (the SSD1306's contrast setting; 207 is the library default). The range is smaller than it sounds: even 0 stays readable, at roughly half brightness. Lower values also slow burn-in.</td></tr>
@@ -514,7 +546,10 @@
     <tr><td><code>CO2_GOOD_BELOW</code>, <code>CO2_OK_BELOW</code>, <code>CO2_VENTILATE_BELOW</code></td><td>800 / 1000 / 2000</td><td>Limits for the rating shown at the top right, and the points where the LED is green, yellow and red.</td></tr>
     <tr><td><code>LED_BRIGHTNESS</code></td><td>5</td><td>Brightness of the RGB LED, 1&ndash;255 (0 = off). 255 is glaring; the BlinkRGB example uses 64. Try 3&ndash;5 for a bedroom, 20&ndash;30 for a bright room.</td></tr>
     <tr><td><code>LED_GREEN</code>, <code>LED_YELLOW</code>, <code>LED_RED</code></td><td>{0,255,0} / {255,160,0} / {255,0,0}</td><td>The three colours at full brightness, as {red, green, blue}. Yellow has less green because the green LED looks brighter than the red one. If yellow looks too green, lower its middle value.</td></tr>
+    <tr><td><code>WIFI_HOSTNAME</code></td><td>co2-monitor</td><td>The name shown in your router's device list.</td></tr>
+    <tr><td><code>NTP_SERVER_1</code>, <code>NTP_SERVER_2</code></td><td>pool.ntp.org / time.google.com</td><td>Internet time servers. Your router's address also works if it offers time itself.</td></tr>
   </table>
+  <p class="muted">The Wi-Fi name and password are in <code>secrets.h</code> (5.8). The history settings are in <code>history.cpp</code> (7.9).</p>
 
   <h3>CO<sub>2</sub> rating on the display and the LED</h3>
   <table>
@@ -528,8 +563,230 @@
 </section>
 
 <!-- ============================================================ 7 -->
-<section id="testing">
-  <h2><span class="n">7</span>Testing</h2>
+<section id="history">
+  <h2><span class="n">7</span>History storage</h2>
+  <p>The monitor keeps a long-term record of its values in the ESP32's own flash memory, with no extra hardware. The web page (section 8) draws its graphs from it and offers it as a CSV download. You can also read it in the Serial Monitor (7.6). The code is in <code>history.h</code> and <code>history.cpp</code>.</p>
+
+  <h3>7.1 Three levels of detail</h3>
+  <table>
+    <tr><th>Level</th><th>Each record holds</th><th>Record</th><th>Files</th><th>Kept</th></tr>
+    <tr><td><b>1-minute</b> (<code>m1</code>)</td><td>average CO<sub>2</sub>, temperature, humidity and air pressure</td><td class="nowrap">12 bytes</td><td><code>/m1/20261028.bin</code>, one per day, up to 17&nbsp;KB</td><td>7 days</td></tr>
+    <tr><td><b>5-minute</b> (<code>m5</code>)</td><td>the same</td><td class="nowrap">12 bytes</td><td><code>/m5/20261028.bin</code>, one per day, up to 3.5&nbsp;KB</td><td>90 days</td></tr>
+    <tr><td><b>Hourly</b> (<code>h1</code>)</td><td>average, minimum and maximum of CO<sub>2</sub>, temperature and humidity; average pressure; number of minutes measured</td><td class="nowrap">26 bytes</td><td><code>/h1/202610.bin</code>, one per month, up to 19&nbsp;KB</td><td>until the flash is full, about 3&frac12; years; then the oldest month is deleted</td></tr>
+  </table>
+  <ul>
+    <li>Air pressure stays empty until the BMP390 is fitted. The light level isn't stored; the VEML7700 is meant for the display brightness.</li>
+    <li>The hourly minimum and maximum come from the 1-minute averages, not from single 5-second readings.</li>
+    <li>Each file starts with a format version, so a later firmware can add values without losing the older data.</li>
+  </ul>
+
+  <h3>7.2 How a reading gets saved</h3>
+  <figure>
+    <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flow of a reading into the history files">
+      <defs>
+        <marker id="hist-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+        </marker>
+      </defs>
+      <text x="160" y="58" text-anchor="middle" font-size="11" font-weight="600" fill="#0969da">In RAM &ndash; lost on a power cut</text>
+      <text x="571" y="14" text-anchor="middle" font-size="11" font-weight="600" fill="#1a7f37">In the flash (LittleFS, 1.5&nbsp;MB) &ndash; kept</text>
+      <rect x="20" y="70" width="120" height="60" rx="6" fill="#eef1f5" stroke="#57606a"/>
+      <text x="80" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">SCD-41 + SHT45</text>
+      <text x="80" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">a reading every 5 s</text>
+      <rect x="170" y="70" width="130" height="60" rx="6" fill="#e5f2ff" stroke="#0969da"/>
+      <text x="235" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">1-minute average</text>
+      <text x="235" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">collected in RAM</text>
+      <rect x="400" y="70" width="140" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
+      <text x="470" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/m1 day files</text>
+      <text x="470" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">1-minute, kept 7 days</text>
+      <rect x="590" y="24" width="152" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
+      <text x="666" y="50" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/m5 day files</text>
+      <text x="666" y="67" text-anchor="middle" font-size="10.5" fill="#57606a">5-minute, kept 90 days</text>
+      <rect x="590" y="124" width="152" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
+      <text x="666" y="146" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/h1 month files</text>
+      <text x="666" y="162" text-anchor="middle" font-size="10.5" fill="#57606a">hourly avg / min / max</text>
+      <text x="666" y="176" text-anchor="middle" font-size="10.5" fill="#57606a">kept about 3&frac12; years</text>
+      <g stroke="#57606a" stroke-width="1.6" fill="none" marker-end="url(#hist-arrow)">
+        <line x1="140" y1="100" x2="168" y2="100"/>
+        <line x1="300" y1="100" x2="398" y2="100"/>
+        <line x1="540" y1="92" x2="588" y2="58"/>
+        <line x1="540" y1="108" x2="588" y2="150"/>
+      </g>
+      <text x="350" y="92" text-anchor="middle" font-size="10.5" fill="#1f2328">every 10 min</text>
+      <text x="350" y="116" text-anchor="middle" font-size="10" fill="#57606a">append</text>
+      <text x="470" y="152" text-anchor="middle" font-size="10" fill="#57606a">in the same save, worked</text>
+      <text x="470" y="166" text-anchor="middle" font-size="10" fill="#57606a">out from the saved minutes</text>
+    </svg>
+    <figcaption>Figure 5 &ndash; How a reading becomes history. Only the part in RAM, at most 10 minutes, is lost on a power cut.</figcaption>
+  </figure>
+  <ol>
+    <li>Every 5&nbsp;s the SCD-41 delivers a CO<sub>2</sub> value. Together with the latest SHT45 values it is added to the average of the current minute, in RAM. Nothing is stored during the 30&nbsp;s warm-up after a start.</li>
+    <li>Every 10 minutes (at :00, :10, :20&nbsp;&hellip; plus 5&nbsp;s) the finished minutes are appended to today's file in <code>/m1</code>.</li>
+    <li>In the same save, every finished 5-minute period and every finished hour is worked out from the saved 1-minute values and appended to <code>/m5</code> and <code>/h1</code>. Because they always come from saved data, a power cut doesn't leave a hole in them: the hour that was running is completed after the restart from what was saved before.</li>
+    <li>Files older than their retention are deleted. If less than 64&nbsp;KB is free, the oldest hourly month is deleted.</li>
+  </ol>
+  <p>Records are only ever added to the end of a file, never changed later. Flash memory can't change data in place, so editing old records would wear it out much faster.</p>
+
+  <h3>7.3 Time</h3>
+  <ul>
+    <li>The clock comes from the internet over Wi-Fi. All values are stored in <b>UTC</b>; the web page converts them to your local time, summer time included. That's why a day file starts at midnight UTC, not at local midnight.</li>
+    <li>If the internet is down after a restart, the monitor doesn't know the time yet (it has no clock battery). It keeps up to <b>24 hours</b> of 1-minute values in RAM and gives them their correct times as soon as the clock is set. If the clock still isn't set after that, the oldest minutes are dropped.</li>
+    <li>Without Wi-Fi details in <code>secrets.h</code> nothing is recorded, because the values would have no time.</li>
+  </ul>
+
+  <h3>7.4 Power cuts, moving and flash wear</h3>
+  <ul>
+    <li><b>Power cut:</b> the saved history is safe. LittleFS finishes a save completely or not at all, so files are never damaged. You lose at most the last 10 minutes. A firmware upload or the <kbd>RESET</kbd> button counts as a power cut too. Before you unplug or upload on purpose, type <code>save</code> in the Serial Monitor.</li>
+    <li><b>Moving the monitor:</b> the same as a power cut. The history stays on the device. In another home, only <code>secrets.h</code> needs the new Wi-Fi.</li>
+    <li><b>Flash wear:</b> flash wears when a 4&nbsp;KB block is erased, and each block is rated for at least 100,000 erases. A save erases about 2&ndash;3 blocks, and LittleFS spreads the erases over the roughly 150 blocks that are reused again and again. That's about 2 erases per block per day, or around 100 years until the rating is reached.</li>
+  </ul>
+
+  <h3>7.5 What erases the history</h3>
+  <div class="box warn"><span class="label">Normal firmware uploads keep the history,</span> including uploads of the scanner and calibration sketches. It is lost only through:
+    <ul>
+      <li>a different <b>Flash Size</b> or <b>Partition Scheme</b> in the Tools menu (5.4). The firmware notices this at start, prints <code>History OFF: wrong partition scheme</code> and doesn't touch the flash. Set the menu back and upload again; the history is normally still there.</li>
+      <li><b>Erase All Flash Before Sketch Upload: Enabled</b> in the Tools menu. Leave it Disabled.</li>
+    </ul>
+    If you ever need either of them, save a CSV copy first (7.6).
+  </div>
+
+  <h3>7.6 Serial Monitor commands</h3>
+  <p>Type a command in the Serial Monitor's input line and press <kbd>Enter</kbd>. The line-ending box next to it must not be set to "No Line Ending".</p>
+  <table>
+    <tr><th style="width:22%">Command</th><th>What it shows or does</th></tr>
+    <tr><td><code>status</code></td><td>Wi-Fi, clock, flash use, minutes not saved yet, and the files of each level with their newest value.</td></tr>
+    <tr><td><code>files</code></td><td>Every history file with its size and number of values.</td></tr>
+    <tr><td><code>csv m1 1</code></td><td>The 1-minute values of the last day as CSV. <code>m5</code> = 5-minute, <code>h1</code> = hourly; the number is how many days back (<code>csv h1 400</code> = more than a year of hourly values).</td></tr>
+    <tr><td><code>save</code></td><td>Saves the minutes waiting in RAM now, for example before you unplug the monitor.</td></tr>
+  </table>
+  <p>Example answer to <code>status</code>:</p>
+<pre>Wi-Fi: connected to "MyNetwork", address 192.168.1.50, signal -58 dBm
+Clock: 2026-10-28 17:21:40 UTC
+Flash: 32 KB of 1536 KB used (2%)
+Not saved yet (in RAM): 2 minutes, next save in 505 s
+1-minute values (m1): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:19 UTC
+5-minute values (m5): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:15 UTC
+Hourly values (h1): 0 files</pre>
+  <p>And the start of <code>csv m1 1</code>:</p>
+<pre>time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa
+2026-10-28 17:05,612,22.41,45.30,
+2026-10-28 17:06,618,22.43,45.12,</pre>
+  <p>To keep a copy, select the lines in the Serial Monitor, paste them into a text file and save it as <code>.csv</code>. If Excel puts everything in one column, open it with <i>Data &rarr; From Text/CSV</i> and choose comma as the separator. Times are UTC. An empty field means the value wasn't measured. The web page's download (8.4) is easier: it uses local time and Excel's number format.</p>
+
+  <div style="break-inside: avoid">
+  <h3>7.7 File format</h3>
+  <p>Each file is a 16-byte header followed by fixed-size records in time order. Numbers are little-endian, and values are stored as whole numbers:</p>
+  <table>
+    <tr><th>Field</th><th>Bytes</th><th>Unit</th><th>Means "missing"</th></tr>
+    <tr><td colspan="4"><b>Header</b> (16 bytes): the letters <code>CO2H</code>, format version (1), minutes per record (1, 5 or 60), record size, creation time, 4 reserved bytes.</td></tr>
+    <tr><td colspan="4"><b>1-minute and 5-minute record</b> (12 bytes):</td></tr>
+    <tr><td>time</td><td>4</td><td>UTC seconds since 1970, start of the minute or 5 minutes</td><td>&ndash;</td></tr>
+    <tr><td>CO<sub>2</sub></td><td>2</td><td>ppm</td><td>0</td></tr>
+    <tr><td>temperature</td><td>2 (signed)</td><td>0.01&nbsp;&deg;C</td><td>&minus;32768</td></tr>
+    <tr><td>humidity</td><td>2</td><td>0.01&nbsp;%RH</td><td>65535</td></tr>
+    <tr><td>air pressure</td><td>2</td><td>0.1&nbsp;hPa</td><td>0</td></tr>
+    <tr><td colspan="4"><b>Hourly record</b> (26 bytes): time (4), CO<sub>2</sub> average, minimum and maximum (3&nbsp;&times;&nbsp;2), the same for temperature and for humidity, average air pressure (2), number of minutes measured (1; 60 = complete hour), 1 reserved byte. Same units and "missing" values as above.</td></tr>
+  </table>
+  </div>
+
+  <h3>7.8 How much fits</h3>
+  <table>
+    <tr><th>Part of the 1.5&nbsp;MB</th><th style="width:28%">Space</th></tr>
+    <tr><td>1-minute files: 8 days of 17&nbsp;KB (5 blocks of 4&nbsp;KB each)</td><td>160&nbsp;KB</td></tr>
+    <tr><td>5-minute files: 91 days of 3.5&nbsp;KB (1 block each)</td><td>364&nbsp;KB</td></tr>
+    <tr><td>LittleFS's own data, plus 64&nbsp;KB that is always kept free</td><td>about 110&nbsp;KB</td></tr>
+    <tr><td><b>Left for hourly values</b>, at 5 blocks (20&nbsp;KB) per month or 240&nbsp;KB per year</td><td><b>about 900&nbsp;KB, roughly 3&frac12; years</b></td></tr>
+  </table>
+  <p class="muted">LittleFS stores each file in whole 4&nbsp;KB blocks, so space is counted in blocks. Keeping 5-minute values for 30 instead of 90 days (7.9) leaves room for about 4&frac12; years of hourly values. A microSD card would allow much more.</p>
+
+  <h3>7.9 Settings in <code>history.cpp</code></h3>
+  <table>
+    <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>MINUTE_KEEP_DAYS</code></td><td>7</td><td>Days of 1-minute values.</td></tr>
+    <tr><td><code>FIVE_MINUTE_KEEP_DAYS</code></td><td>90</td><td>Days of 5-minute values.</td></tr>
+    <tr><td><code>SAVE_INTERVAL_S</code></td><td>600</td><td>Seconds between saves, and the most a power cut can lose. Shorter means more flash wear.</td></tr>
+    <tr><td><code>PENDING_MAX</code></td><td>1440</td><td>Minutes kept in RAM while the clock isn't set (24&nbsp;h, 17&nbsp;KB of RAM).</td></tr>
+    <tr><td><code>MIN_FREE_BYTES</code></td><td>64&nbsp;KB</td><td>When less is free, the oldest hourly month is deleted.</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ 8 -->
+<section id="webpage" class="newpage">
+  <h2><span class="n">8</span>Web page</h2>
+  <p>The monitor serves its own web page on your home network. It shows the live values, graphs of any stored day and a CSV download. It needs no app and no internet: any browser on a phone, tablet or PC in the same Wi-Fi works. The code is in <code>web.h</code> and <code>web.cpp</code>, the page in <code>web/index.html</code>.</p>
+
+  <figure>
+    <img src="web_page.png" alt="The web page: live values, calendar, time range, graphs of CO2, temperature and humidity, and the download box" style="display:block; width:100%; max-width:118mm; margin:0 auto; border:1px solid var(--line); border-radius:6px">
+    <figcaption>Figure 6 &ndash; The web page in light mode, on the first evening with stored values (29 Oct 2026). The short break at about 21:40 is a restart for a firmware upload.</figcaption>
+  </figure>
+
+  <h3>8.1 Opening the page</h3>
+  <ul>
+    <li>At the start the Serial Monitor shows <code>Wi-Fi connected, web page at http://192.168.178.40/</code>, and <code>status</code> shows it too. Type that address into the browser and save it as a bookmark, or on the phone's home screen.</li>
+    <li>The phone or PC must be in the <b>same Wi-Fi</b>. A guest network usually can't reach devices in the home network.</li>
+    <li>There's no password. Anyone in your Wi-Fi can look at the values, but nothing can be changed from the page.</li>
+  </ul>
+
+  <h3>8.2 Fixed address in the router</h3>
+  <p>The router gives every device its address. It normally keeps it, but after a router reset or a long time switched off the monitor may get another one, and the bookmark stops working. Tell the router to always give the monitor the same address. The monitor is listed there as <b>co2-monitor</b>.</p>
+  <ul>
+    <li><b>FRITZ!Box</b> (home addresses 192.168.178.x): <i>Heimnetz &rarr; Netzwerk &rarr; Netzwerkverbindungen</i>, pencil next to co2-monitor, tick <i>Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen</i>, then OK. In English: <i>Home Network &rarr; Network &rarr; Network Connections</i>, <i>Always assign this network device the same IPv4 address</i>. The menu names differ a little between FRITZ!OS versions.</li>
+    <li><b>Other routers:</b> look for "DHCP reservation", "static lease" or "address reservation" in the LAN or DHCP settings.</li>
+  </ul>
+  <div class="box note">The address isn't fixed in the firmware on purpose. With a new router or in another network the monitor would then not get online at all, so it would get no time and store nothing. A name like <code>co2-monitor.local</code> isn't used either, because the Matter step brings its own name service and the two would clash.</div>
+
+  <h3>8.3 What the page shows</h3>
+  <table>
+    <tr><th style="width:21%">Part</th><th>What it does</th></tr>
+    <tr><td>Status line</td><td>Green dot: a new reading arrived within the last 15&nbsp;s (the page asks every 5&nbsp;s). Red dot: no connection. "Waiting for the internet time" while the monitor's clock isn't set.</td></tr>
+    <tr><td>Live values</td><td>CO<sub>2</sub> with the same rating as the display (Good, OK, Ventilate, Bad air; limits in section 6), temperature and humidity. During the 30&nbsp;s warm-up: "Warming up" with the seconds left.</td></tr>
+    <tr><td>Graphs</td><td>Right below the live values. One graph per value, all on the same time axis in local time; the heading above them names the time shown. Move the mouse over them, or drag a finger along them, to see the values at that moment. Dashed lines mark the CO<sub>2</sub> limits that fall inside the scale. A gap means nothing was measured (power off, restart, warm-up). While the range includes the current time, new values are added every minute.</td></tr>
+    <tr><td>Last 1&ndash;24 h</td><td>The buttons <i>1 h</i>, <i>3 h</i>, <i>6 h</i>, <i>12 h</i> and <i>24 h</i> above the graphs show the last hours up to now. The range then moves along with the time. Picking a day or changing a time ends it; a day picked after it is shown whole.</td></tr>
+    <tr><td>Detail</td><td>The last 7 days use the 1-minute values, up to 90 days the 5-minute values, older days the hourly averages with a shaded band from the hourly minimum to the maximum. The line above the graphs says which.</td></tr>
+    <tr><td>Day and calendar</td><td>Below the graphs: the chosen day and time range on the right, the calendar on the left (on a phone the day box comes first). In the calendar, a dot under a day means values are stored for it, a ring that only hourly values are left (days older than 90 days). Future days can't be chosen. The arrows change the month.</td></tr>
+    <tr><td>Time range</td><td>From and to, up to 24 hours. If "to" is earlier than "from", the range ends the next day. <i>Whole day</i> and <i>Night 22&ndash;08</i> set it with one click.</td></tr>
+    <tr><td>Show</td><td>Switches the CO<sub>2</sub>, temperature and humidity graphs on and off. The browser remembers the choice.</td></tr>
+    <tr><td>Auto / Light / Dark</td><td>Auto follows the light or dark setting of the phone or PC. Light and Dark override it. The browser remembers the choice.</td></tr>
+    <tr><td>Bottom line</td><td>Wi-Fi signal, flash used by the history, and the time since the monitor started.</td></tr>
+  </table>
+
+  <h3>8.4 CSV download</h3>
+  <p>Choose a start and an end date (both included) and the detail, then press <i>Download CSV</i>. The browser fetches the values from the monitor in parts and saves them as a file, for example <code>co2_2026-10-23_2026-10-29_1min.csv</code>.</p>
+  <ul>
+    <li><b>Best available detail:</b> 1-minute values if the start date is within the last 7 days, 5-minute values within the last 90 days, otherwise hourly values. One file always has one level of detail.</li>
+    <li><b>Columns:</b> <code>time_local</code> (your time, summer time included), <code>time_utc</code>, then CO<sub>2</sub> in ppm, temperature in &deg;C and humidity in %. Hourly files have the average, minimum and maximum of each, plus <code>minutes</code> (1-minute values in that hour; 60 = complete). Each time is the start of its minute, 5 minutes or hour. A pressure column appears once the BMP390 is added. An empty field means the value wasn't measured.</li>
+    <li><b>Excel:</b> the file uses the browser's number format. With German settings that's <code>22,5</code> with <code>;</code> between the columns, so Excel opens it straight into columns.</li>
+  </ul>
+
+  <div style="break-inside: avoid">
+  <h3>8.5 What the web page costs</h3>
+  <table>
+    <tr><th style="width:21%">Resource</th><th>Use</th></tr>
+    <tr><td>Program flash</td><td>About 60&nbsp;KB more: 1,166,586 of 3,342,336 bytes (34%), up from 1,106,244. About 41&nbsp;KB is the web server library and 12&nbsp;KB the page (35&nbsp;KB before compression). Plenty is left for Matter.</td></tr>
+    <tr><td>RAM</td><td>0.4&nbsp;KB more fixed RAM, plus a few KB while a request is answered.</td></tr>
+    <tr><td>History storage</td><td><b>Unchanged.</b> The page is part of the firmware, not of the 1.5&nbsp;MB data partition, and reading the history doesn't wear the flash. The keeping times in 7.1 stay the same.</td></tr>
+    <tr><td>Measuring</td><td>Every answer is below 60&nbsp;KB and takes well under a second. The main program waits meanwhile, but no reading is lost: the SCD-41 keeps its newest value until it is read.</td></tr>
+  </table>
+  </div>
+
+  <h3>8.6 Changing the page</h3>
+  <ul>
+    <li>The page is <code>web/index.html</code>: HTML, CSS and JavaScript in one file, with no outside libraries. <code>web_page.h</code> holds a compressed copy that the firmware serves. After changing the page, run <code>web\make_web_page.ps1</code> in PowerShell, then upload the firmware.</li>
+    <li>To try a change without uploading, open the file in Chrome or Edge with the monitor's address added: <code>&hellip;/web/index.html?device=192.168.178.40</code>. It then loads its data from the monitor.</li>
+  </ul>
+  <p>The page gets its data from these addresses, which also work in your own scripts. Times are UTC seconds since 1970.</p>
+  <table>
+    <tr><th style="width:40%">Address</th><th>Answer</th></tr>
+    <tr><td><code>/api/now</code></td><td>Live values, warm-up seconds, CO<sub>2</sub> limits, Wi-Fi signal and clock state (JSON).</td></tr>
+    <tr><td><code>/api/info</code></td><td>History on or off, flash use, minutes not saved yet, and the oldest file and days kept for each level (JSON).</td></tr>
+    <tr><td><code>/api/days?from=&hellip;&amp;to=&hellip;</code></td><td>The UTC days with values and their finest detail, for the calendar marks (JSON, at most 45 days).</td></tr>
+    <tr><td><code>/api/data?res=1|5|60&amp;from=&hellip;&amp;to=&hellip;</code></td><td>The stored values as binary records, exactly as in the files (7.7). At most 2 days of 1-minute, 14 days of 5-minute or 92 days of hourly values per request.</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ 9 -->
+<section id="testing" class="newpage">
+  <h2><span class="n">9</span>Testing</h2>
   <p>Test in this order. Each step builds on the one before, so when something fails you know where to look.</p>
 
   <h3>Step 1 &ndash; Power-on check</h3>
@@ -554,14 +811,16 @@
 SHT45 found
 SCD-41 found, serial 0x...
 SCD-41 automatic self-calibration (ASC): enabled
-SCD-41 measuring, first CO2 value in about 5 s
+SCD-41 measuring
+Warm-up: the first values follow in 30 s
+Warm-up done, values are shown and saved from now on
 CO2_ppm:612 Temperature_C:22.41 Humidity_pct:45.3
 CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
-  <p>The display shows "starting&hellip;", then temperature/humidity, then CO<sub>2</sub> after about 5&nbsp;s ("warming up&hellip;" until then). The RGB LED on the board goes off at the start and lights up dimly in the CO<sub>2</sub> colour with the first value. In normal room air it is green or yellowish. If the text is upside down, change <code>OLED_ROTATION</code> (2 &harr; 0) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick Temperature and Humidity to see the CO<sub>2</sub> curve at a useful scale.</p>
+  <p>The display shows "starting&hellip;", then "warming up" with a countdown from 30&nbsp;s and <code>--.-</code> / <code>--%</code> at the bottom. After the countdown the temperature and humidity appear at once, and CO<sub>2</sub> within 5&nbsp;s ("measuring&hellip;" until then). The RGB LED on the board goes off at the start and lights up dimly in the CO<sub>2</sub> colour with the first value. In normal room air it is green or yellowish. If the text is upside down, change <code>OLED_ROTATION</code> (2 &harr; 0) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick Temperature and Humidity to see the CO<sub>2</sub> curve at a useful scale.</p>
 
   <h3>Step 4 &ndash; Button and display timeout</h3>
   <ol>
-    <li>After about 30&nbsp;s the display goes dark. Serial output continues, so the sensors are still running.</li>
+    <li>About 30&nbsp;s after the warm-up ends (1&nbsp;minute after start-up) the display goes dark. Serial output continues, so the sensors are still running.</li>
     <li>Press the button. The display turns on immediately with current values.</li>
     <li>Press again after ~20&nbsp;s. The 30&nbsp;s start over.</li>
   </ol>
@@ -584,11 +843,39 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
 
   <h3>Step 7 &ndash; Long run</h3>
   <p>Leave it running for at least 24&nbsp;h, ideally a week. Typical pattern: CO<sub>2</sub> rises while people are in the room with the door and windows closed (a bedroom can reach 1500&ndash;2500&nbsp;ppm overnight), and drops quickly when you air the room. If values drift or seem stuck, check the Serial output for errors.</p>
+
+  <h3>Step 8 &ndash; Wi-Fi, clock and history</h3>
+  <p>Enter your Wi-Fi in <code>secrets.h</code> (5.8), upload, and open the Serial Monitor. At the start you should see:</p>
+<pre>CO2 monitor starting
+History: formatting the data partition (first start)
+History: 8 KB of 1536 KB used
+Wi-Fi: connecting to "MyNetwork"
+SHT45 found
+...
+Wi-Fi connected, web page at http://192.168.1.50/
+History: clock set to 2026-10-28 17:05:12 UTC</pre>
+  <p>The "formatting" line appears only at the very first start, right after the first upload, so you'll usually miss it in the Serial Monitor. Every later start shows only the "KB used" line. Then:</p>
+  <ol>
+    <li>Wait until the next full 10 minutes have passed (for example 17:10:05) and type <code>status</code>. <code>m1</code> and <code>m5</code> each show one file and a newest value.</li>
+    <li>Type <code>csv m1 1</code>. There is one line per minute since the start, and the CO<sub>2</sub> values match the live readings.</li>
+    <li>After the next full hour (plus 5&nbsp;s), type <code>csv h1 1</code>. The first hour shows fewer than 60 in the <code>minutes</code> column, because the monitor started during that hour.</li>
+    <li><b>Power cut test:</b> unplug the monitor for about 20 minutes, then plug it back in. In <code>csv m1 1</code> the gap starts at the last save before unplugging (at most 10 minutes earlier) and ends at the restart. Nothing else is missing.</li>
+    <li><b>Optional, no internet at start:</b> switch off the router, restart the monitor, wait a few minutes, then switch the router back on. <code>status</code> shows "Clock: not set yet" until the router is back. Once the clock is set, the minutes measured without it appear in <code>csv m1 1</code> with the correct times.</li>
+  </ol>
+
+  <h3>Step 9 &ndash; Web page</h3>
+  <ol>
+    <li>Open the address from the Serial Monitor (<code>status</code> shows it too) in a browser on a phone or PC in the same Wi-Fi. The live values appear within 5&nbsp;s, and the status line says "Live".</li>
+    <li>The calendar shows a dot under every day with values. Pick one, and the graph shows that day. Move the mouse over the graph: the values match <code>csv m1 1</code> for that minute. The page shows local time, the Serial Monitor UTC.</li>
+    <li>Press <i>3 h</i> above the graphs: they show the last 3 hours, and a minute later the range has moved on by a minute. Press <i>Night 22&ndash;08</i>: the range ends the next morning. Switch off two of the values under <i>Show</i>, and only one graph is left.</li>
+    <li>Download the last 7 days with <i>Best available detail</i> and open the file in Excel. There is one row per minute, already split into columns.</li>
+    <li>Switch your phone or PC between light and dark mode. With <i>Auto</i> the page follows.</li>
+  </ol>
 </section>
 
-<!-- ============================================================ 8 -->
+<!-- ============================================================ 10 -->
 <section id="calibration">
-  <h2><span class="n">8</span>CO<sub>2</sub> calibration (SCD-41)</h2>
+  <h2><span class="n">10</span>CO<sub>2</sub> calibration (SCD-41)</h2>
   <p>The SCD-41 is <b>calibrated at the factory</b> by Sensirion and works out of the box. Over time, mechanical stress, soldering, shipping and ageing can shift its zero point (the "offset"). Two mechanisms correct this:</p>
 
   <table>
@@ -641,9 +928,9 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
   <div class="box note">The target is <code>FRC_TARGET_PPM = 425</code> (global outdoor background in 2026 is about 420&ndash;430&nbsp;ppm). A wrong reference makes the sensor worse, not better, so only run FRC in genuinely fresh air.</div>
 </section>
 
-<!-- ============================================================ 9 -->
+<!-- ============================================================ 11 -->
 <section id="notes">
-  <h2><span class="n">9</span>Hardware notes</h2>
+  <h2><span class="n">11</span>Hardware notes</h2>
 
   <h3>ESP32-C6-DevKitC-1-N8</h3>
   <ul>
@@ -664,7 +951,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
     <li><b>I&sup2;C address 0x62</b> (fixed). 3.3&ndash;5&nbsp;V supply; the breakout has a regulator and level shifting. A clean, stable supply matters for accuracy.</li>
     <li><b>Built-in T/RH:</b> the SCD-41 always measures temperature and humidity; it needs them internally to compensate the CO<sub>2</sub> value, and this cannot be switched off. Every reading returns all three values. The code reads them and simply ignores T/RH, because the sensor warms itself slightly and the SHT45 is more accurate. Ignoring them has <b>no effect on CO<sub>2</sub> accuracy</b>, and neither does its temperature offset setting (it only shifts the reported T/RH). The SCD-41 cannot take temperature or humidity from the SHT45.</li>
     <li><b>Air pressure:</b> this <i>does</i> affect CO<sub>2</sub> accuracy, so set your altitude in the code. Weather changes air pressure by a few percent; a pressure sensor added later could feed live values with <code>setAmbientPressure()</code>, which works during periodic measurement.</li>
-    <li><b>Handling:</b> the weak spot is the <b>white membrane on top of the metal cap</b>. It keeps dust and water out and lets CO<sub>2</sub> in. Sensirion: don't remove, damage, imprint or cover it. So don't touch or press it, and don't tape over it, clean it, or blow compressed air at it. The sensor is an optical system: avoid strong force on the cap, especially sideways, and drops onto hard floors. ESD rating is only 2&nbsp;kV (HBM), so touch something metal first. Chemical fumes don't affect the CO<sub>2</sub> measurement the way they affect the SHT45's humidity reading. Keep dust, direct sunlight and strong drafts off it. Leave space for air to reach it. If it ever reads clearly wrong in fresh air after a knock, a forced recalibration fixes the offset (section 8). Calibration persists in its EEPROM.</li>
+    <li><b>Handling:</b> the weak spot is the <b>white membrane on top of the metal cap</b>. It keeps dust and water out and lets CO<sub>2</sub> in. Sensirion: don't remove, damage, imprint or cover it. So don't touch or press it, and don't tape over it, clean it, or blow compressed air at it. The sensor is an optical system: avoid strong force on the cap, especially sideways, and drops onto hard floors. ESD rating is only 2&nbsp;kV (HBM), so touch something metal first. Chemical fumes don't affect the CO<sub>2</sub> measurement the way they affect the SHT45's humidity reading. Keep dust, direct sunlight and strong drafts off it. Leave space for air to reach it. If it ever reads clearly wrong in fresh air after a knock, a forced recalibration fixes the offset (section 10). Calibration persists in its EEPROM.</li>
   </ul>
 
   <h3>Sensor choice: SCD-41 vs SCD-30</h3>
@@ -721,7 +1008,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
     <li>Not near windows, doors, air vents, radiators, the stove, a humidifier, or in direct sunlight.</li>
     <li>Free air on all sides: not in a drawer, a closed shelf or behind the monitor.</li>
     <li>The SHT45 beside or below the ESP32, never above it (hot air rises), and at least 5&ndash;10&nbsp;cm from the ESP32, the SCD-41 and the monitor.</li>
-    <li>Air the room now and then: the SCD-41's self-calibration needs fresh-air levels at least once a week (section 8).</li>
+    <li>Air the room now and then: the SCD-41's self-calibration needs fresh-air levels at least once a week (section 10).</li>
   </ul>
 
   <h3>Joy-it 0.96" OLED (SBC-OLED01)</h3>
@@ -752,9 +1039,9 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
   </ul>
 </section>
 
-<!-- ============================================================ 10 -->
+<!-- ============================================================ 12 -->
 <section id="troubleshooting">
-  <h2><span class="n">10</span>Troubleshooting</h2>
+  <h2><span class="n">12</span>Troubleshooting</h2>
   <table>
     <tr><th style="width:34%">Symptom</th><th>Cause / fix</th></tr>
     <tr><td>No COM port appears</td><td>Charge-only cable &rarr; use a data cable. Missing driver for the "UART" port &rarr; see the next row. Try the other USB-C port.</td></tr>
@@ -767,18 +1054,27 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
     <tr><td>Display text is upside down</td><td>Change <code>OLED_ROTATION</code> in the sketch (2 &harr; 0).</td></tr>
     <tr><td>Display shows noise or a picture shifted by 2 pixels</td><td>The module has an SH1106 controller, not an SSD1306 (common on 1.3" modules). Switch the code to the <i>Adafruit SH110X</i> library.</td></tr>
     <tr><td>Button does nothing</td><td>Button not across the gap, or both wires on the same internal leg pair &rarr; use diagonal legs f25 / e27. Check wire 5 (j8 = next to GPIO2).</td></tr>
-    <tr><td>"warming up&hellip;" never goes away</td><td>SCD-41 is not delivering values; check Serial for "SCD-41 not found" and the STEMMA cable.</td></tr>
+    <tr><td>"measuring&hellip;" never goes away after the warm-up</td><td>SCD-41 is not delivering values; check Serial for "SCD-41 not found" and the STEMMA cable.</td></tr>
     <tr><td>CO<sub>2</sub> fluctuates by 10&ndash;30&nbsp;ppm</td><td>Normal. People nearby, drafts and doors cause real changes too.</td></tr>
     <tr><td>Temperature reads 1&ndash;3&nbsp;&deg;C too high</td><td>SHT45 too close to the ESP32, SCD-41, display, or in sunlight. Move it away.</td></tr>
     <tr><td>Outdoor CO<sub>2</sub> clearly not ~420&nbsp;ppm</td><td>Let ASC work for a week with regular airing, or run the FRC tool outdoors.</td></tr>
     <tr><td>Board doesn't start after adding hardware</td><td>Something is connected to a strapping pin (GPIO4/5/8/9/15). Move it to a free GPIO.</td></tr>
     <tr><td>Compile error about <code>SensirionI2cScd4x</code></td><td>Old SCD4x library (0.x) installed &rarr; update to 1.x in the Library Manager.</td></tr>
+    <tr><td>Compile error "secrets.h is missing"</td><td>Copy <code>secrets_example.h</code> to <code>secrets.h</code> and enter your Wi-Fi (5.8).</td></tr>
+    <tr><td>Serial: <code>Wi-Fi: enter your network in secrets.h</code></td><td><code>secrets.h</code> still has the example name. Enter your network and upload again. Without Wi-Fi there's no clock, so nothing is recorded.</td></tr>
+    <tr><td>"Wi-Fi: connecting&hellip;" but never "connected"</td><td>Wrong name or password (both are case-sensitive), a 5&nbsp;GHz-only network, or the router is too far away.</td></tr>
+    <tr><td><code>status</code>: "Clock: not set yet" although Wi-Fi is connected</td><td>The router has no internet or blocks time requests (UDP port 123). The values wait in RAM for up to 24&nbsp;h. If your router offers time itself, enter its address as <code>NTP_SERVER_1</code>.</td></tr>
+    <tr><td>Serial: <code>History OFF: wrong partition scheme</code></td><td>Tools menu: Flash Size <b>8MB</b>, Partition Scheme <b>8M with spiffs (3MB APP/1.5MB SPIFFS)</b> (5.4), then upload again. The history is normally still there.</td></tr>
+    <tr><td>Commands in the Serial Monitor do nothing</td><td>The line-ending box next to the input line is set to "No Line Ending". Choose "New Line".</td></tr>
+    <tr><td>Web page doesn't open</td><td>The phone or PC is in another network (guest Wi-Fi, mobile data). Or the address has changed: <code>status</code> shows the current one, and a fixed address in the router (8.2) stops it changing.</td></tr>
+    <tr><td>Web page: "No connection to the monitor"</td><td>The monitor is unplugged, restarting or out of Wi-Fi range. The page keeps trying every 5&nbsp;s and continues by itself.</td></tr>
+    <tr><td>Web page: "waiting for the internet time"</td><td>Same cause as "Clock: not set yet" above. The graphs appear as soon as the clock is set.</td></tr>
   </table>
 </section>
 
-<!-- ============================================================ 11 -->
+<!-- ============================================================ 13 -->
 <section id="case">
-  <h2><span class="n">11</span>Case (design v3)</h2>
+  <h2><span class="n">13</span>Case (design v3)</h2>
   <div class="box ok"><span class="label">Approved design, 25 Oct 2026.</span> The drawings use datasheet sizes and the Berrybase breadboard (83 &times; 55&nbsp;mm). The printable model follows once the measurements at the end of this section are in.</div>
 
   <h3>The design</h3>
@@ -792,17 +1088,17 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
 
   <figure>
     <svg id="case-iso" viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, isometric view"></svg>
-    <figcaption>Figure 5 &ndash; Closed case seen from the front and the sensor-chamber side. (1) OLED window; (2) light-sensor window; (3) RGB LED; (4) panel button; (5) side vents and (6) front vents of the sensor chamber; (7) lid vents above the ESP32 module; (8) speaker grille; (9) lid screws, 4 &times; M3; (10) feet, with floor vents under the chamber between them; (11) back with the USB-C ports (Figure 8).</figcaption>
+    <figcaption>Figure 7 &ndash; Closed case seen from the front and the sensor-chamber side. (1) OLED window; (2) light-sensor window; (3) RGB LED; (4) panel button; (5) side vents and (6) front vents of the sensor chamber; (7) lid vents above the ESP32 module; (8) speaker grille; (9) lid screws, 4 &times; M3; (10) feet, with floor vents under the chamber between them; (11) back with the USB-C ports (Figure 10).</figcaption>
   </figure>
 
   <figure>
     <svg id="case-top" viewBox="0 0 760 525" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, top view with the lid removed"></svg>
-    <figcaption>Figure 6 &ndash; Top view, lid removed, same orientation as Figure 3 (back with USB on the left, front on the right). (1) breadboard, unchanged; (2) ESP32 with both USB-C cut-outs; (3) speaker, hanging under the lid; (4) lid vents above the module (dashed red); (5) OLED behind the front window; (6) light sensor lying under the OLED; (7) spare place; (8) panel button; (9) sealed cable slot in the double wall; (10) SHT45, (11) SCD-41 and (12) BMP390 standing upright, sensors facing the outer wall; (13) side and floor vents of the chamber; (14) lid screw bosses; (15) intake vents for the electronics.</figcaption>
+    <figcaption>Figure 8 &ndash; Top view, lid removed, same orientation as Figure 3 (back with USB on the left, front on the right). (1) breadboard, unchanged; (2) ESP32 with both USB-C cut-outs; (3) speaker, hanging under the lid; (4) lid vents above the module (dashed red); (5) OLED behind the front window; (6) light sensor lying under the OLED; (7) spare place; (8) panel button; (9) sealed cable slot in the double wall; (10) SHT45, (11) SCD-41 and (12) BMP390 standing upright, sensors facing the outer wall; (13) side and floor vents of the chamber; (14) lid screw bosses; (15) intake vents for the electronics.</figcaption>
   </figure>
 
   <figure>
     <svg id="case-front" viewBox="0 0 680 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, front face and cross-section"></svg>
-    <figcaption>Figure 7 &ndash; Top: front face. Bottom: cut across the case through the SCD-41 and the ESP32, seen from the front. Blue: fresh and cooling air. Red: warm air from the ESP32 leaves through the lid, while the double wall keeps it out of the sensor chamber.</figcaption>
+    <figcaption>Figure 9 &ndash; Top: front face. Bottom: cut across the case through the SCD-41 and the ESP32, seen from the front. Blue: fresh and cooling air. Red: warm air from the ESP32 leaves through the lid, while the double wall keeps it out of the sensor chamber.</figcaption>
   </figure>
 
   <div class="two-col">
@@ -818,7 +1114,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
     </div>
     <figure style="margin-top:4px">
       <svg id="case-back" viewBox="0 0 380 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Case v3, back view"></svg>
-      <figcaption>Figure 8 &ndash; Back, seen from outside. Both USB-C ports get a cut-out big enough for the plug's moulding; normally you use the "UART" one.</figcaption>
+      <figcaption>Figure 10 &ndash; Back, seen from outside. Both USB-C ports get a cut-out big enough for the plug's moulding; normally you use the "UART" one.</figcaption>
     </figure>
   </div>
 
@@ -868,11 +1164,15 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
   </ol>
 </section>
 
-<!-- ============================================================ 12 -->
+<!-- ============================================================ 14 -->
 <section id="changelog">
-  <h2><span class="n">12</span>Change log</h2>
+  <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.11</td><td>29 Oct 2026</td><td>Web page: the graphs are now right below the live values, with a heading that names the time shown. New buttons <i>Last 1 / 3 / 6 / 12 / 24 h</i> above them; the range moves along with the time (they replace <i>Last 24 h</i>). On a phone the day box now comes before the calendar. New screenshot (Figure 6), updated 8.3, 8.5 and test step 9. Tested on the board, on a PC and at phone width.</td></tr>
+    <tr><td>0.10</td><td>29 Oct 2026</td><td>Step 3: web page served by the monitor (new section 8, files <code>web.h</code>, <code>web.cpp</code>, <code>web/</code>). Live values, a calendar with marks on days that have values, a time range of up to 24&nbsp;h, graphs of CO<sub>2</sub>, temperature and humidity that can be switched on and off, a CSV download between two dates, and Auto/Light/Dark themes. Fixed address via the router (8.2). Uses 60&nbsp;KB more program flash; the history storage is unchanged. New test step 9 and troubleshooting rows. Sections 8&ndash;13 are now 9&ndash;14, and the case drawings are now Figures 7&ndash;10. Tested on the board and in the browser, on a PC and at phone width.</td></tr>
+    <tr><td>0.9</td><td>29 Oct 2026</td><td>30&nbsp;s warm-up after start-up (new setting <code>WARMUP_TIME_MS</code>): the sensors measure, but no value is shown, printed on Serial or saved in the history, and the readings from this time are thrown away. The display counts down meanwhile, then stays on for 30&nbsp;s with the first values. <code>status</code> shows the seconds left. Updated test steps 3 and 4 and the troubleshooting row. Tested on the board: the warm-up ended exactly 30&nbsp;s after the SCD-41 started, the first CO<sub>2</sub> value followed 3&nbsp;s later.</td></tr>
+    <tr><td>0.8</td><td>28 Oct 2026</td><td>Step 2: Wi-Fi (name and password in <code>secrets.h</code>, which isn't in git) and internet time. New section 7: the values are stored in the flash with LittleFS as 1-minute values (7 days), 5-minute values (90 days) and hourly values with min/max (about 3&frac12; years), saved every 10 minutes. New Serial Monitor commands <code>status</code>, <code>files</code>, <code>csv</code> and <code>save</code>. Warning about the partition scheme and "Erase All Flash" in 5.4, new setup step 5.8, test step 8 and troubleshooting rows. Sections 7&ndash;12 are now 8&ndash;13, and the case drawings are now Figures 6&ndash;9. Tested on the board: saving, restart and firmware upload keep the history.</td></tr>
     <tr><td>0.7</td><td>25 Oct 2026</td><td>Section 11 now shows the approved case design v3: side by side, sensor chamber along the column-a side behind a double wall, display, light sensor, RGB LED and panel button on the front, speaker under the lid. New drawings, parts list, planned pins (RGB LED GPIO18&ndash;20, speaker GPIO21) and the measurements needed for the printable model.</td></tr>
     <tr><td>0.6</td><td>25 Oct 2026</td><td>New section 11: concept for a 3D-printed case (flat box, display deck over the OLED, vented sensor chamber behind an inner wall), with four drawings, a parts list and the measurements needed for the printable files.</td></tr>
     <tr><td>0.5</td><td>25 Oct 2026</td><td>New setting <code>OLED_BRIGHTNESS</code> (display brightness 0&ndash;255, default 207). RGB LED default brightness lowered to 5. More about OLED burn-in in section 9.</td></tr>
@@ -1016,7 +1316,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
 </script>
 
 <script>
-  // Case drawings (section 11, design v3). One set of sizes in mm feeds all four views.
+  // Case drawings (section 13, design v3). One set of sizes in mm feeds all four views.
   // x along the breadboard (0 = inside of the back wall at the USB end), y across (+ = column j side,
   // - = column a side with the sensor chamber), z up (0 = underside of the floor).
   (() => {
@@ -1084,7 +1384,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
       return out;
     };
 
-    // ---- Figure 5: isometric view of the closed case, seen from the front and the chamber side
+    // ---- Figure 7: isometric view of the closed case, seen from the front and the chamber side
     {
       const svg = document.getElementById('case-iso');
       const k = 3.6, c30 = Math.cos(Math.PI / 6), OX = 234.6, OY = 225.2;
@@ -1147,7 +1447,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
       c(11, [x0, 0, h], 245, 30);
     }
 
-    // ---- Figure 6: top view with the lid removed (same orientation as Figure 3)
+    // ---- Figure 8: top view with the lid removed (same orientation as Figure 3)
     {
       const svg = document.getElementById('case-top');
       const s = 5, X = x => 60 + (x + 2) * s, Y = y => 30 + (32 - y) * s;
@@ -1245,7 +1545,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
       c(15, 30, 31, 225, 13);
     }
 
-    // ---- Figure 7: front face (top) and a cut across the case through the SCD-41 and the ESP32 (bottom)
+    // ---- Figure 9: front face (top) and a cut across the case through the SCD-41 and the ESP32 (bottom)
     {
       const svg = document.getElementById('case-front');
       const s = 3.4, X = y => 150 + (y + 54) * s, Zf = z => 60 + (40 - z) * s, Zc = z => 290 + (40 - z) * s;
@@ -1316,7 +1616,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
       T(484, Zc(5), 'electronics', { 'text-anchor': 'start', 'font-weight': 700 });
     }
 
-    // ---- Figure 8: back, seen from outside (column j side on the left)
+    // ---- Figure 10: back, seen from outside (column j side on the left)
     {
       const svg = document.getElementById('case-back');
       const s = 3.4, H = y => 40 + (32 - y) * s, V = z => 30 + (40 - z) * s;
