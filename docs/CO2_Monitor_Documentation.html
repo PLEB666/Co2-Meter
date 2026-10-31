@@ -99,7 +99,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 0.96" OLED</p>
   <div class="meta">
-    <span><b>Version</b> 0.12 &ndash; Step 3: web page, sleep mode</span>
+    <span><b>Version</b> 0.13 &ndash; Step 3: web page, sleep mode, case update</span>
     <span><b>Updated</b> 31 Oct 2026</span>
     <span><b>Status</b> breadboard prototype</span>
   </div>
@@ -1252,12 +1252,13 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
 <section id="case">
   <h2><span class="n">13</span>Case (design v3)</h2>
   <div class="box ok"><span class="label">Approved design, 25 Oct 2026.</span> The drawings use datasheet sizes and the Berrybase breadboard (83 &times; 55&nbsp;mm). The printable model follows once the measurements at the end of this section are in.</div>
+  <div class="box note"><span class="label">Changed 31 Oct 2026.</span> The sensor boards are now screwed to standoffs instead of held by clips, the chamber's side vents became 4&nbsp;mm slots wide enough for a screwdriver, and a dust mesh goes behind them (see <i>Sensor mounting and side slots</i> below). Figures 8&ndash;10 still show the v3 vents and sensor holders; they are redrawn once the sensor layout is settled.</div>
 
   <h3>The design</h3>
   <ul>
     <li><b>Side by side, about 105 &times; 86 &times; 43&nbsp;mm</b> including feet. The breadboard goes in unchanged; the USB cable leaves at the back (row-1 end).</li>
-    <li><b>Sensor chamber along the column-a side</b>, behind a <b>double wall with an air gap</b>. The ESP32's warmth rises out through the lid instead of reaching the sensors. BMP390, SCD-41 and SHT45 stand upright, sensors facing the side vents. The SHT45 is at the front and low: the point farthest from the ESP32 module, and more than 10&nbsp;mm from the SCD-41, which warms itself slightly. Nothing can touch the SCD-41's membrane, and dust can't settle on it.</li>
-    <li><b>Vents:</b> the sensor chamber breathes through its outer side wall, its part of the front face and the floor (the case stands on feet). There are no vents in the top over the sensors, so no dust falls in. The electronics take cooling air in through the column-j side wall and let warm air out through lid vents directly above the ESP32 module. No fan.</li>
+    <li><b>Sensor chamber along the column-a side</b>, behind a <b>double wall with an air gap</b>. The ESP32's warmth rises out through the lid instead of reaching the sensors. The pressure sensor (BMP390 or BMP580), SCD-41 and SHT45 stand upright on standoffs, sensors facing the side slots. The SHT45 is at the front and low: the point farthest from the ESP32 module, and more than 10&nbsp;mm from the SCD-41, which warms itself slightly. Nothing can touch the SCD-41's membrane, and dust can't settle on it.</li>
+    <li><b>Vents:</b> the sensor chamber breathes through slots in its outer side wall (with a dust mesh behind them), its part of the front face and the floor (the case stands on feet). There are no vents in the top over the sensors, so no dust falls in. The electronics take cooling air in through the column-j side wall and let warm air out through lid vents directly above the ESP32 module. No fan.</li>
     <li><b>Front face:</b> OLED behind a window. The light sensor (right-angle VEML7700) lies under the display behind a small window and measures the light falling on the display face. The RGB LED sits above the panel button, on the far side from the light sensor so it can't fool it.</li>
     <li><b>Speaker</b> under the lid at the back with a grille in the lid: as far from the SCD-41 as possible, in a spot without wires. A <b>spare place</b> at the front takes one more STEMMA QT board later, for example an air-quality sensor.</li>
   </ul>
@@ -1282,10 +1283,10 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       <h3 style="margin-top:0">Printed parts</h3>
       <table>
         <tr><th class="c">#</th><th>Part</th><th>Printed</th></tr>
-        <tr><td class="c">1</td><td><b>Base:</b> floor, walls, double wall, breadboard pocket, sensor slots, OLED bracket, light-sensor holder, screw bosses, vents, USB cut-outs, feet</td><td>upright</td></tr>
+        <tr><td class="c">1</td><td><b>Base:</b> floor, walls, double wall, breadboard pocket, sensor standoffs, mesh groove, OLED bracket, light-sensor holder, screw bosses, vents, USB cut-outs, feet</td><td>upright</td></tr>
         <tr><td class="c">2</td><td><b>Lid</b> with vents, speaker grille and speaker holder</td><td>upside down</td></tr>
-        <tr><td class="c">3</td><td><b>3 sensor clips</b> that hold the upright boards at the top</td><td>flat</td></tr>
       </table>
+      <p class="muted">The 3 sensor clips of v3 are gone: the boards are screwed on.</p>
       <p class="muted">All parts print without supports.</p>
     </div>
     <figure style="margin-top:4px">
@@ -1298,15 +1299,17 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <table>
     <tr><th>Part</th><th>For</th><th>Notes</th></tr>
     <tr><td>Adafruit <b>STEMMA Speaker</b> (3885)</td><td>alarm beeps</td><td>37 &times; 30.5 &times; 7.2&nbsp;mm, class-D amplifier, 3&ndash;5&nbsp;V, 3-pin JST PH input</td></tr>
-    <tr><td>Adafruit <b>BMP390</b> (4816, also sold as BMP390L)</td><td>air pressure; feeds the SCD-41's pressure compensation</td><td>STEMMA QT, I&sup2;C 0x77</td></tr>
-    <tr><td>Adafruit <b>VEML7700 right angle</b> (5378)</td><td>ambient light; dims display and LED at night</td><td>STEMMA QT, I&sup2;C 0x10, sees light along the board</td></tr>
+    <tr><td>Adafruit <b>BMP390</b> (4816, also sold as BMP390L) or <b>BMP580</b> (6411)</td><td>air pressure; feeds the SCD-41's pressure compensation</td><td>STEMMA QT. BMP390: I&sup2;C 0x77. The BMP390 was out of stock on 31 Oct 2026; the BMP580 has the same board size and holes, I&sup2;C 0x46 or 0x47 (address jumper), and needs the Adafruit BMP5xx library.</td></tr>
+    <tr><td>Adafruit <b>VEML7700 right angle</b> (5378)</td><td>ambient light; dims display and LED at night</td><td>STEMMA QT, I&sup2;C 0x10, sees light along the board. Out of stock on 31 Oct 2026; see <i>Still open</i> below.</td></tr>
     <tr><td>Panel push button, Berrybase 10131</td><td>replaces the breadboard button</td><td>M7 &times; 0.75 thread, 27.5&nbsp;mm long</td></tr>
     <tr><td>5&nbsp;mm LED holder, 3 &times; 220&nbsp;&Omega; resistors</td><td>your 4-leg RGB LED in the front wall</td><td>find out first whether the LED is common anode or common cathode</td></tr>
     <tr><td>4 female&ndash;male jumper wires</td><td>OLED to rows 27&ndash;30</td><td>&ndash;</td></tr>
     <tr><td>JST PH 3-pin to male-pin cable</td><td>speaker to the breadboard</td><td>&ndash;</td></tr>
-    <tr><td>2 STEMMA QT cables, 50&ndash;100&nbsp;mm</td><td>BMP390 and VEML7700</td><td>&ndash;</td></tr>
+    <tr><td>STEMMA QT cables, 50&nbsp;mm</td><td>pressure sensor and VEML7700</td><td>the shortest ones found; their route between the sensors is still open</td></tr>
     <tr><td>4 &times; M3 &times; 10 screws</td><td>lid</td><td>self-tapping into the base</td></tr>
-    <tr><td>Filter fleece (optional)</td><td>behind the chamber vents</td><td>keeps dust and splashes out, lets gases through</td></tr>
+    <tr><td>6 &times; M2.5 &times; 6 hex socket screws (ISO 4762)</td><td>sensor boards, 2 each</td><td>cut their own thread in the printed standoffs (&#8960;2.1&nbsp;mm holes)</td></tr>
+    <tr><td>Precision screwdriver, 2&nbsp;mm hex</td><td>sensor screws</td><td>the blade must be thin (about &#8960;2.3&nbsp;mm) to reach through the 4&nbsp;mm side slots; a Phillips PH1 is too thick</td></tr>
+    <tr><td>Dust mesh</td><td>behind the chamber's side slots</td><td>keeps dust out, lets gases through; type and thickness still open</td></tr>
   </table>
 
   <h3>Planned pins</h3>
@@ -1315,7 +1318,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Panel button</td><td>GPIO2</td><td>row 25 (as now)</td><td>replaces the breadboard button; other contact to GND</td></tr>
     <tr><td>RGB LED red / green / blue</td><td>GPIO18 / 19 / 20</td><td>a10 / a11 / a12</td><td>each through a 220&nbsp;&Omega; resistor; common leg to GND or 3.3&nbsp;V depending on the LED type</td></tr>
     <tr><td>Speaker signal</td><td>GPIO21</td><td>a13</td><td>PWM tones. Power 3.3&nbsp;V, or 5&nbsp;V from the 5V pin (free hole j6) for more volume; the 5&nbsp;V goes to the speaker only.</td></tr>
-    <tr><td>OLED, BMP390, VEML7700</td><td>I&sup2;C (23 / 22)</td><td>rows 27&ndash;30 / STEMMA chain</td><td>new addresses 0x77 and 0x10 don't clash with 0x3C, 0x44, 0x62</td></tr>
+    <tr><td>OLED, BMP390 or BMP580, VEML7700</td><td>I&sup2;C (23 / 22)</td><td>rows 27&ndash;30 / STEMMA chain</td><td>new addresses (0x77, or 0x46/0x47 for the BMP580, and 0x10) don't clash with 0x3C, 0x44, 0x62</td></tr>
   </table>
   <p class="muted">GPIO18&ndash;21 are free, not strapping pins, and have free holes next to them in column a.</p>
 
@@ -1324,8 +1327,32 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li>Sensirion's design-in rules: sensors close to large openings with little dead air around them, decoupled from heat sources (the ESP32 module and its voltage regulator, both in the middle of the board), the temperature sensor low because warm air rises.</li>
     <li>The SHT45 sits at least 10&nbsp;mm from the SCD-41 and never above it.</li>
     <li>The speaker is far from the SCD-41, which measures acoustically and doesn't like vibration.</li>
-    <li>Walls, floor and lid 2&nbsp;mm; double wall 2 &times; 1.2&nbsp;mm with a 1.6&nbsp;mm air gap; vent slots 2&ndash;3&nbsp;mm wide (air gets in, fingers don't).</li>
+    <li>Walls, floor and lid 2&nbsp;mm; double wall 2 &times; 1.2&nbsp;mm with a 1.6&nbsp;mm air gap; vent slots 2&ndash;3&nbsp;mm wide, the chamber's side slots 4&nbsp;mm so a screwdriver fits (air gets in, fingers don't).</li>
   </ul>
+
+  <h3>Sensor mounting and side slots</h3>
+  <p>The sensor boards are <b>screwed on</b>. Each board sits on two <b>standoffs</b>, pillars that rise from the floor along the double wall as part of the base. Two <b>M2.5 &times; 6 hex socket screws</b> go through the board's holes on the edge away from its header; that edge is at the top.</p>
+  <p>A screwdriver doesn't fit inside the chamber. It is 18&nbsp;mm wide, and only 8.6&ndash;11.6&nbsp;mm is left in front of a screw head, while a 1/4" bit is 25&nbsp;mm long and the short leg of a 2&nbsp;mm hex key about 16&nbsp;mm. So the screws are turned <b>from outside, through the side slots</b>, with a 2&nbsp;mm hex precision screwdriver. The screw heads don't fit through a slot: with the lid off, push the screws through the board, hold the board on its standoffs from above and tighten them from outside.</p>
+  <table>
+    <tr><th>Board</th><th>Size</th><th>Mounting holes</th><th>Used</th></tr>
+    <tr><td>SCD-41</td><td>25.4 &times; 22.9&nbsp;mm</td><td>4 &times; &#8960;3.0&nbsp;mm</td><td>the 2 at the top</td></tr>
+    <tr><td>SHT45</td><td>25.4 &times; 17.8&nbsp;mm</td><td>4 &times; &#8960;2.5&nbsp;mm</td><td>the 2 at the top</td></tr>
+    <tr><td>BMP390 / BMP580</td><td>25.4 &times; 17.8&nbsp;mm</td><td>2 &times; &#8960;2.5&nbsp;mm, on the edge opposite the 8-pin header</td><td>both</td></tr>
+  </table>
+  <p class="muted">From Adafruit's board files. The holes are 2.54&nbsp;mm from the edges, so the two used holes are 20.32&nbsp;mm apart on every board. All parts sit on the front; the back is flat.</p>
+  <p><b>Side slots:</b> the chamber's outer wall gets vertical slots 4&nbsp;mm wide in two rows, 10&nbsp;mm (lower) and 12&nbsp;mm (upper) tall, instead of the v3 grid of 96 slots of 3 &times; 2&nbsp;mm. The slots are 6.77&nbsp;mm apart, a third of the 20.32&nbsp;mm hole spacing, so both screws of a board can sit behind a slot. The open area is about 1140&nbsp;mm&sup2;, twice the 576&nbsp;mm&sup2; of the v3 grid, so the sensors follow the room's air sooner. Vertical slots print without supports.</p>
+  <p><b>Dust mesh:</b> the bigger slots let in a little more dust, so a mesh sits behind them in a groove on the inside of the outer wall. It slides in from above, so with the lid off it can be pulled out whenever the screwdriver is needed.</p>
+  <figure>
+    <svg id="case-mount" viewBox="0 52 450 236" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sensor board screwed to a standoff, screwdriver through a side slot" style="max-width:120mm"></svg>
+    <figcaption>Figure 12 &ndash; Cut across the sensor chamber through a sensor screw, seen from the front, to scale. Dashed: the path of the screwdriver during assembly, with the lid off and the dust mesh pulled out.</figcaption>
+  </figure>
+  <div class="box warn"><span class="label">Still open.</span>
+    <ul>
+      <li><b>Sensor layout in the chamber.</b> All three sensors stay in the chamber, and the case keeps its size. The v3 drawing leaves only 2.5&nbsp;mm between the BMP390 and the SCD-41, too little for the STEMMA QT plugs, and the shortest cables available are 50&nbsp;mm, so the cables between the sensors still need a route. With three boards in the 101&nbsp;mm chamber and the lid-screw bosses in both corners, not every screw can sit behind a slot. The exact slot positions follow from the final layout.</li>
+      <li><b>Dust mesh:</b> type and thickness, which set the size of the groove.</li>
+      <li><b>Light sensor:</b> the right-angle VEML7700 (5378) was out of stock on 31 Oct 2026. The standard 4162 doesn't fit upright behind the front face; it would hang under the lid and look up through a small window in the lid. Not decided yet.</li>
+    </ul>
+  </div>
 
   <h3>Needed for the printable model</h3>
   <ol>
@@ -1334,9 +1361,10 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Panel button:</b> usable thread length, and the nut and washer you got with it.</li>
     <li><b>OLED:</b> where the lit area is, the mounting holes (diameter and spacing) and how far the header pins stick out. A photo from straight above with a ruler next to it is enough.</li>
     <li><b>LED holder:</b> which one, and the hole size it needs.</li>
-    <li><b>STEMMA QT cables</b> you have and their lengths.</li>
-    <li><b>3D printer:</b> bed size, material (PLA or PETG) and nozzle size.</li>
-    <li><b>Screws:</b> M3 available? Otherwise the lid gets snap hooks.</li>
+    <li><b>STEMMA QT cables:</b> only 50&nbsp;mm ones are available; how they run between the sensors is still open.</li>
+    <li><b>3D printer:</b> the case is printed on the school's 3D printer. Model, nozzle, material, slicer and file format are being asked from the teachers by email. A short test print (screw holes, button hole, breadboard fit) comes first.</li>
+    <li><b>Screws:</b> M3 available for the lid? Otherwise the lid gets snap hooks.</li>
+    <li><b>Dust mesh:</b> type and thickness.</li>
   </ol>
 </section>
 
@@ -1345,6 +1373,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.13</td><td>31 Oct 2026</td><td>Case (section 13): the sensor boards are screwed on with M2.5 &times; 6 hex socket screws to standoffs on the double wall; the 3 sensor clips are gone. The chamber's side vents are now 4&nbsp;mm vertical slots in two rows, so a 2&nbsp;mm hex screwdriver reaches the screws from outside, with a removable dust mesh behind them. New subsection <i>Sensor mounting and side slots</i> with the boards' mounting holes and Figure 12. BMP580 (6411) added as the in-stock pressure sensor. New <i>Still open</i> notes: sensor layout and the 50&nbsp;mm cables, mesh size, light sensor. The case is printed on the school's printer.</td></tr>
     <tr><td>0.12</td><td>31 Oct 2026</td><td>Sleep mode (section 6): the RGB LED is off and the display shows a small moon, while measuring, history and the web page carry on. Switched by holding the button for 2&nbsp;s (new settings <code>LONG_PRESS_MS</code>, <code>SLEEP_MESSAGE_MS</code>), by a switch on the web page (new address <code>/api/sleep</code>) or with <code>sleep on|off</code> in the Serial Monitor; remembered through restarts. New in section 11: the power LEDs that no software can switch off, and Figure 7, where tape may cover the SCD-41 and SHT45 boards (drawn from Adafruit's board files). The case drawings are now Figures 8&ndash;11. New test step 10 and troubleshooting rows. <code>OLED_BRIGHTNESS</code> in the settings table now shows the sketch's value, 10. Tested on the board: web switch, <code>/api/sleep</code>, Serial commands, restart.</td></tr>
     <tr><td>0.11</td><td>29 Oct 2026</td><td>Web page: the graphs are now right below the live values, with a heading that names the time shown. New buttons <i>Last 1 / 3 / 6 / 12 / 24 h</i> above them; the range moves along with the time (they replace <i>Last 24 h</i>). On a phone the day box now comes before the calendar. New screenshot (Figure 6), updated 8.3, 8.5 and test step 9. Tested on the board, on a PC and at phone width.</td></tr>
     <tr><td>0.10</td><td>29 Oct 2026</td><td>Step 3: web page served by the monitor (new section 8, files <code>web.h</code>, <code>web.cpp</code>, <code>web/</code>). Live values, a calendar with marks on days that have values, a time range of up to 24&nbsp;h, graphs of CO<sub>2</sub>, temperature and humidity that can be switched on and off, a CSV download between two dates, and Auto/Light/Dark themes. Fixed address via the router (8.2). Uses 60&nbsp;KB more program flash; the history storage is unchanged. New test step 9 and troubleshooting rows. Sections 8&ndash;13 are now 9&ndash;14, and the case drawings are now Figures 7&ndash;10. Tested on the board and in the browser, on a PC and at phone width.</td></tr>
@@ -1811,6 +1840,48 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       mk('text', { x: H(P.y0), y: 18, 'text-anchor': 'end', 'font-size': 8, fill: C.line }, svg, 'sensor chamber →');
       dimH(svg, H(P.y1), H(P.y0), 200, '86 mm');
       dimV(svg, 352, V(P.h), V(-3), '43 mm');
+    }
+
+    // ---- Figure 12: cut across the sensor chamber through a sensor screw, seen from the front
+    {
+      const svg = document.getElementById('case-mount');
+      const s = 5.2, X = y => 20 + (y + 72) * s, Z = z => 270 - z * s;
+      const box = (ya, za, yb, zb, a) => mk('rect', Object.assign({ x: X(Math.min(ya, yb)), y: Z(Math.max(za, zb)), width: Math.abs(yb - ya) * s, height: Math.abs(zb - za) * s }, a), svg);
+      const T = (x, y, t) => mk('text', { x, y, 'font-size': 10, fill: '#1f2328' }, svg, t);
+      const leader = (x1, y1, x2, y2) => mk('line', { x1, y1, x2, y2, stroke: '#8c959f', 'stroke-width': 0.8, 'stroke-dasharray': '3 2' }, svg);
+      const wall = { fill: C.wall, stroke: C.line, 'stroke-width': 0.6 };
+      const ghost = { fill: 'none', stroke: C.line, 'stroke-width': 0.9, 'stroke-dasharray': '4 2' };
+
+      box(-54, 0, -30, 2, wall);                                                         // floor
+      for (const [za, zb] of [[2, 4], [14, 17], [29, P.lidZ]]) box(-54, za, -52, zb, wall);   // outer wall, cut through a slot
+      box(-54, P.lidZ, -30, P.h, wall);                                                  // lid
+      box(-34, 2, -32.8, P.lidZ, wall);                                                  // double wall
+      box(-31.2, 2, -30, P.lidZ, wall);
+      box(-40, 2, -34, 26.82, wall);                                                     // standoff pillar
+      for (const z of [23.27, 25.37]) mk('line', { x1: X(-40), y1: Z(z), x2: X(-35), y2: Z(z), stroke: C.line, 'stroke-width': 0.6, 'stroke-dasharray': '2 1.5' }, svg);   // pilot hole
+      mk('line', { x1: X(-51.7), y1: Z(3), x2: X(-51.7), y2: Z(37), stroke: C.blue, 'stroke-width': 1.4, 'stroke-dasharray': '1.5 1.5' }, svg);   // dust mesh
+      box(-41.6, 4, -40, 26.86, { fill: '#1b1f3b' });                                    // SCD-41 board
+      box(-48.1, 11.14, -41.6, 21.24, { fill: '#c9ced6', stroke: '#8c959f' });           // SCD-41 sensor
+      box(-41.6, 23.07, -35.6, 25.57, { fill: '#8c959f', opacity: 0.85 });               // screw shank
+      box(-43.4, 22.07, -41.6, 26.57, { fill: '#6e7781', stroke: C.line, 'stroke-width': 0.6 });   // screw head
+      box(-62, 23.17, -43.4, 25.47, ghost);                                              // screwdriver blade
+      box(-72, 20.3, -62, 28.3, Object.assign({ rx: 4 }, ghost));                        // screwdriver handle
+      dimH(svg, X(-52), X(-34), Z(31.5), '18 mm');
+
+      leader(70, 100, X(-53), Z(27.5));
+      T(20, 92, 'side slot,'); T(20, 104, '4 mm wide');
+      leader(40, 190, X(-67), Z(20.3));
+      T(20, 202, '2 mm hex'); T(20, 214, 'screwdriver');
+      leader(X(-51.7), Z(35), 258, 70);
+      T(262, 68, 'dust mesh in a groove,'); T(262, 80, 'slides out upwards');
+      leader(X(-32), Z(33), 258, 97);
+      T(262, 100, 'double wall');
+      leader(X(-42.5), Z(26.3), 258, 133);
+      T(262, 136, 'M2.5 × 6 hex socket screw');
+      leader(X(-46), Z(16), 258, 173);
+      T(262, 176, 'SCD-41 board');
+      leader(X(-37), Z(12), 258, 211);
+      T(262, 214, 'standoff pillar, part of the base');
     }
   })();
 </script>
