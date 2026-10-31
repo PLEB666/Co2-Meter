@@ -20,8 +20,9 @@ constexpr uint32_t MAX_SPAN_DAYS = 45 * SECONDS_PER_DAY;    // calendar markers
 
 static WebServer server(80);
 static bool started = false;
-static LiveValues live = {0, NAN, NAN, 0};
+static LiveValues live = {0, NAN, NAN, 0, false};
 static uint16_t co2Limits[3];
+static void (*sleepModeSetter)(bool on) = nullptr;
 
 // Sends everything printed to it as one HTTP answer, in pieces ("chunked"),
 // so the size doesn't have to be known in advance
@@ -96,7 +97,19 @@ static void handleNow() {
   printJsonNumber(out, "temperature", live.temperatureC, 2);
   out.print(',');
   printJsonNumber(out, "humidity", live.humidityPct, 1);
-  out.printf(",\"limits\":[%u,%u,%u],\"rssi\":%d}", co2Limits[0], co2Limits[1], co2Limits[2], WiFi.RSSI());
+  out.printf(",\"sleep\":%s,\"limits\":[%u,%u,%u],\"rssi\":%d}", live.sleepMode ? "true" : "false", co2Limits[0],
+             co2Limits[1], co2Limits[2], WiFi.RSSI());
+}
+
+static void handleSleep() {
+  String on = server.arg("on");
+  if (on != "0" && on != "1") {
+    server.send(400, "text/plain", "on must be 0 or 1");
+    return;
+  }
+  live.sleepMode = on == "1";
+  sleepModeSetter(live.sleepMode);
+  server.send(200, "application/json", live.sleepMode ? "{\"sleep\":true}" : "{\"sleep\":false}");
 }
 
 static void handleInfo() {
@@ -124,11 +137,12 @@ static void handleData() {
   historyWriteRecords(out, minutes, from, to);
 }
 
-void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateBelow) {
+void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateBelow, void (*setSleepMode)(bool on)) {
   if (started) return;
   co2Limits[0] = co2GoodBelow;
   co2Limits[1] = co2OkBelow;
   co2Limits[2] = co2VentilateBelow;
+  sleepModeSetter = setSleepMode;
 
   // Lets a copy of the page opened on the PC ask the monitor (index.html?device=<address>)
   server.enableCORS(true);
@@ -137,6 +151,7 @@ void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateB
   server.on("/api/info", HTTP_GET, handleInfo);
   server.on("/api/days", HTTP_GET, handleDays);
   server.on("/api/data", HTTP_GET, handleData);
+  server.on("/api/sleep", HTTP_POST, handleSleep);
   server.onNotFound([]() {
     server.send(404, "text/plain", "Not found");
   });

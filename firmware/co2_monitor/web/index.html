@@ -50,6 +50,13 @@ h1{font-size:22px;font-weight:600;margin:0}
 .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:2px;gap:2px}
 .seg button{border:0;background:none;height:28px;color:var(--sub)}
 .seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.switch{display:inline-flex;align-items:center;gap:8px}
+.switch svg{width:15px;height:15px;fill:currentColor;color:var(--sub)}
+.track{position:relative;width:30px;height:18px;border-radius:9px;background:var(--line);transition:background .15s}
+.knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.switch[aria-checked=true] svg{color:var(--acc)}
+.switch[aria-checked=true] .track{background:var(--acc)}
+.switch[aria-checked=true] .knob{left:14px}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px}
 .big{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
@@ -120,8 +127,11 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
     <h1>CO<sub>2</sub> monitor</h1>
     <div class="status"><span id="dot" class="dot"></span><span id="status">Connecting…</span></div>
   </div>
-  <div class="seg" id="theme" role="group" aria-label="Colour theme">
-    <button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+  <div class="line">
+    <button id="sleep" class="switch" role="switch" aria-checked="false" disabled title="Turns the LED off and shows a moon on the display. Holding the monitor's button for 2 s does the same."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Sleep mode<span class="track"><span class="knob"></span></span></button>
+    <div class="seg" id="theme" role="group" aria-label="Colour theme">
+      <button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+    </div>
   </div>
 </header>
 
@@ -223,8 +233,8 @@ const dateText = (t, o) => new Date(t * 1000).toLocaleDateString([], o || {day: 
 const fmt = (v, dec) => v == null ? '–' : v.toLocaleString([], {minimumFractionDigits: dec, maximumFractionDigits: dec});
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function get(path) {
-  const r = await fetch((DEVICE ? 'http://' + DEVICE : '') + path, {cache: 'no-store'});
+async function get(path, options) {
+  const r = await fetch((DEVICE ? 'http://' + DEVICE : '') + path, Object.assign({cache: 'no-store'}, options));
   if (!r.ok) throw new Error(path + ': ' + r.status);
   return r;
 }
@@ -259,8 +269,26 @@ function oldestData() {
 
 // ---------- Live values ----------
 
+let liveToken = 0;
 async function loadLive() {
-  try { live = await (await get('/api/now')).json(); liveAt = Date.now(); } catch (e) {}
+  const token = ++liveToken;
+  try {
+    const r = await (await get('/api/now')).json();
+    if (token === liveToken) { live = r; liveAt = Date.now(); }
+  } catch (e) {}
+  showLive();
+}
+
+// Sleep mode: LED off and a moon on the display
+let sleepBusy = false;
+async function toggleSleep() {
+  const b = $('sleep'), on = b.getAttribute('aria-checked') !== 'true';
+  sleepBusy = true;
+  b.disabled = true;
+  b.setAttribute('aria-checked', on);
+  liveToken++;  // a reading already on its way still has the old state
+  try { live.sleep = (await (await get('/api/sleep?on=' + (on ? 1 : 0), {method: 'POST'})).json()).sleep; } catch (e) {}
+  sleepBusy = false;
   showLive();
 }
 
@@ -274,6 +302,10 @@ function showLive() {
     if (!live.clock) s += ', waiting for the internet time';
   }
   $('status').textContent = s;
+  if (!sleepBusy) {
+    $('sleep').disabled = !ok;
+    $('sleep').setAttribute('aria-checked', !!(live && live.sleep));
+  }
   if (!live) return;
 
   const warm = live.warmup > 0;
@@ -642,6 +674,7 @@ function setup() {
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   showTheme();
+  $('sleep').onclick = toggleSleep;
 
   for (let i = 0; i < 7; i++) $('wd').innerHTML += '<span>' + new Date(2024, 0, 1 + i).toLocaleDateString([], {weekday: 'short'}).slice(0, 2) + '</span>';
   $('prev').onclick = () => moveMonth(-1);

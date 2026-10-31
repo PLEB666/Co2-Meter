@@ -9,14 +9,16 @@
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
   - The RGB LED on the board shows the CO2 level all the time, dimmed:
     green -> yellow -> red.
+  - Sleep mode for the night: the RGB LED is off and the display shows a small moon.
+    Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
   - Wi-Fi gets the time from the internet. The values are stored in the flash
     as 1-minute, 5-minute and hourly averages (history.h explains how).
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
-  - Serial Monitor commands: status, files, csv m1|m5|h1 [days], save
+  - Serial Monitor commands: status, files, csv m1|m5|h1 [days], save, sleep on|off
 
-  The sensors keep measuring while the display is off. This matters for the
+  The sensors keep measuring while the display is off and in sleep mode. This matters for the
   SCD-41's automatic self-calibration, which needs uninterrupted operation.
 
   Libraries (Arduino IDE -> Library Manager):
@@ -28,6 +30,7 @@
 
 #include <Wire.h>
 #include <WiFi.h>
+#include <Preferences.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_SHT4x.h>
@@ -85,6 +88,15 @@ constexpr LedColour LED_GREEN = {0, 255, 0};
 constexpr LedColour LED_YELLOW = {255, 160, 0};
 constexpr LedColour LED_RED = {255, 0, 0};
 
+// ---------- Sleep mode ----------
+// For the night: the RGB LED stays off and the display shows a small moon. The sensors,
+// the history and the web page keep running. The setting survives a restart.
+// Holding the button this long turns sleep mode on or off.
+constexpr uint32_t LONG_PRESS_MS = 2000;
+// After a long press the display confirms the new mode for this long. In sleep mode it
+// then goes dark at once.
+constexpr uint32_t SLEEP_MESSAGE_MS = 2500;
+
 // ---------- Wi-Fi and clock ----------
 // The name the monitor shows in your router's list of devices
 constexpr char WIFI_HOSTNAME[] = "co2-monitor";
@@ -95,6 +107,10 @@ constexpr char NTP_SERVER_2[] = "time.google.com";
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 Adafruit_SHT4x sht4;
 SensirionI2cScd4x scd4x;
+Preferences settings;  // keeps the sleep mode through a restart
+
+// 8 x 8 moon, shown in the top line of the display while sleep mode is on
+const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0x3C};
 
 bool displayFound = false;
 bool shtFound = false;
@@ -102,6 +118,10 @@ bool scdFound = false;
 
 bool displayOn = false;
 uint32_t displayOnSince = 0;
+
+bool sleepMode = false;
+bool sleepMessageShown = false;  // the display confirms a long press
+uint32_t sleepMessageSince = 0;
 
 bool warmingUp = true;
 uint32_t warmupStart = 0;  // when the sensors started measuring
@@ -114,11 +134,16 @@ bool newData = false;  // something on the display has changed
 uint32_t lastShtRead = 0;
 uint32_t lastScdPoll = 0;
 
-// Returns true once per button press (debounced, button pulls the pin to GND).
-bool buttonPressed() {
+enum class ButtonEvent { None, Press, LongPress };
+
+// Debounced, the button pulls the pin to GND. Press comes as soon as the button goes
+// down, LongPress once more when it has been held for LONG_PRESS_MS.
+ButtonEvent readButton() {
   static bool stableState = HIGH;
   static bool lastReading = HIGH;
   static uint32_t lastChange = 0;
+  static uint32_t pressedSince = 0;
+  static bool longPressReported = false;
 
   bool reading = digitalRead(BUTTON_PIN);
   if (reading != lastReading) {
@@ -127,9 +152,17 @@ bool buttonPressed() {
   }
   if (millis() - lastChange > 30 && reading != stableState) {
     stableState = reading;
-    return stableState == LOW;
+    if (stableState == LOW) {
+      pressedSince = millis();
+      longPressReported = false;
+      return ButtonEvent::Press;
+    }
   }
-  return false;
+  if (stableState == LOW && !longPressReported && millis() - pressedSince >= LONG_PRESS_MS) {
+    longPressReported = true;
+    return ButtonEvent::LongPress;
+  }
+  return ButtonEvent::None;
 }
 
 const char* co2Rating(uint16_t ppm) {
@@ -162,9 +195,9 @@ uint8_t dimmed(uint8_t value) {
   return (value * LED_BRIGHTNESS + 127) / 255;
 }
 
-// LED off until the first CO2 value arrives
+// LED off until the first CO2 value arrives, and in sleep mode
 void updateLed() {
-  LedColour colour = co2Ppm > 0 ? co2Colour(co2Ppm) : LedColour{0, 0, 0};
+  LedColour colour = co2Ppm > 0 && !sleepMode ? co2Colour(co2Ppm) : LedColour{0, 0, 0};
   rgbLedWrite(RGB_BUILTIN, dimmed(colour.r), dimmed(colour.g), dimmed(colour.b));
 }
 
@@ -181,15 +214,40 @@ void printCentred(const char *text, uint8_t size, int16_t y) {
   display.print(text);
 }
 
+// Big moon or sun with the new mode, shown for a moment after a long press
+void drawSleepMessage() {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  if (sleepMode) {
+    display.fillCircle(64, 14, 12, SSD1306_WHITE);
+    display.fillCircle(71, 8, 11, SSD1306_BLACK);
+  } else {
+    display.fillCircle(64, 14, 6, SSD1306_WHITE);
+    for (uint8_t i = 0; i < 8; i++) {
+      float angle = i * PI / 4;
+      display.drawLine(64 + lroundf(cosf(angle) * 9), 14 + lroundf(sinf(angle) * 9), 64 + lroundf(cosf(angle) * 12),
+                       14 + lroundf(sinf(angle) * 12), SSD1306_WHITE);
+    }
+  }
+  printCentred("Sleep mode", 2, 32);
+  printCentred(sleepMode ? "on - LED off" : "off - LED on", 1, 54);
+  display.display();
+}
+
 void drawScreen() {
   char text[12];
+  if (sleepMessageShown) {
+    drawSleepMessage();
+    return;
+  }
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
-  // Top line: label left, rating right (inverted when the air is bad)
+  // Top line: label left, moon in sleep mode, rating right (inverted when the air is bad)
   display.setTextSize(1);
   display.setCursor(0, 0);
   display.print(F("CO2 ppm"));
+  if (sleepMode) display.drawBitmap(53, 0, MOON_ICON, 8, 8, SSD1306_WHITE);
   const char* rating = co2Rating(co2Ppm);
   int16_t ratingX = OLED_WIDTH - strlen(rating) * 6;
   if (co2Ppm >= CO2_OK_BELOW) {
@@ -253,10 +311,30 @@ void displayWake() {
   drawScreen();
 }
 
-void displaySleep() {
+void displayOff() {
   if (!displayFound) return;
   display.ssd1306_command(SSD1306_DISPLAYOFF);
   displayOn = false;
+  sleepMessageShown = false;
+}
+
+// From the button, the web page or the Serial Monitor
+void setSleepMode(bool on) {
+  if (on != sleepMode) {
+    sleepMode = on;
+    settings.putBool("sleep", on);
+    updateLed();
+    newData = true;  // adds or removes the moon if the display is on
+  }
+  Serial.println(on ? F("Sleep mode on: LED off") : F("Sleep mode off: LED on"));
+}
+
+// Long press: switches sleep mode and confirms it on the display
+void toggleSleepMode() {
+  setSleepMode(!sleepMode);
+  sleepMessageShown = true;
+  sleepMessageSince = millis();
+  displayWake();
 }
 
 bool initScd41() {
@@ -364,7 +442,7 @@ void updateWifi() {
       configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);  // UTC, updated every 3 hours
       timeStarted = true;
     }
-    webBegin(CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW);  // only the first time
+    webBegin(CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW, setSleepMode);  // only the first time
   } else {
     Serial.println(F("Wi-Fi lost, reconnecting"));
   }
@@ -378,13 +456,14 @@ void printStatus() {
     Serial.println(F("Wi-Fi: not connected"));
   }
   if (warmingUp) Serial.printf("Warm-up: %u s left\n", warmupSecondsLeft());
+  Serial.printf("Sleep mode: %s\n", sleepMode ? "on (LED off)" : "off");
   historyPrintStatus(Serial);
 }
 
 // Commands typed in the Serial Monitor (line ending: New Line, Carriage Return or Both)
 void runCommand(char *line) {
   const char *command = strtok(line, " ");
-  const char *level = strtok(nullptr, " ");
+  const char *option = strtok(nullptr, " ");  // csv: the level, sleep: on or off
   const char *days = strtok(nullptr, " ");
   if (!command) return;
 
@@ -393,13 +472,17 @@ void runCommand(char *line) {
   } else if (strcmp(command, "files") == 0) {
     historyPrintFiles(Serial);
   } else if (strcmp(command, "csv") == 0) {
-    if (!level || !historyPrintCsv(Serial, level, days ? atoi(days) : 1)) {
+    if (!option || !historyPrintCsv(Serial, option, days ? atoi(days) : 1)) {
       Serial.println(F("Use: csv m1|m5|h1 [days], for example \"csv m1 1\""));
     }
   } else if (strcmp(command, "save") == 0) {
     Serial.println(historySave() ? F("History saved") : F("Not saved - see \"status\""));
+  } else if (strcmp(command, "sleep") == 0 && option && strcmp(option, "on") == 0) {
+    setSleepMode(true);
+  } else if (strcmp(command, "sleep") == 0 && option && strcmp(option, "off") == 0) {
+    setSleepMode(false);
   } else {
-    Serial.println(F("Commands: status, files, csv m1|m5|h1 [days], save"));
+    Serial.println(F("Commands: status, files, csv m1|m5|h1 [days], save, sleep on|off"));
   }
 }
 
@@ -430,6 +513,10 @@ void setup() {
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+
+  settings.begin("co2monitor");
+  sleepMode = settings.getBool("sleep", false);
+  if (sleepMode) Serial.println(F("Sleep mode on: LED off"));
 
   // The LED keeps its last colour through a reset (for example from BlinkRGB), so clear it
   updateLed();
@@ -475,12 +562,14 @@ void setup() {
 }
 
 void loop() {
-  if (buttonPressed()) displayWake();
+  ButtonEvent button = readButton();
+  if (button == ButtonEvent::Press) displayWake();
+  if (button == ButtonEvent::LongPress) toggleSleepMode();
   readSerialCommands();
   updateWifi();
   historyLoop();
   updateWarmup();
-  webLoop({co2Ppm, temperatureC, humidityPct, warmupSecondsLeft()});
+  webLoop({co2Ppm, temperatureC, humidityPct, warmupSecondsLeft(), sleepMode});
 
   if (shtFound && !warmingUp && millis() - lastShtRead >= SHT_INTERVAL_MS) {
     lastShtRead = millis();
@@ -492,8 +581,15 @@ void loop() {
   }
 
   if (displayOn) {
-    if (millis() - displayOnSince >= DISPLAY_ON_TIME_MS) {
-      displaySleep();
+    if (sleepMessageShown && millis() - sleepMessageSince >= SLEEP_MESSAGE_MS) {
+      sleepMessageShown = false;
+      if (sleepMode) {
+        displayOff();  // dark at once for the night
+      } else {
+        drawScreen();  // the values, until the display times out
+      }
+    } else if (millis() - displayOnSince >= DISPLAY_ON_TIME_MS) {
+      displayOff();
     } else if (newData) {
       drawScreen();
     }
