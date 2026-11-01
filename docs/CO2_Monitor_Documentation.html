@@ -56,6 +56,8 @@
   tr { break-inside: avoid; }
   td.c, th.c { text-align: center; }
   .nowrap { white-space: nowrap; }
+  table.measure td.grp { background: var(--soft); font-weight: 600; }
+  table.measure td.c { font-weight: 700; color: var(--info); }
 
   figure { margin: 8px 0 14px; break-inside: avoid; }
   figure svg { display: block; width: 100%; height: auto; }
@@ -99,8 +101,8 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 0.96" OLED</p>
   <div class="meta">
-    <span><b>Version</b> 0.13 &ndash; Step 3: web page, sleep mode, case update</span>
-    <span><b>Updated</b> 31 Oct 2026</span>
+    <span><b>Version</b> 0.14 &ndash; Step 3: web page, sleep mode, case measurements</span>
+    <span><b>Updated</b> 1 Nov 2026</span>
     <span><b>Status</b> breadboard prototype</span>
   </div>
 </header>
@@ -202,6 +204,7 @@
     <tr><td><code>docs/CO2_Monitor_Documentation.pdf</code></td><td>PDF version, regenerated from the HTML after every change.</td></tr>
     <tr><td><code>docs/build_pdf.ps1</code></td><td>Script that turns the HTML into the PDF (uses Chrome or Edge in headless mode).</td></tr>
     <tr><td><code>docs/web_page.png</code></td><td>Screenshot of the web page (Figure 6).</td></tr>
+    <tr><td><code>cad/adafruit/*.step</code>, <code>LICENSE</code></td><td>Adafruit's 3D models of the sensor and speaker boards (MIT licence), the reference for the case model (section 13).</td></tr>
   </table>
   </div>
 </section>
@@ -258,12 +261,12 @@
   <h3>Pins used in step 1</h3>
   <table>
     <tr><th>Header pin</th><th>Signal</th><th>Used for</th><th>Breadboard hole &rarr; goes to</th></tr>
-    <tr><td>J1-1</td><td><b>3V3</b></td><td>3.3&nbsp;V supply for OLED, SCD-41, SHT45</td><td>j19 &rarr; c28 (3.3&nbsp;V bus row)</td></tr>
-    <tr><td>J1-12</td><td><b>GPIO2</b></td><td>Push button (internal pull-up, pressed = LOW)</td><td>j8 &rarr; j25 (button leg f25)</td></tr>
-    <tr><td>J3-5</td><td><b>GPIO23</b></td><td>I&sup2;C SDA (Arduino default for ESP32-C6)</td><td>a15 &rarr; c30 (SDA bus row)</td></tr>
-    <tr><td>J3-6</td><td><b>GPIO22</b></td><td>I&sup2;C SCL (Arduino default for ESP32-C6)</td><td>a14 &rarr; c29 (SCL bus row)</td></tr>
-    <tr><td>J3-1</td><td><b>GND</b></td><td>Ground</td><td>a19 &rarr; c27 (GND bus row)</td></tr>
-    <tr><td>(J1-9)</td><td><b>GPIO8</b></td><td>On-board RGB LED (CO<sub>2</sub> colour)</td><td>no wire, keep i11 empty</td></tr>
+    <tr><td>J1-1</td><td><b>3V3</b></td><td>3.3&nbsp;V supply for OLED, SCD-41, SHT45</td><td>j18 &rarr; c28 (3.3&nbsp;V bus row)</td></tr>
+    <tr><td>J1-12</td><td><b>GPIO2</b></td><td>Push button (internal pull-up, pressed = LOW)</td><td>j7 &rarr; j25 (button leg f25)</td></tr>
+    <tr><td>J3-5</td><td><b>GPIO23</b></td><td>I&sup2;C SDA (Arduino default for ESP32-C6)</td><td>a14 &rarr; c30 (SDA bus row)</td></tr>
+    <tr><td>J3-6</td><td><b>GPIO22</b></td><td>I&sup2;C SCL (Arduino default for ESP32-C6)</td><td>a13 &rarr; c29 (SCL bus row)</td></tr>
+    <tr><td>J3-1</td><td><b>GND</b></td><td>Ground</td><td>a18 &rarr; c27 (GND bus row)</td></tr>
+    <tr><td>(J1-9)</td><td><b>GPIO8</b></td><td>On-board RGB LED (CO<sub>2</sub> colour)</td><td>no wire, keep i10 empty</td></tr>
   </table>
 
   <h3>Pins to avoid (or use with care)</h3>
@@ -282,7 +285,7 @@
   <p>Breadboard holes are named <b>column letter + row number</b>, e.g. <code>j19</code> = column j, row 19. On a 400-point breadboard, each row's five holes a&ndash;e are connected together, and so are f&ndash;j (but not across the centre gap). The long power rails run along the edges.</p>
 
   <figure>
-    <svg id="bb-svg" viewBox="0 0 760 624" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Breadboard layout">
+    <svg id="bb-svg" viewBox="-20 0 780 624" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Breadboard layout">
       <!-- sensors (off the board, on their cables) -->
       <text x="200" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2328">Adafruit SHT45 &middot; 0x44</text>
       <rect x="140" y="28" width="120" height="62" rx="6" fill="#1b1f3b"/>
@@ -319,28 +322,28 @@
       <circle cx="550" cy="270" r="6.5" fill="none" stroke="#2e9d4a" stroke-width="2.5"/>
       <circle cx="590" cy="330" r="6.5" fill="none" stroke="#24292f" stroke-width="2.5"/>
 
-      <!-- ESP32-C6-DevKitC-1: pins in rows 4-19, J1 in column i, J3 in column b, USB end at the board edge -->
-      <rect x="34" y="200" width="408" height="200" rx="6" fill="#22272e" opacity=".95"/>
-      <rect x="291" y="229" width="201" height="142" rx="3" fill="#30363d" stroke="#57606a"/>
-      <path d="M450,246 h30 v14 h-30 v14 h30 v14 h-30 v14 h30 v14 h-30 v14 h30 v14 h-30 v14 h30" fill="none" stroke="#d4a72c" stroke-width="2"/>
-      <rect x="299" y="237" width="141" height="126" rx="2" fill="#c9ced6"/>
-      <text x="370" y="292" text-anchor="middle" font-size="10.5" font-weight="700" fill="#30363d">ESP32-C6</text>
-      <text x="370" y="306" text-anchor="middle" font-size="9" fill="#30363d">WROOM-1-N8</text>
-      <text x="165" y="296" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">ESP32-C6-DevKitC-1</text>
-      <text x="165" y="312" text-anchor="middle" font-size="9" fill="#c9d1d9">USB end flush with the board edge</text>
-      <text x="52" y="232" font-size="9" fill="#c9d1d9">J1</text>
-      <text x="52" y="376" font-size="9" fill="#c9d1d9">J3</text>
-      <rect x="14" y="236" width="22" height="28" rx="4" fill="#b0b8c1" stroke="#6e7781"/>
-      <rect x="14" y="336" width="22" height="28" rx="4" fill="#b0b8c1" stroke="#6e7781"/>
-      <text x="9" y="300" font-size="10" fill="#57606a" text-anchor="middle" transform="rotate(-90 9 300)">USB-C &rarr; PC</text>
+      <!-- ESP32-C6-DevKitC-1: pins in rows 3-18, J1 in column i, J3 in column b, USB end 2.5 mm past the board edge -->
+      <rect x="14" y="200" width="408" height="200" rx="6" fill="#22272e" opacity=".95"/>
+      <rect x="271" y="229" width="201" height="142" rx="3" fill="#30363d" stroke="#57606a"/>
+      <path d="M430,246 h30 v14 h-30 v14 h30 v14 h-30 v14 h30 v14 h-30 v14 h30 v14 h-30 v14 h30" fill="none" stroke="#d4a72c" stroke-width="2"/>
+      <rect x="279" y="237" width="141" height="126" rx="2" fill="#c9ced6"/>
+      <text x="350" y="292" text-anchor="middle" font-size="10.5" font-weight="700" fill="#30363d">ESP32-C6</text>
+      <text x="350" y="306" text-anchor="middle" font-size="9" fill="#30363d">WROOM-1-N8</text>
+      <text x="145" y="296" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">ESP32-C6-DevKitC-1</text>
+      <text x="145" y="312" text-anchor="middle" font-size="9" fill="#c9d1d9">USB end 2.5&nbsp;mm past the board edge</text>
+      <text x="32" y="232" font-size="9" fill="#c9d1d9">J1</text>
+      <text x="32" y="376" font-size="9" fill="#c9d1d9">J3</text>
+      <rect x="-6" y="236" width="22" height="28" rx="4" fill="#b0b8c1" stroke="#6e7781"/>
+      <rect x="-6" y="336" width="22" height="28" rx="4" fill="#b0b8c1" stroke="#6e7781"/>
+      <text x="-12" y="300" font-size="10" fill="#57606a" text-anchor="middle" transform="rotate(-90 -12 300)">USB-C &rarr; PC</text>
       <g id="bb-esp-pins"></g>
       <!-- pin labels -->
       <g font-size="8.5" font-weight="700" text-anchor="middle">
-        <g transform="translate(430,222) rotate(90)"><rect x="0" y="-6.5" width="30" height="13" rx="6.5" fill="#fff" stroke="#d32f2f"/><text x="15" y="3.2" fill="#d32f2f">3V3</text></g>
-        <g transform="translate(210,222) rotate(90)"><rect x="0" y="-6.5" width="40" height="13" rx="6.5" fill="#fff" stroke="#2e9d4a"/><text x="20" y="3.2" fill="#1a7f37">GPIO2</text></g>
-        <g transform="translate(430,378) rotate(-90)"><rect x="0" y="-6.5" width="30" height="13" rx="6.5" fill="#fff" stroke="#24292f"/><text x="15" y="3.2" fill="#24292f">GND</text></g>
-        <g transform="translate(350,378) rotate(-90)"><rect x="0" y="-6.5" width="46" height="13" rx="6.5" fill="#fff" stroke="#1e63d6"/><text x="23" y="3.2" fill="#1e63d6">SDA 23</text></g>
-        <g transform="translate(330,378) rotate(-90)"><rect x="0" y="-6.5" width="46" height="13" rx="6.5" fill="#fff" stroke="#b08800"/><text x="23" y="3.2" fill="#9a6700">SCL 22</text></g>
+        <g transform="translate(410,222) rotate(90)"><rect x="0" y="-6.5" width="30" height="13" rx="6.5" fill="#fff" stroke="#d32f2f"/><text x="15" y="3.2" fill="#d32f2f">3V3</text></g>
+        <g transform="translate(190,222) rotate(90)"><rect x="0" y="-6.5" width="40" height="13" rx="6.5" fill="#fff" stroke="#2e9d4a"/><text x="20" y="3.2" fill="#1a7f37">GPIO2</text></g>
+        <g transform="translate(410,378) rotate(-90)"><rect x="0" y="-6.5" width="30" height="13" rx="6.5" fill="#fff" stroke="#24292f"/><text x="15" y="3.2" fill="#24292f">GND</text></g>
+        <g transform="translate(330,378) rotate(-90)"><rect x="0" y="-6.5" width="46" height="13" rx="6.5" fill="#fff" stroke="#1e63d6"/><text x="23" y="3.2" fill="#1e63d6">SDA 23</text></g>
+        <g transform="translate(310,378) rotate(-90)"><rect x="0" y="-6.5" width="46" height="13" rx="6.5" fill="#fff" stroke="#b08800"/><text x="23" y="3.2" fill="#9a6700">SCL 22</text></g>
       </g>
 
       <!-- OLED lying flat, header in a27-a30, hanging over the board edge -->
@@ -363,11 +366,11 @@
 
       <!-- jumper wires -->
       <g fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M430,410 Q430,420 440,420 L452,420 Q460,420 460,412 L460,384 Q460,376 468,376 L584,376 Q590,376 590,370" stroke="#24292f"/>
-        <path d="M430,190 C470,190 520,198 520,236 L520,352 Q520,360 528,360 L602,360 Q610,360 610,366 L610,370" stroke="#d32f2f"/>
-        <path d="M330,410 Q330,434 340,434 L492,434 Q500,434 500,426 L500,388 Q500,380 508,380 L624,380 Q630,380 630,374 L630,370" stroke="#e2b100"/>
-        <path d="M350,410 Q350,427 360,427 L472,427 Q480,427 480,419 L480,392 Q480,384 488,384 L644,384 Q650,384 650,376 L650,370" stroke="#1e63d6"/>
-        <path d="M210,190 C220,104 540,104 550,190" stroke="#2e9d4a"/>
+        <path d="M410,410 Q410,420 420,420 L452,420 Q460,420 460,412 L460,384 Q460,376 468,376 L584,376 Q590,376 590,370" stroke="#24292f"/>
+        <path d="M410,190 C460,190 520,198 520,236 L520,352 Q520,360 528,360 L602,360 Q610,360 610,366 L610,370" stroke="#d32f2f"/>
+        <path d="M310,410 Q310,434 320,434 L492,434 Q500,434 500,426 L500,388 Q500,380 508,380 L624,380 Q630,380 630,374 L630,370" stroke="#e2b100"/>
+        <path d="M330,410 Q330,427 340,427 L472,427 Q480,427 480,419 L480,392 Q480,384 488,384 L644,384 Q650,384 650,376 L650,370" stroke="#1e63d6"/>
+        <path d="M190,190 C200,104 540,104 550,190" stroke="#2e9d4a"/>
       </g>
       <!-- STEMMA QT to pins cable from the SCD-41: d27 black, d28 red, d29 yellow, d30 blue -->
       <path d="M578,59 C604,59 620,78 620,104 L620,314" fill="none" stroke="#6e7781" stroke-width="7" stroke-linecap="round"/>
@@ -387,17 +390,17 @@
         <circle cx="380" cy="126" r="7.5" fill="#2e9d4a" stroke="#fff"/><text x="380" y="129">5</text>
       </g>
     </svg>
-    <figcaption>Figure 3 &ndash; Breadboard layout (top view, seen from the column-a side). The ESP32 sits in rows 4&ndash;19 (3V3 pin in i19) with its USB end flush with the board edge; the antenna overhangs rows 20&ndash;22. Rows 27&ndash;30, left half, form the bus in the same order as the OLED's pins: <b>row 27 = GND, row 28 = 3.3&nbsp;V, row 29 = SCL, row 30 = SDA</b>. The OLED lies flat in a27&ndash;a30 and hangs over the board edge, the ESP32 wires go into column c, the SCD-41 cable into column d. The button's GND leg (e27) sits directly in the GND row. The power rails are not used.</figcaption>
+    <figcaption>Figure 3 &ndash; Breadboard layout (top view, seen from the column-a side). The ESP32 sits in rows 3&ndash;18 (3V3 pin in i18) with its USB end about 2.5&nbsp;mm past the board edge, so the USB-C ports reach just past the joining nubs; the antenna overhangs rows 19&ndash;21. Rows 27&ndash;30, left half, form the bus in the same order as the OLED's pins: <b>row 27 = GND, row 28 = 3.3&nbsp;V, row 29 = SCL, row 30 = SDA</b>. The OLED lies flat in a27&ndash;a30 and hangs over the board edge, the ESP32 wires go into column c, the SCD-41 cable into column d. The button's GND leg (e27) sits directly in the GND row. The power rails are not used.</figcaption>
   </figure>
 
   <h3>Connection list</h3>
   <table>
     <tr><th class="c">#</th><th>Wire</th><th>From</th><th>To</th><th>Signal</th></tr>
-    <tr><td class="c">1</td><td><span class="wire" style="background:#24292f"></span>black</td><td>a19 (J3-1 GND)</td><td>c27</td><td>GND &rarr; bus row 27</td></tr>
-    <tr><td class="c">2</td><td><span class="wire" style="background:#d32f2f"></span>red (long)</td><td>j19 (J1-1 3V3)</td><td>c28</td><td>3.3&nbsp;V &rarr; bus row 28</td></tr>
-    <tr><td class="c">3</td><td><span class="wire" style="background:#e2b100"></span>yellow</td><td>a14 (J3-6 GPIO22)</td><td>c29</td><td>SCL &rarr; bus row 29</td></tr>
-    <tr><td class="c">4</td><td><span class="wire" style="background:#1e63d6"></span>blue</td><td>a15 (J3-5 GPIO23)</td><td>c30</td><td>SDA &rarr; bus row 30</td></tr>
-    <tr><td class="c">5</td><td><span class="wire" style="background:#2e9d4a"></span>green</td><td>j8 (J1-12 GPIO2)</td><td>j25</td><td>Button, leg f25</td></tr>
+    <tr><td class="c">1</td><td><span class="wire" style="background:#24292f"></span>black</td><td>a18 (J3-1 GND)</td><td>c27</td><td>GND &rarr; bus row 27</td></tr>
+    <tr><td class="c">2</td><td><span class="wire" style="background:#d32f2f"></span>red (long)</td><td>j18 (J1-1 3V3)</td><td>c28</td><td>3.3&nbsp;V &rarr; bus row 28</td></tr>
+    <tr><td class="c">3</td><td><span class="wire" style="background:#e2b100"></span>yellow</td><td>a13 (J3-6 GPIO22)</td><td>c29</td><td>SCL &rarr; bus row 29</td></tr>
+    <tr><td class="c">4</td><td><span class="wire" style="background:#1e63d6"></span>blue</td><td>a14 (J3-5 GPIO23)</td><td>c30</td><td>SDA &rarr; bus row 30</td></tr>
+    <tr><td class="c">5</td><td><span class="wire" style="background:#2e9d4a"></span>green</td><td>j7 (J1-12 GPIO2)</td><td>j25</td><td>Button, leg f25</td></tr>
     <tr><td class="c">&ndash;</td><td>OLED header</td><td colspan="2">a27 GND &middot; a28 VCC &middot; a29 SCL &middot; a30 SDA (lying flat, pins at the top)</td><td>plugs straight into the bus rows</td></tr>
     <tr><td class="c">&ndash;</td><td>STEMMA QT &rarr; pins</td><td colspan="2">d27 black (GND) &middot; d28 red (V+) &middot; d29 yellow (SCL) &middot; d30 blue (SDA); other end into the SCD-41</td><td>SCD-41 on the bus</td></tr>
     <tr><td class="c">&ndash;</td><td>STEMMA QT &harr; STEMMA QT</td><td colspan="2">SCD-41 second connector &rarr; SHT45</td><td>SHT45 on the bus</td></tr>
@@ -407,13 +410,13 @@
 
   <h3>Step by step (USB unplugged!)</h3>
   <ol>
-    <li><b>ESP32:</b> pins in rows 4&ndash;19, USB-C ports flush with the end of the breadboard, antenna overhanging rows 20&ndash;22, the pin labelled <b>3V3</b> in <b>i19</b>. One free hole is left next to every pin: column <b>j</b> on the J1 side, column <b>a</b> on the J3 side.</li>
+    <li><b>ESP32:</b> pins in rows 3&ndash;18, so the USB-C ports stick out about 2.5&nbsp;mm past the end of the breadboard (about 1&nbsp;mm past its joining nubs, which the case needs), antenna overhanging rows 19&ndash;21, the pin labelled <b>3V3</b> in <b>i18</b>. One free hole is left next to every pin: column <b>j</b> on the J1 side, column <b>a</b> on the J3 side.</li>
     <li><b>OLED:</b> plug its header into <b>a27&ndash;a30</b> so that you can read the screen with the pins at the top: <b>GND &rarr; a27, VCC &rarr; a28, SCL &rarr; a29, SDA &rarr; a30</b>. The module lies flat, screen up, and hangs over the edge of the breadboard. Nothing else is plugged in underneath it.</li>
-    <li><b>ESP32 to the bus:</b> wire 1 (a19 &rarr; c27, GND), wire 3 (a14 &rarr; c29, SCL), wire 4 (a15 &rarr; c30, SDA). Then wire 2 (j19 &rarr; c28, 3.3&nbsp;V); it is the long one that crosses the board just past the antenna end.</li>
+    <li><b>ESP32 to the bus:</b> wire 1 (a18 &rarr; c27, GND), wire 3 (a13 &rarr; c29, SCL), wire 4 (a14 &rarr; c30, SDA). Then wire 2 (j18 &rarr; c28, 3.3&nbsp;V); it is the long one that crosses the board just past the antenna end.</li>
     <li><b>SCD-41:</b> plug the STEMMA QT &rarr; pins cable into one of its connectors. Put the pins in d27 (black), d28 (red), d29 (yellow), d30 (blue): the same order as the OLED.</li>
     <li><b>SHT45:</b> connect it to the SCD-41's second connector with the STEMMA QT &harr; STEMMA QT cable. Place it as far from the ESP32 and the SCD-41 as the cable allows.</li>
-    <li><b>Button:</b> place it across the centre gap in rows 25&ndash;27, legs in e25, e27, f25, f27. Then wire 5 (j8 &rarr; j25). The button's leg e27 is in the GND row and its diagonally opposite leg f25 is wired to GPIO2. Diagonal legs work whichever way round the button's internal leg pairs are.</li>
-    <li><b>Check before plugging in USB:</b> row 27 (GND) and row 28 (3.3&nbsp;V) are not connected to each other; nothing is connected to the 5V pin (J1-14, hole i6); the STEMMA colours are in the right rows.</li>
+    <li><b>Button:</b> place it across the centre gap in rows 25&ndash;27, legs in e25, e27, f25, f27. Then wire 5 (j7 &rarr; j25). The button's leg e27 is in the GND row and its diagonally opposite leg f25 is wired to GPIO2. Diagonal legs work whichever way round the button's internal leg pairs are.</li>
+    <li><b>Check before plugging in USB:</b> row 27 (GND) and row 28 (3.3&nbsp;V) are not connected to each other; nothing is connected to the 5V pin (J1-14, hole i5); the STEMMA colours are in the right rows.</li>
   </ol>
   <p class="muted">No pins pointing out of the back of your OLED, or not enough room? Connect it with four female&ndash;male jumper wires to the same rows instead (GND &rarr; row 27, VCC &rarr; 28, SCL &rarr; 29, SDA &rarr; 30) and put it wherever you like.</p>
 <div class="box warn"><span class="label">Power the sensors from 3.3&nbsp;V only.</span> The Adafruit boards would accept 5&nbsp;V, but their I&sup2;C pull-up resistors connect to their supply pin. At 5&nbsp;V they would pull SDA/SCL to 5&nbsp;V, and the ESP32-C6 pins are not 5&nbsp;V tolerant.</div>
@@ -1002,7 +1005,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Two USB-C ports:</b> "USB" = native USB (Serial/JTAG, GPIO12/13), "UART" = USB-to-serial bridge (GPIO16/17). Either one powers and programs the board.</li>
     <li><b>On board:</b> BOOT button (GPIO9), RESET button, addressable RGB LED (WS2812B on GPIO8), red power LED ("3.3&nbsp;V Power On LED", always on, see below). Jumper <b>J5</b> (2-pin header next to the "3V3" marking) carries the 3.3&nbsp;V supply to the ESP32 module. It is fitted at the factory and <b>must stay fitted</b>; it is only removed to measure the module's current with an ammeter. Without it, the USB chip still shows up on the PC, but the ESP32 itself has no power.</li>
     <li><b>Strapping pins</b> GPIO4, 5, 8, 9, 15: don't connect buttons or pull-downs to them.</li>
-    <li><b>Breadboard fit:</b> 25.4&nbsp;&times;&nbsp;51.8&nbsp;mm, pin rows 22.86&nbsp;mm (9 holes) apart. In columns b and i it leaves one free hole per pin on each side. The PCB extends ~12&nbsp;mm past pin 16 (USB end) and the module overhangs ~8&nbsp;mm past pin 1 (antenna end). With pins in rows 4&ndash;19, the USB ports end flush with the breadboard and the antenna covers rows 20&ndash;22, which leaves rows 23&ndash;30 free for the button and the bus.</li>
+    <li><b>Breadboard fit:</b> 25.4&nbsp;&times;&nbsp;51.8&nbsp;mm, pin rows 22.86&nbsp;mm (9 holes) apart. In columns b and i it leaves one free hole per pin on each side. The PCB extends ~12&nbsp;mm past pin 16 (USB end) and the module overhangs ~8&nbsp;mm past pin 1 (antenna end). With pins in rows 3&ndash;18, the USB ports stick out about 2.5&nbsp;mm past the breadboard (in rows 4&ndash;19 they would end flush with it, behind its joining nubs) and the antenna covers rows 19&ndash;21, which leaves rows 22&ndash;30 free for the button and the bus.</li>
   </ul>
 
   <h3>Adafruit SCD-41 (Sensirion SCD41)</h3>
@@ -1229,7 +1232,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Red LED on the ESP32 and green LEDs on the sensors stay on in sleep mode</td><td>They are power LEDs on the supply, not under software control. Cover them or disconnect them (section 11, Figure 7).</td></tr>
     <tr><td>Display text is upside down</td><td>Change <code>OLED_ROTATION</code> in the sketch (2 &harr; 0).</td></tr>
     <tr><td>Display shows noise or a picture shifted by 2 pixels</td><td>The module has an SH1106 controller, not an SSD1306 (common on 1.3" modules). Switch the code to the <i>Adafruit SH110X</i> library.</td></tr>
-    <tr><td>Button does nothing</td><td>Button not across the gap, or both wires on the same internal leg pair &rarr; use diagonal legs f25 / e27. Check wire 5 (j8 = next to GPIO2).</td></tr>
+    <tr><td>Button does nothing</td><td>Button not across the gap, or both wires on the same internal leg pair &rarr; use diagonal legs f25 / e27. Check wire 5 (j7 = next to GPIO2).</td></tr>
     <tr><td>"measuring&hellip;" never goes away after the warm-up</td><td>SCD-41 is not delivering values; check Serial for "SCD-41 not found" and the STEMMA cable.</td></tr>
     <tr><td>CO<sub>2</sub> fluctuates by 10&ndash;30&nbsp;ppm</td><td>Normal. People nearby, drafts and doors cause real changes too.</td></tr>
     <tr><td>Temperature reads 1&ndash;3&nbsp;&deg;C too high</td><td>SHT45 too close to the ESP32, SCD-41, display, or in sunlight. Move it away.</td></tr>
@@ -1253,6 +1256,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">13</span>Case (design v3)</h2>
   <div class="box ok"><span class="label">Approved design, 25 Oct 2026.</span> The drawings use datasheet sizes and the Berrybase breadboard (83 &times; 55&nbsp;mm). The printable model follows once the measurements at the end of this section are in.</div>
   <div class="box note"><span class="label">Changed 31 Oct 2026.</span> The sensor boards are now screwed to standoffs instead of held by clips, the chamber's side vents became 4&nbsp;mm slots wide enough for a screwdriver, and a dust mesh goes behind them (see <i>Sensor mounting and side slots</i> below). Figures 8&ndash;10 still show the v3 vents and sensor holders; they are redrawn once the sensor layout is settled.</div>
+  <div class="box note"><span class="label">Changed 1 Nov 2026.</span> The ESP32 moved one row towards the USB end, to rows 3&ndash;18 (section 4). Its USB-C ports now stick out about 2.5&nbsp;mm past the breadboard body and about 1&nbsp;mm past the joining nubs on that end, so they reach almost to the outside of the back wall and any USB-C plug fits. The RGB LED and speaker holes moved with it (<i>Planned pins</i>). Figures 9 and 11 still show the ESP32 in its old place.</div>
 
   <h3>The design</h3>
   <ul>
@@ -1316,8 +1320,8 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <table>
     <tr><th>Signal</th><th>GPIO</th><th>Breadboard</th><th>Note</th></tr>
     <tr><td>Panel button</td><td>GPIO2</td><td>row 25 (as now)</td><td>replaces the breadboard button; other contact to GND</td></tr>
-    <tr><td>RGB LED red / green / blue</td><td>GPIO18 / 19 / 20</td><td>a10 / a11 / a12</td><td>each through a 220&nbsp;&Omega; resistor; common leg to GND or 3.3&nbsp;V depending on the LED type</td></tr>
-    <tr><td>Speaker signal</td><td>GPIO21</td><td>a13</td><td>PWM tones. Power 3.3&nbsp;V, or 5&nbsp;V from the 5V pin (free hole j6) for more volume; the 5&nbsp;V goes to the speaker only.</td></tr>
+    <tr><td>RGB LED red / green / blue</td><td>GPIO18 / 19 / 20</td><td>a9 / a10 / a11</td><td>each through a 220&nbsp;&Omega; resistor; common leg to GND or 3.3&nbsp;V depending on the LED type</td></tr>
+    <tr><td>Speaker signal</td><td>GPIO21</td><td>a12</td><td>PWM tones. Power 3.3&nbsp;V, or 5&nbsp;V from the 5V pin (free hole j5) for more volume; the 5&nbsp;V goes to the speaker only.</td></tr>
     <tr><td>OLED, BMP390 or BMP580, VEML7700</td><td>I&sup2;C (23 / 22)</td><td>rows 27&ndash;30 / STEMMA chain</td><td>new addresses (0x77, or 0x46/0x47 for the BMP580, and 0x10) don't clash with 0x3C, 0x44, 0x62</td></tr>
   </table>
   <p class="muted">GPIO18&ndash;21 are free, not strapping pins, and have free holes next to them in column a.</p>
@@ -1334,12 +1338,22 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <p>The sensor boards are <b>screwed on</b>. Each board sits on two <b>standoffs</b>, pillars that rise from the floor along the double wall as part of the base. Two <b>M2.5 &times; 6 hex socket screws</b> go through the board's holes on the edge away from its header; that edge is at the top.</p>
   <p>A screwdriver doesn't fit inside the chamber. It is 18&nbsp;mm wide, and only 8.6&ndash;11.6&nbsp;mm is left in front of a screw head, while a 1/4" bit is 25&nbsp;mm long and the short leg of a 2&nbsp;mm hex key about 16&nbsp;mm. So the screws are turned <b>from outside, through the side slots</b>, with a 2&nbsp;mm hex precision screwdriver. The screw heads don't fit through a slot: with the lid off, push the screws through the board, hold the board on its standoffs from above and tighten them from outside.</p>
   <table>
-    <tr><th>Board</th><th>Size</th><th>Mounting holes</th><th>Used</th></tr>
-    <tr><td>SCD-41</td><td>25.4 &times; 22.9&nbsp;mm</td><td>4 &times; &#8960;3.0&nbsp;mm</td><td>the 2 at the top</td></tr>
-    <tr><td>SHT45</td><td>25.4 &times; 17.8&nbsp;mm</td><td>4 &times; &#8960;2.5&nbsp;mm</td><td>the 2 at the top</td></tr>
-    <tr><td>BMP390 / BMP580</td><td>25.4 &times; 17.8&nbsp;mm</td><td>2 &times; &#8960;2.5&nbsp;mm, on the edge opposite the 8-pin header</td><td>both</td></tr>
+    <tr><th>Board</th><th>Size</th><th>Height overall</th><th>Mounting holes</th><th>Used</th></tr>
+    <tr><td>SCD-41</td><td>25.4 &times; 22.9&nbsp;mm</td><td>7.9&nbsp;mm (sensor)</td><td>4 &times; &#8960;3.0&nbsp;mm</td><td>the 2 at the top</td></tr>
+    <tr><td>SHT45</td><td>25.4 &times; 17.8&nbsp;mm</td><td>4.5&nbsp;mm (sockets)</td><td>4 &times; &#8960;2.5&nbsp;mm</td><td>the 2 at the top</td></tr>
+    <tr><td>BMP390 / BMP580</td><td>25.4 &times; 17.8&nbsp;mm</td><td>4.5&nbsp;mm (sockets)</td><td>2 &times; &#8960;2.5&nbsp;mm, on the edge opposite the 8-pin header</td><td>both</td></tr>
   </table>
-  <p class="muted">From Adafruit's board files. The holes are 2.54&nbsp;mm from the edges, so the two used holes are 20.32&nbsp;mm apart on every board. All parts sit on the front; the back is flat.</p>
+  <p class="muted">From Adafruit's board files and 3D models; the two agree on the outlines and holes. The holes are 2.54&nbsp;mm from the edges, so the two used holes are 20.32&nbsp;mm apart on every board. All parts sit on the front; the back is flat. Adafruit's product pages give slightly different heights (SCD-41 7.7, SHT45 4.8&nbsp;mm): rounded caliper values, like the 25.5&nbsp;mm they give for these 25.4&nbsp;mm boards.</p>
+  <p><b>Parts on the boards</b>, from Adafruit's 3D models (data sheet values in brackets):</p>
+  <ul>
+    <li><b>Boards</b> are 1.57&nbsp;mm thick (the usual &ldquo;1.6&nbsp;mm&rdquo;).</li>
+    <li><b>SCD-41 sensor:</b> 10.1 &times; 10.1&nbsp;mm, 6.3&nbsp;mm above the board (0.8&nbsp;mm base plus 5.5&nbsp;mm cap, each &plusmn;0.3&nbsp;mm; Sensirion's short summary says 6.5&nbsp;mm). It sits in the middle of the board's width, its centre 12.2&nbsp;mm from the header edge. The cap narrows to 7.8&nbsp;mm at the top, where the white membrane is.</li>
+    <li><b>STEMMA QT sockets</b> (JST SH, 4 pins): 3.0&nbsp;mm above the board, 6.0&nbsp;mm wide, 4.95&nbsp;mm deep, one in the middle of each short edge. Their openings sit 0.1&ndash;0.7&nbsp;mm in from the board edge, so a plugged-in plug sticks out past the edge (S3 measures how far).</li>
+    <li><b>SHT45 and BMP580 chips</b> are tiny (1.5 &times; 1.5 &times; 0.5&nbsp;mm and 2.0 &times; 2.0 &times; 0.8&nbsp;mm), so on those boards the sockets stick up furthest.</li>
+    <li><b>Right-angle VEML7700 (5378):</b> the sensor (6.8 &times; 2.35 &times; 3.0&nbsp;mm) lies 2.5&nbsp;mm high on the board, its window 0.1&nbsp;mm in from the edge opposite the header; the board is 4.5&nbsp;mm tall overall.</li>
+    <li><b>STEMMA speaker (3885):</b> board 36.8 &times; 30.5 &times; 1.57&nbsp;mm, 6.6&nbsp;mm tall overall with the speaker (the product page says 7.2&nbsp;mm).</li>
+  </ul>
+  <p><b>3D models:</b> Adafruit's STEP models of the SCD-40 (same board outline and sensor as the SCD-41), SHT45, BMP390, right-angle VEML7700 and STEMMA speaker boards are in <code>cad/adafruit/</code>, from Adafruit's <i>Adafruit_CAD_Parts</i> collection on GitHub (MIT licence). They go into the case model to check the fit. The BMP390 model stands in for the BMP580: the outline and holes are the same, and both chips are about 2 &times; 2&nbsp;mm.</p>
   <p><b>Side slots:</b> the chamber's outer wall gets vertical slots 4&nbsp;mm wide in two rows, 10&nbsp;mm (lower) and 12&nbsp;mm (upper) tall, instead of the v3 grid of 96 slots of 3 &times; 2&nbsp;mm. The slots are 6.77&nbsp;mm apart, a third of the 20.32&nbsp;mm hole spacing, so both screws of a board can sit behind a slot. The open area is about 1140&nbsp;mm&sup2;, twice the 576&nbsp;mm&sup2; of the v3 grid, so the sensors follow the room's air sooner. Vertical slots print without supports.</p>
   <p><b>Dust mesh:</b> the bigger slots let in a little more dust, so a mesh sits behind them in a groove on the inside of the outer wall. It slides in from above, so with the lid off it can be pulled out whenever the screwdriver is needed.</p>
   <figure>
@@ -1354,18 +1368,270 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     </ul>
   </div>
 
-  <h3>Needed for the printable model</h3>
-  <ol>
-    <li><b>Breadboard:</b> height including the adhesive layer, and how far the side latches stick out.</li>
-    <li><b>Tallest wire or cable:</b> press the jumper wires and cable pins down as flat as they go, then measure the highest point above the breadboard surface.</li>
-    <li><b>Panel button:</b> usable thread length, and the nut and washer you got with it.</li>
-    <li><b>OLED:</b> where the lit area is, the mounting holes (diameter and spacing) and how far the header pins stick out. A photo from straight above with a ruler next to it is enough.</li>
-    <li><b>LED holder:</b> which one, and the hole size it needs.</li>
-    <li><b>STEMMA QT cables:</b> only 50&nbsp;mm ones are available; how they run between the sensors is still open.</li>
-    <li><b>3D printer:</b> the case is printed on the school's 3D printer. Model, nozzle, material, slicer and file format are being asked from the teachers by email. A short test print (screw holes, button hole, breadboard fit) comes first.</li>
-    <li><b>Screws:</b> M3 available for the lid? Otherwise the lid gets snap hooks.</li>
-    <li><b>Dust mesh:</b> type and thickness.</li>
-  </ol>
+  <h3 id="measure">Measurements for the 3D model</h3>
+  <p>The printable model is built from these numbers. The Adafruit boards' outlines and holes come from their board files, but how the parts sit on the breadboard, the OLED and the cables have to be measured. The IDs match Figure 13.</p>
+  <ul>
+    <li><b>Tool:</b> a digital caliper, read to 0.1&nbsp;mm. Measure each value twice; if the two differ by more than 0.2&nbsp;mm, measure a third time. Don't squeeze soft parts such as the adhesive pad or the cables.</li>
+    <li><b>Leave the breadboard as it is.</b> Measure with the ESP32 and the wires plugged in, the way they will sit in the case. All heights are from the breadboard's top surface.</li>
+    <li><b>Photos</b> let me check the numbers. Take them straight on from 30&ndash;50&nbsp;cm away and zoom in (that keeps the edges straight), with a ruler lying at the same height as the part. Wanted: the breadboard from above, from the column-a side and from the USB end; the OLED from the front (switched on) and from the back.</li>
+    <li><b>So far</b> is the value the drawings use now, from a shop page, a data sheet or a guess. A few tenths of a millimetre off is normal; a bigger difference changes the model.</li>
+  </ul>
+  <table class="measure">
+    <tr><th class="c" style="width:7%">ID</th><th>What to measure (mm)</th><th style="width:17%">So far</th><th style="width:19%">Measured</th></tr>
+    <tr><td colspan="4" class="grp">Breadboard (Berrybase, 400 contacts)</td></tr>
+    <tr><td class="c">B1</td><td>Length (row-1 end to row-30 end) and width (column-a edge to column-j edge), on the body without the latches</td><td>83 &times; 55</td><td>84.5 &times; 55.7 including the joining nubs</td></tr>
+    <tr><td class="c">B2</td><td>Height from the table to the top surface, with the adhesive pad as it is now. Is the backing paper still on?</td><td>8.5 (guess)</td><td>9.3 without parts</td></tr>
+    <tr><td class="c">B3</td><td>Side latches (the tongues and grooves for joining boards): on which edges, how many, how far they stick out, how wide. A photo from above is enough.</td><td>&ndash;</td><td>on the row-1 (USB) end and the column-a side; included in B1 (body 83 &times; 55 by the shop)</td></tr>
+    <tr><td class="c">B4</td><td>From the row-1 end edge to the middle of the row-1 holes, and from the column-a edge to the middle of the column-a holes</td><td>&ndash;</td><td></td></tr>
+    <tr><td colspan="4" class="grp">ESP32 on the breadboard</td></tr>
+    <tr><td class="c">E1</td><td>Gap between the breadboard top and the underside of the ESP32 board (the black plastic of its pin headers)</td><td>2.5 (usual header)</td><td></td></tr>
+    <tr><td class="c">E2</td><td>Highest point of the ESP32 board above the breadboard top (usually the metal cover of the module)</td><td>&ndash;</td><td></td></tr>
+    <tr><td class="c">E3</td><td>For each USB-C port: height of its middle above the breadboard top, and distance from its middle to the column-a edge of the breadboard</td><td>5.7; USB 20.3, UART 34.7</td><td>top of the USB-C ports 16.5 above the breadboard's <i>bottom</i></td></tr>
+    <tr><td class="c">E4</td><td>How far the USB ports stick out past the breadboard's row-1 edge (a minus value if they sit behind it)</td><td>0 (flush)</td><td>0 in rows 4&ndash;19: flush with the body, the nubs reach about 1.5 further. Now in rows 3&ndash;18: about 2.5 past the body, 1 past the nubs.</td></tr>
+    <tr><td class="c">E5</td><td>Your USB-C cable: width &times; thickness of the plug's plastic grip, and its length up to where the cable can bend</td><td>&ndash;</td><td>not measured: different cables get used</td></tr>
+    <tr><td colspan="4" class="grp">Wires and cables</td></tr>
+    <tr><td class="c">W1</td><td>Highest point of any wire or cable above the breadboard top, after pressing them down as flat as they go. Where is it (row and column)?</td><td>&ndash;</td><td>30.0 above the breadboard's <i>bottom</i>, at rows 27&ndash;30: the STEMMA QT to pins cable</td></tr>
+    <tr><td class="c">W2</td><td>STEMMA QT cables you have: how many plug-to-plug and plug-to-pins cables, and how long each one is</td><td>50 plug&ndash;plug</td><td>only 50&nbsp;mm plug&ndash;plug; 50&nbsp;mm is the shortest ready-made length (Adafruit, Pimoroni, SparkFun)</td></tr>
+    <tr><td colspan="4" class="grp">OLED (Joy-it SBC-OLED01)</td></tr>
+    <tr><td class="c">O1</td><td>Board width &times; height &times; thickness</td><td>&ndash;</td><td>27.75 &times; 28; about 12 deep with the pins</td></tr>
+    <tr><td class="c">O2</td><td>Glass: width &times; height, and its distance to each board edge (left, right, top, bottom)</td><td>&ndash;</td><td>26.75 &times; 19.15, 1.8 thick; photo: 0.5 in from left and right, top edge 4.4 below the board's top edge</td></tr>
+    <tr><td class="c">O3</td><td>Total thickness from the back of the board to the front of the glass. Any parts on the back, and how tall?</td><td>&ndash;</td><td></td></tr>
+    <tr><td class="c">O4</td><td>Lit area: where the pixels are, as distances from the glass edges. Easiest from the front photo with the display on.</td><td>21.7 &times; 10.9 (usual 0.96" panel)</td><td>photo: about 21.7 &times; 10.9, 2.5 in from the glass's left and right edges, 2.1 below its top edge</td></tr>
+    <tr><td class="c">O5</td><td>Mounting holes: diameter, and the distance of their middles from the board edges</td><td>&ndash;</td><td>&#8960;1.5 (caliper); photo: middles 1.9 from the sides and 2.1 from top and bottom (23.9 apart)</td></tr>
+    <tr><td class="c">O6</td><td>Pin header: straight or angled; how far the pins stick out behind the board, including the black plastic</td><td>&ndash;</td><td>straight; black plastic and pins at the back. Solder ends on the glass side stick out 1.8, level with the glass; pin row 1.5 below the top edge, centred</td></tr>
+    <tr><td class="c">O7</td><td>Which glass edge has the thin flex strip that folds round to the back (the case must not press on it)</td><td>&ndash;</td><td>bottom edge, opposite the header: the lowest 4.2 of the glass is the connector strip; the flex folds round to the back through a notch about 14.5 wide and 2 deep</td></tr>
+    <tr><td colspan="4" class="grp">Sensor boards (SCD-41, SHT45)</td></tr>
+    <tr><td class="c">S1</td><td>Board thickness. Also the overall height of each board, from its back to its highest point.</td><td>1.57; overall SCD-41 7.9, SHT45 4.5 (3D model)</td><td>SCD-41 25.5 &times; 22.75 &times; 8; SHT45 25.5 &times; 17.75 &times; 4.75 overall</td></tr>
+    <tr><td class="c">S2</td><td>Tallest part, from the board's front surface: on the SCD-41 the sensor's metal cap, on the SHT45 a STEMMA QT socket</td><td>SCD-41 6.3; SHT45 3.0 (3D model)</td><td></td></tr>
+    <tr><td class="c">S3</td><td>With a STEMMA QT cable plugged in: from the board edge to where the cable can bend by 90&deg; without forcing it</td><td>&ndash;</td><td></td></tr>
+    <tr><td class="c">S4</td><td>Pin headers soldered onto any sensor board? If yes, which one, and how far they stick out at the back</td><td>none</td><td></td></tr>
+    <tr><td colspan="4" class="grp">Parts for the case (only the ones you already have)</td></tr>
+    <tr><td class="c">P1</td><td>Panel button 10131: usable thread length; cap diameter and height in front of the panel; depth behind the panel including the solder tags; nut across flats and thickness; washer outer diameter and thickness</td><td>M7 &times; 0.75, 27.5 long</td><td>28 long, &#8960;9; thread &#8960;6.7; washer &#8960;9</td></tr>
+    <tr><td class="c">P2</td><td>RGB LED: body diameter, rim diameter at the base, height. Common anode or common cathode?</td><td>5 (body)</td><td>not bought yet</td></tr>
+    <tr><td class="c">P3</td><td>LED holder: the hole diameter it needs and the wall thickness it clamps</td><td>&ndash;</td><td>not bought yet</td></tr>
+    <tr><td class="c">P4</td><td>2&nbsp;mm hex screwdriver: blade diameter, blade length from the tip to the handle, handle diameter</td><td>blade 2.3</td><td></td></tr>
+    <tr><td class="c">P5</td><td>Dust mesh: material and thickness</td><td>&ndash;</td><td>not bought yet</td></tr>
+    <tr><td class="c">P6</td><td>STEMMA speaker 3885: length &times; width &times; height</td><td>36.8 &times; 30.5 &times; 6.6 (3D model)</td><td>37 &times; 32.8 &times; 7.3; the 32.8 includes the cable at the side</td></tr>
+  </table>
+  <p class="muted">First measurements entered on 1 Nov 2026; the empty cells are still open. Values marked <i>photo</i> come from Joy-it's front photo of the OLED, scaled to the measured board size (&plusmn;0.3&nbsp;mm); the lit area matches the usual 0.96" panel. The pressure sensor and the light sensor aren't bought yet. Their sizes come from Adafruit's 3D models and board files; check the board size, holes and tallest part when they arrive.</p>
+
+  <figure>
+<svg viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Where to measure the breadboard, the ESP32, the OLED and the sensor boards">
+    <rect x="6" y="6" width="368" height="284" fill="none" stroke="#d0d7de" stroke-width="1" rx="6"/>
+    <text x="190" y="28" font-size="13" text-anchor="middle" fill="#1f2328" font-weight="600">Breadboard and ESP32, seen from the USB end</text>
+    <g transform="translate(0 -22)">
+    <line x1="20" y1="250" x2="355" y2="250" stroke="#57606a" stroke-width="1.2"/>
+    <rect x="45" y="207" width="275" height="43" fill="#eef1f4" stroke="#57606a" stroke-width="1"/>
+    <rect x="45" y="245" width="275" height="5" fill="#cfd7df" stroke="none" stroke-width="0"/>
+    <path d="M45,215 L35,212 L35,240 L45,237 Z" fill="#eef1f4" stroke="#57606a" stroke-width="1"/>
+    <rect x="119" y="194.5" width="13" height="12.5" fill="#1f2328" stroke="none" stroke-width="0"/>
+    <rect x="233" y="194.5" width="13" height="12.5" fill="#1f2328" stroke="none" stroke-width="0"/>
+    <rect x="119" y="186.5" width="127" height="8" fill="#3b4652" stroke="none" stroke-width="0"/>
+    <rect x="137.5" y="168" width="90" height="18.5" fill="#c9d1d9" stroke="#57606a" stroke-width="1"/>
+    <rect x="124" y="170.5" width="45" height="16" fill="#d8dee4" stroke="#57606a" stroke-width="1" rx="7"/>
+    <rect x="129.5" y="175" width="34" height="7" fill="#57606a" stroke="none" stroke-width="0" rx="3.5"/>
+    <text x="150.5" y="165" font-size="9" text-anchor="start" fill="#57606a">UART</text>
+    <line x1="141.5" y1="178.5" x2="151.5" y2="178.5" stroke="#0969da" stroke-width="1"/>
+    <line x1="146.5" y1="173.5" x2="146.5" y2="183.5" stroke="#0969da" stroke-width="1"/>
+    <rect x="196" y="170.5" width="45" height="16" fill="#d8dee4" stroke="#57606a" stroke-width="1" rx="7"/>
+    <rect x="201.5" y="175" width="34" height="7" fill="#57606a" stroke="none" stroke-width="0" rx="3.5"/>
+    <text x="222.5" y="165" font-size="9" text-anchor="start" fill="#57606a">USB</text>
+    <line x1="213.5" y1="178.5" x2="223.5" y2="178.5" stroke="#0969da" stroke-width="1"/>
+    <line x1="218.5" y1="173.5" x2="218.5" y2="183.5" stroke="#0969da" stroke-width="1"/>
+    <text x="45" y="268" font-size="10" text-anchor="start" fill="#57606a">column j</text>
+    <text x="320" y="268" font-size="10" text-anchor="end" fill="#57606a">column a</text>
+    <text x="182.5" y="232" font-size="10" text-anchor="middle" fill="#57606a">breadboard</text>
+    <line x1="35" y1="200" x2="45" y2="200" stroke="#0969da" stroke-width="1"/>
+    <line x1="35" y1="196" x2="35" y2="204" stroke="#0969da" stroke-width="1"/>
+    <line x1="45" y1="196" x2="45" y2="204" stroke="#0969da" stroke-width="1"/>
+    <text x="40" y="193" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">B3</text>
+    <line x1="119" y1="194.5" x2="104" y2="194.5" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="108" y1="194.5" x2="108" y2="207" stroke="#0969da" stroke-width="1"/>
+    <line x1="104" y1="194.5" x2="112" y2="194.5" stroke="#0969da" stroke-width="1"/>
+    <line x1="104" y1="207" x2="112" y2="207" stroke="#0969da" stroke-width="1"/>
+    <text x="102" y="204.8" font-size="11" text-anchor="end" fill="#0969da" font-weight="700">E1</text>
+    <line x1="218.5" y1="178.5" x2="266" y2="178.5" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="262" y1="178.5" x2="262" y2="207" stroke="#0969da" stroke-width="1"/>
+    <line x1="258" y1="178.5" x2="266" y2="178.5" stroke="#0969da" stroke-width="1"/>
+    <line x1="258" y1="207" x2="266" y2="207" stroke="#0969da" stroke-width="1"/>
+    <text x="268" y="196.8" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">E3</text>
+    <line x1="227.5" y1="168" x2="294" y2="168" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="290" y1="168" x2="290" y2="207" stroke="#0969da" stroke-width="1"/>
+    <line x1="286" y1="168" x2="294" y2="168" stroke="#0969da" stroke-width="1"/>
+    <line x1="286" y1="207" x2="294" y2="207" stroke="#0969da" stroke-width="1"/>
+    <text x="296" y="191.5" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">E2</text>
+    <line x1="218.5" y1="170.5" x2="218.5" y2="146" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="146.5" y1="170.5" x2="146.5" y2="130" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="320" y1="207" x2="320" y2="126" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="218.5" y1="150" x2="320" y2="150" stroke="#0969da" stroke-width="1"/>
+    <line x1="218.5" y1="146" x2="218.5" y2="154" stroke="#0969da" stroke-width="1"/>
+    <line x1="320" y1="146" x2="320" y2="154" stroke="#0969da" stroke-width="1"/>
+    <text x="269.2" y="145" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">E3</text>
+    <line x1="146.5" y1="134" x2="320" y2="134" stroke="#0969da" stroke-width="1"/>
+    <line x1="146.5" y1="130" x2="146.5" y2="138" stroke="#0969da" stroke-width="1"/>
+    <line x1="320" y1="130" x2="320" y2="138" stroke="#0969da" stroke-width="1"/>
+    <text x="233.2" y="129" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">E3</text>
+    <line x1="320" y1="207" x2="342" y2="207" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="320" y1="250" x2="342" y2="250" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="338" y1="207" x2="338" y2="250" stroke="#0969da" stroke-width="1"/>
+    <line x1="334" y1="207" x2="342" y2="207" stroke="#0969da" stroke-width="1"/>
+    <line x1="334" y1="250" x2="342" y2="250" stroke="#0969da" stroke-width="1"/>
+    <text x="344" y="232.5" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">B2</text>
+    </g>
+    <rect x="386" y="6" width="368" height="284" fill="none" stroke="#d0d7de" stroke-width="1" rx="6"/>
+    <text x="570" y="28" font-size="13" text-anchor="middle" fill="#1f2328" font-weight="600">Breadboard from above</text>
+    <path d="M469.6,70 L466.3,63.4 L492.7,63.4 L489.4,70 Z" fill="#eef1f4" stroke="#57606a" stroke-width="1"/>
+    <path d="M601.6,70 L598.3,63.4 L624.7,63.4 L621.4,70 Z" fill="#eef1f4" stroke="#57606a" stroke-width="1"/>
+    <rect x="430" y="70" width="273.9" height="181.5" fill="#eef1f4" stroke="#57606a" stroke-width="1"/>
+    <path d="M447.0,111.8h2.6v2.6h-2.6zM447.0,120.2h2.6v2.6h-2.6zM447.0,128.6h2.6v2.6h-2.6zM447.0,137.0h2.6v2.6h-2.6zM447.0,145.4h2.6v2.6h-2.6zM455.4,111.8h2.6v2.6h-2.6zM455.4,120.2h2.6v2.6h-2.6zM455.4,128.6h2.6v2.6h-2.6zM455.4,137.0h2.6v2.6h-2.6zM455.4,145.4h2.6v2.6h-2.6zM463.8,111.8h2.6v2.6h-2.6zM463.8,120.2h2.6v2.6h-2.6zM463.8,128.6h2.6v2.6h-2.6zM463.8,137.0h2.6v2.6h-2.6zM463.8,145.4h2.6v2.6h-2.6zM472.2,111.8h2.6v2.6h-2.6zM472.2,120.2h2.6v2.6h-2.6zM472.2,128.6h2.6v2.6h-2.6zM472.2,137.0h2.6v2.6h-2.6zM472.2,145.4h2.6v2.6h-2.6zM480.6,111.8h2.6v2.6h-2.6zM480.6,120.2h2.6v2.6h-2.6zM480.6,128.6h2.6v2.6h-2.6zM480.6,137.0h2.6v2.6h-2.6zM480.6,145.4h2.6v2.6h-2.6zM488.9,111.8h2.6v2.6h-2.6zM488.9,120.2h2.6v2.6h-2.6zM488.9,128.6h2.6v2.6h-2.6zM488.9,137.0h2.6v2.6h-2.6zM488.9,145.4h2.6v2.6h-2.6zM497.3,111.8h2.6v2.6h-2.6zM497.3,120.2h2.6v2.6h-2.6zM497.3,128.6h2.6v2.6h-2.6zM497.3,137.0h2.6v2.6h-2.6zM497.3,145.4h2.6v2.6h-2.6zM505.7,111.8h2.6v2.6h-2.6zM505.7,120.2h2.6v2.6h-2.6zM505.7,128.6h2.6v2.6h-2.6zM505.7,137.0h2.6v2.6h-2.6zM505.7,145.4h2.6v2.6h-2.6zM514.1,111.8h2.6v2.6h-2.6zM514.1,120.2h2.6v2.6h-2.6zM514.1,128.6h2.6v2.6h-2.6zM514.1,137.0h2.6v2.6h-2.6zM514.1,145.4h2.6v2.6h-2.6zM522.5,111.8h2.6v2.6h-2.6zM522.5,120.2h2.6v2.6h-2.6zM522.5,128.6h2.6v2.6h-2.6zM522.5,137.0h2.6v2.6h-2.6zM522.5,145.4h2.6v2.6h-2.6zM530.8,111.8h2.6v2.6h-2.6zM530.8,120.2h2.6v2.6h-2.6zM530.8,128.6h2.6v2.6h-2.6zM530.8,137.0h2.6v2.6h-2.6zM530.8,145.4h2.6v2.6h-2.6zM539.2,111.8h2.6v2.6h-2.6zM539.2,120.2h2.6v2.6h-2.6zM539.2,128.6h2.6v2.6h-2.6zM539.2,137.0h2.6v2.6h-2.6zM539.2,145.4h2.6v2.6h-2.6zM547.6,111.8h2.6v2.6h-2.6zM547.6,120.2h2.6v2.6h-2.6zM547.6,128.6h2.6v2.6h-2.6zM547.6,137.0h2.6v2.6h-2.6zM547.6,145.4h2.6v2.6h-2.6zM556.0,111.8h2.6v2.6h-2.6zM556.0,120.2h2.6v2.6h-2.6zM556.0,128.6h2.6v2.6h-2.6zM556.0,137.0h2.6v2.6h-2.6zM556.0,145.4h2.6v2.6h-2.6zM564.4,111.8h2.6v2.6h-2.6zM564.4,120.2h2.6v2.6h-2.6zM564.4,128.6h2.6v2.6h-2.6zM564.4,137.0h2.6v2.6h-2.6zM564.4,145.4h2.6v2.6h-2.6zM572.7,111.8h2.6v2.6h-2.6zM572.7,120.2h2.6v2.6h-2.6zM572.7,128.6h2.6v2.6h-2.6zM572.7,137.0h2.6v2.6h-2.6zM572.7,145.4h2.6v2.6h-2.6zM581.1,111.8h2.6v2.6h-2.6zM581.1,120.2h2.6v2.6h-2.6zM581.1,128.6h2.6v2.6h-2.6zM581.1,137.0h2.6v2.6h-2.6zM581.1,145.4h2.6v2.6h-2.6zM589.5,111.8h2.6v2.6h-2.6zM589.5,120.2h2.6v2.6h-2.6zM589.5,128.6h2.6v2.6h-2.6zM589.5,137.0h2.6v2.6h-2.6zM589.5,145.4h2.6v2.6h-2.6zM597.9,111.8h2.6v2.6h-2.6zM597.9,120.2h2.6v2.6h-2.6zM597.9,128.6h2.6v2.6h-2.6zM597.9,137.0h2.6v2.6h-2.6zM597.9,145.4h2.6v2.6h-2.6zM606.3,111.8h2.6v2.6h-2.6zM606.3,120.2h2.6v2.6h-2.6zM606.3,128.6h2.6v2.6h-2.6zM606.3,137.0h2.6v2.6h-2.6zM606.3,145.4h2.6v2.6h-2.6zM614.6,111.8h2.6v2.6h-2.6zM614.6,120.2h2.6v2.6h-2.6zM614.6,128.6h2.6v2.6h-2.6zM614.6,137.0h2.6v2.6h-2.6zM614.6,145.4h2.6v2.6h-2.6zM623.0,111.8h2.6v2.6h-2.6zM623.0,120.2h2.6v2.6h-2.6zM623.0,128.6h2.6v2.6h-2.6zM623.0,137.0h2.6v2.6h-2.6zM623.0,145.4h2.6v2.6h-2.6zM631.4,111.8h2.6v2.6h-2.6zM631.4,120.2h2.6v2.6h-2.6zM631.4,128.6h2.6v2.6h-2.6zM631.4,137.0h2.6v2.6h-2.6zM631.4,145.4h2.6v2.6h-2.6zM639.8,111.8h2.6v2.6h-2.6zM639.8,120.2h2.6v2.6h-2.6zM639.8,128.6h2.6v2.6h-2.6zM639.8,137.0h2.6v2.6h-2.6zM639.8,145.4h2.6v2.6h-2.6zM648.2,111.8h2.6v2.6h-2.6zM648.2,120.2h2.6v2.6h-2.6zM648.2,128.6h2.6v2.6h-2.6zM648.2,137.0h2.6v2.6h-2.6zM648.2,145.4h2.6v2.6h-2.6zM656.5,111.8h2.6v2.6h-2.6zM656.5,120.2h2.6v2.6h-2.6zM656.5,128.6h2.6v2.6h-2.6zM656.5,137.0h2.6v2.6h-2.6zM656.5,145.4h2.6v2.6h-2.6zM664.9,111.8h2.6v2.6h-2.6zM664.9,120.2h2.6v2.6h-2.6zM664.9,128.6h2.6v2.6h-2.6zM664.9,137.0h2.6v2.6h-2.6zM664.9,145.4h2.6v2.6h-2.6zM673.3,111.8h2.6v2.6h-2.6zM673.3,120.2h2.6v2.6h-2.6zM673.3,128.6h2.6v2.6h-2.6zM673.3,137.0h2.6v2.6h-2.6zM673.3,145.4h2.6v2.6h-2.6zM681.7,111.8h2.6v2.6h-2.6zM681.7,120.2h2.6v2.6h-2.6zM681.7,128.6h2.6v2.6h-2.6zM681.7,137.0h2.6v2.6h-2.6zM681.7,145.4h2.6v2.6h-2.6z" fill="#8c959f"/>
+    <path d="M447.0,170.5h2.6v2.6h-2.6zM447.0,178.9h2.6v2.6h-2.6zM447.0,187.3h2.6v2.6h-2.6zM447.0,195.6h2.6v2.6h-2.6zM447.0,204.0h2.6v2.6h-2.6zM455.4,170.5h2.6v2.6h-2.6zM455.4,178.9h2.6v2.6h-2.6zM455.4,187.3h2.6v2.6h-2.6zM455.4,195.6h2.6v2.6h-2.6zM455.4,204.0h2.6v2.6h-2.6zM463.8,170.5h2.6v2.6h-2.6zM463.8,178.9h2.6v2.6h-2.6zM463.8,187.3h2.6v2.6h-2.6zM463.8,195.6h2.6v2.6h-2.6zM463.8,204.0h2.6v2.6h-2.6zM472.2,170.5h2.6v2.6h-2.6zM472.2,178.9h2.6v2.6h-2.6zM472.2,187.3h2.6v2.6h-2.6zM472.2,195.6h2.6v2.6h-2.6zM472.2,204.0h2.6v2.6h-2.6zM480.6,170.5h2.6v2.6h-2.6zM480.6,178.9h2.6v2.6h-2.6zM480.6,187.3h2.6v2.6h-2.6zM480.6,195.6h2.6v2.6h-2.6zM480.6,204.0h2.6v2.6h-2.6zM488.9,170.5h2.6v2.6h-2.6zM488.9,178.9h2.6v2.6h-2.6zM488.9,187.3h2.6v2.6h-2.6zM488.9,195.6h2.6v2.6h-2.6zM488.9,204.0h2.6v2.6h-2.6zM497.3,170.5h2.6v2.6h-2.6zM497.3,178.9h2.6v2.6h-2.6zM497.3,187.3h2.6v2.6h-2.6zM497.3,195.6h2.6v2.6h-2.6zM497.3,204.0h2.6v2.6h-2.6zM505.7,170.5h2.6v2.6h-2.6zM505.7,178.9h2.6v2.6h-2.6zM505.7,187.3h2.6v2.6h-2.6zM505.7,195.6h2.6v2.6h-2.6zM505.7,204.0h2.6v2.6h-2.6zM514.1,170.5h2.6v2.6h-2.6zM514.1,178.9h2.6v2.6h-2.6zM514.1,187.3h2.6v2.6h-2.6zM514.1,195.6h2.6v2.6h-2.6zM514.1,204.0h2.6v2.6h-2.6zM522.5,170.5h2.6v2.6h-2.6zM522.5,178.9h2.6v2.6h-2.6zM522.5,187.3h2.6v2.6h-2.6zM522.5,195.6h2.6v2.6h-2.6zM522.5,204.0h2.6v2.6h-2.6zM530.8,170.5h2.6v2.6h-2.6zM530.8,178.9h2.6v2.6h-2.6zM530.8,187.3h2.6v2.6h-2.6zM530.8,195.6h2.6v2.6h-2.6zM530.8,204.0h2.6v2.6h-2.6zM539.2,170.5h2.6v2.6h-2.6zM539.2,178.9h2.6v2.6h-2.6zM539.2,187.3h2.6v2.6h-2.6zM539.2,195.6h2.6v2.6h-2.6zM539.2,204.0h2.6v2.6h-2.6zM547.6,170.5h2.6v2.6h-2.6zM547.6,178.9h2.6v2.6h-2.6zM547.6,187.3h2.6v2.6h-2.6zM547.6,195.6h2.6v2.6h-2.6zM547.6,204.0h2.6v2.6h-2.6zM556.0,170.5h2.6v2.6h-2.6zM556.0,178.9h2.6v2.6h-2.6zM556.0,187.3h2.6v2.6h-2.6zM556.0,195.6h2.6v2.6h-2.6zM556.0,204.0h2.6v2.6h-2.6zM564.4,170.5h2.6v2.6h-2.6zM564.4,178.9h2.6v2.6h-2.6zM564.4,187.3h2.6v2.6h-2.6zM564.4,195.6h2.6v2.6h-2.6zM564.4,204.0h2.6v2.6h-2.6zM572.7,170.5h2.6v2.6h-2.6zM572.7,178.9h2.6v2.6h-2.6zM572.7,187.3h2.6v2.6h-2.6zM572.7,195.6h2.6v2.6h-2.6zM572.7,204.0h2.6v2.6h-2.6zM581.1,170.5h2.6v2.6h-2.6zM581.1,178.9h2.6v2.6h-2.6zM581.1,187.3h2.6v2.6h-2.6zM581.1,195.6h2.6v2.6h-2.6zM581.1,204.0h2.6v2.6h-2.6zM589.5,170.5h2.6v2.6h-2.6zM589.5,178.9h2.6v2.6h-2.6zM589.5,187.3h2.6v2.6h-2.6zM589.5,195.6h2.6v2.6h-2.6zM589.5,204.0h2.6v2.6h-2.6zM597.9,170.5h2.6v2.6h-2.6zM597.9,178.9h2.6v2.6h-2.6zM597.9,187.3h2.6v2.6h-2.6zM597.9,195.6h2.6v2.6h-2.6zM597.9,204.0h2.6v2.6h-2.6zM606.3,170.5h2.6v2.6h-2.6zM606.3,178.9h2.6v2.6h-2.6zM606.3,187.3h2.6v2.6h-2.6zM606.3,195.6h2.6v2.6h-2.6zM606.3,204.0h2.6v2.6h-2.6zM614.6,170.5h2.6v2.6h-2.6zM614.6,178.9h2.6v2.6h-2.6zM614.6,187.3h2.6v2.6h-2.6zM614.6,195.6h2.6v2.6h-2.6zM614.6,204.0h2.6v2.6h-2.6zM623.0,170.5h2.6v2.6h-2.6zM623.0,178.9h2.6v2.6h-2.6zM623.0,187.3h2.6v2.6h-2.6zM623.0,195.6h2.6v2.6h-2.6zM623.0,204.0h2.6v2.6h-2.6zM631.4,170.5h2.6v2.6h-2.6zM631.4,178.9h2.6v2.6h-2.6zM631.4,187.3h2.6v2.6h-2.6zM631.4,195.6h2.6v2.6h-2.6zM631.4,204.0h2.6v2.6h-2.6zM639.8,170.5h2.6v2.6h-2.6zM639.8,178.9h2.6v2.6h-2.6zM639.8,187.3h2.6v2.6h-2.6zM639.8,195.6h2.6v2.6h-2.6zM639.8,204.0h2.6v2.6h-2.6zM648.2,170.5h2.6v2.6h-2.6zM648.2,178.9h2.6v2.6h-2.6zM648.2,187.3h2.6v2.6h-2.6zM648.2,195.6h2.6v2.6h-2.6zM648.2,204.0h2.6v2.6h-2.6zM656.5,170.5h2.6v2.6h-2.6zM656.5,178.9h2.6v2.6h-2.6zM656.5,187.3h2.6v2.6h-2.6zM656.5,195.6h2.6v2.6h-2.6zM656.5,204.0h2.6v2.6h-2.6zM664.9,170.5h2.6v2.6h-2.6zM664.9,178.9h2.6v2.6h-2.6zM664.9,187.3h2.6v2.6h-2.6zM664.9,195.6h2.6v2.6h-2.6zM664.9,204.0h2.6v2.6h-2.6zM673.3,170.5h2.6v2.6h-2.6zM673.3,178.9h2.6v2.6h-2.6zM673.3,187.3h2.6v2.6h-2.6zM673.3,195.6h2.6v2.6h-2.6zM673.3,204.0h2.6v2.6h-2.6zM681.7,170.5h2.6v2.6h-2.6zM681.7,178.9h2.6v2.6h-2.6zM681.7,187.3h2.6v2.6h-2.6zM681.7,195.6h2.6v2.6h-2.6zM681.7,204.0h2.6v2.6h-2.6z" fill="#8c959f"/>
+    <path d="M455.4,78.3h2.6v2.6h-2.6zM455.4,86.7h2.6v2.6h-2.6zM463.8,78.3h2.6v2.6h-2.6zM463.8,86.7h2.6v2.6h-2.6zM472.2,78.3h2.6v2.6h-2.6zM472.2,86.7h2.6v2.6h-2.6zM480.6,78.3h2.6v2.6h-2.6zM480.6,86.7h2.6v2.6h-2.6zM488.9,78.3h2.6v2.6h-2.6zM488.9,86.7h2.6v2.6h-2.6zM497.3,78.3h2.6v2.6h-2.6zM497.3,86.7h2.6v2.6h-2.6zM505.7,78.3h2.6v2.6h-2.6zM505.7,86.7h2.6v2.6h-2.6zM514.1,78.3h2.6v2.6h-2.6zM514.1,86.7h2.6v2.6h-2.6zM522.5,78.3h2.6v2.6h-2.6zM522.5,86.7h2.6v2.6h-2.6zM530.8,78.3h2.6v2.6h-2.6zM530.8,86.7h2.6v2.6h-2.6zM539.2,78.3h2.6v2.6h-2.6zM539.2,86.7h2.6v2.6h-2.6zM547.6,78.3h2.6v2.6h-2.6zM547.6,86.7h2.6v2.6h-2.6zM556.0,78.3h2.6v2.6h-2.6zM556.0,86.7h2.6v2.6h-2.6zM564.4,78.3h2.6v2.6h-2.6zM564.4,86.7h2.6v2.6h-2.6zM572.7,78.3h2.6v2.6h-2.6zM572.7,86.7h2.6v2.6h-2.6zM581.1,78.3h2.6v2.6h-2.6zM581.1,86.7h2.6v2.6h-2.6zM589.5,78.3h2.6v2.6h-2.6zM589.5,86.7h2.6v2.6h-2.6zM597.9,78.3h2.6v2.6h-2.6zM597.9,86.7h2.6v2.6h-2.6zM606.3,78.3h2.6v2.6h-2.6zM606.3,86.7h2.6v2.6h-2.6zM614.6,78.3h2.6v2.6h-2.6zM614.6,86.7h2.6v2.6h-2.6zM623.0,78.3h2.6v2.6h-2.6zM623.0,86.7h2.6v2.6h-2.6zM631.4,78.3h2.6v2.6h-2.6zM631.4,86.7h2.6v2.6h-2.6zM639.8,78.3h2.6v2.6h-2.6zM639.8,86.7h2.6v2.6h-2.6zM648.2,78.3h2.6v2.6h-2.6zM648.2,86.7h2.6v2.6h-2.6zM656.5,78.3h2.6v2.6h-2.6zM656.5,86.7h2.6v2.6h-2.6z" fill="#8c959f"/>
+    <path d="M455.4,229.2h2.6v2.6h-2.6zM455.4,237.5h2.6v2.6h-2.6zM463.8,229.2h2.6v2.6h-2.6zM463.8,237.5h2.6v2.6h-2.6zM472.2,229.2h2.6v2.6h-2.6zM472.2,237.5h2.6v2.6h-2.6zM480.6,229.2h2.6v2.6h-2.6zM480.6,237.5h2.6v2.6h-2.6zM488.9,229.2h2.6v2.6h-2.6zM488.9,237.5h2.6v2.6h-2.6zM497.3,229.2h2.6v2.6h-2.6zM497.3,237.5h2.6v2.6h-2.6zM505.7,229.2h2.6v2.6h-2.6zM505.7,237.5h2.6v2.6h-2.6zM514.1,229.2h2.6v2.6h-2.6zM514.1,237.5h2.6v2.6h-2.6zM522.5,229.2h2.6v2.6h-2.6zM522.5,237.5h2.6v2.6h-2.6zM530.8,229.2h2.6v2.6h-2.6zM530.8,237.5h2.6v2.6h-2.6zM539.2,229.2h2.6v2.6h-2.6zM539.2,237.5h2.6v2.6h-2.6zM547.6,229.2h2.6v2.6h-2.6zM547.6,237.5h2.6v2.6h-2.6zM556.0,229.2h2.6v2.6h-2.6zM556.0,237.5h2.6v2.6h-2.6zM564.4,229.2h2.6v2.6h-2.6zM564.4,237.5h2.6v2.6h-2.6zM572.7,229.2h2.6v2.6h-2.6zM572.7,237.5h2.6v2.6h-2.6zM581.1,229.2h2.6v2.6h-2.6zM581.1,237.5h2.6v2.6h-2.6zM589.5,229.2h2.6v2.6h-2.6zM589.5,237.5h2.6v2.6h-2.6zM597.9,229.2h2.6v2.6h-2.6zM597.9,237.5h2.6v2.6h-2.6zM606.3,229.2h2.6v2.6h-2.6zM606.3,237.5h2.6v2.6h-2.6zM614.6,229.2h2.6v2.6h-2.6zM614.6,237.5h2.6v2.6h-2.6zM623.0,229.2h2.6v2.6h-2.6zM623.0,237.5h2.6v2.6h-2.6zM631.4,229.2h2.6v2.6h-2.6zM631.4,237.5h2.6v2.6h-2.6zM639.8,229.2h2.6v2.6h-2.6zM639.8,237.5h2.6v2.6h-2.6zM648.2,229.2h2.6v2.6h-2.6zM648.2,237.5h2.6v2.6h-2.6zM656.5,229.2h2.6v2.6h-2.6zM656.5,237.5h2.6v2.6h-2.6z" fill="#8c959f"/>
+    <line x1="449.8" y1="75.3" x2="661" y2="75.3" stroke="#cf222e" stroke-width="1"/>
+    <line x1="449.8" y1="246.2" x2="661" y2="246.2" stroke="#0969da" stroke-width="1"/>
+    <rect x="430.7" y="119.1" width="170.9" height="83.8" fill="#3b4652" stroke="none" stroke-width="0" fill-opacity="0.85"/>
+    <rect x="479.5" y="132" width="72.6" height="57.8" fill="#c9d1d9" stroke="none" stroke-width="0" fill-opacity="0.9"/>
+    <text x="515.8" y="164.1" font-size="10" text-anchor="middle" fill="#1f2328">ESP32</text>
+    <rect x="428" y="122.5" width="24.4" height="29.4" fill="#d8dee4" stroke="#57606a" stroke-width="1" rx="3"/>
+    <rect x="428" y="170.1" width="24.4" height="29.4" fill="#d8dee4" stroke="#57606a" stroke-width="1" rx="3"/>
+    <text x="444.5" y="56.1" font-size="10" text-anchor="middle" fill="#57606a">row 1</text>
+    <text x="687.7" y="56.1" font-size="10" text-anchor="middle" fill="#57606a">row 30</text>
+    <text x="696.6" y="118.4" font-size="10" text-anchor="middle" fill="#57606a">j</text>
+    <text x="696.6" y="210.6" font-size="10" text-anchor="middle" fill="#57606a">a</text>
+    <line x1="481.1" y1="65" x2="529" y2="40.3" stroke="#0969da" stroke-width="0.8"/>
+    <circle cx="481.1" cy="65" r="1.8" fill="#0969da"/>
+    <circle cx="529" cy="40.3" r="11" fill="#0969da" stroke="#fff" stroke-width="1.5"/>
+    <text x="529" y="44.1" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">B3</text>
+    <line x1="428" y1="152.5" x2="405.2" y2="211.9" stroke="#0969da" stroke-width="0.8"/>
+    <circle cx="428" cy="152.5" r="1.8" fill="#0969da"/>
+    <circle cx="405.2" cy="211.9" r="11" fill="#0969da" stroke="#fff" stroke-width="1.5"/>
+    <text x="405.2" y="215.7" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">E4</text>
+    <line x1="444.5" y1="110.6" x2="444.5" y2="58.5" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="703.9" y1="207.1" x2="722" y2="207.1" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="703.9" y1="251.5" x2="722" y2="251.5" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="713.8" y1="207.1" x2="713.8" y2="251.5" stroke="#0969da" stroke-width="1"/>
+    <line x1="709.8" y1="207.1" x2="717.8" y2="207.1" stroke="#0969da" stroke-width="1"/>
+    <line x1="709.8" y1="251.5" x2="717.8" y2="251.5" stroke="#0969da" stroke-width="1"/>
+    <text x="719.8" y="233.3" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">B4</text>
+    <line x1="430" y1="251.5" x2="430" y2="277.9" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="703.9" y1="251.5" x2="703.9" y2="277.9" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="430" y1="271.3" x2="703.9" y2="271.3" stroke="#0969da" stroke-width="1"/>
+    <line x1="430" y1="267.3" x2="430" y2="275.3" stroke="#0969da" stroke-width="1"/>
+    <line x1="703.9" y1="267.3" x2="703.9" y2="275.3" stroke="#0969da" stroke-width="1"/>
+    <text x="567" y="266.3" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">B1</text>
+    <line x1="703.9" y1="70" x2="743.5" y2="70" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="733.6" y1="70" x2="733.6" y2="205.3" stroke="#0969da" stroke-width="1"/>
+    <line x1="729.6" y1="70" x2="737.6" y2="70" stroke="#0969da" stroke-width="1"/>
+    <line x1="729.6" y1="205.3" x2="737.6" y2="205.3" stroke="#0969da" stroke-width="1"/>
+    <text x="739.6" y="141.6" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">B1</text>
+    <line x1="430" y1="61.8" x2="444.5" y2="61.8" stroke="#0969da" stroke-width="1"/>
+    <line x1="430" y1="57.8" x2="430" y2="65.8" stroke="#0969da" stroke-width="1"/>
+    <line x1="444.5" y1="57.8" x2="444.5" y2="65.8" stroke="#0969da" stroke-width="1"/>
+    <text x="425.1" y="56.1" font-size="11" text-anchor="end" fill="#0969da" font-weight="700">B4</text>
+    <rect x="6" y="300" width="368" height="254" fill="none" stroke="#d0d7de" stroke-width="1" rx="6"/>
+    <text x="190" y="322" font-size="13" text-anchor="middle" fill="#1f2328" font-weight="600">OLED, from the front and from the side</text>
+    <rect x="42" y="352" width="135" height="135" fill="#2f3b4a" stroke="none" stroke-width="0" rx="3"/>
+    <circle cx="54" cy="364" r="5" fill="#fff" stroke="#c9a227" stroke-width="1.5"/>
+    <circle cx="165" cy="364" r="5" fill="#fff" stroke="#c9a227" stroke-width="1.5"/>
+    <circle cx="54" cy="475" r="5" fill="#fff" stroke="#c9a227" stroke-width="1.5"/>
+    <circle cx="165" cy="475" r="5" fill="#fff" stroke="#c9a227" stroke-width="1.5"/>
+    <rect x="85" y="356" width="6" height="6" fill="#c9a227" stroke="none" stroke-width="0"/>
+    <rect x="97.7" y="356" width="6" height="6" fill="#c9a227" stroke="none" stroke-width="0"/>
+    <rect x="110.4" y="356" width="6" height="6" fill="#c9a227" stroke="none" stroke-width="0"/>
+    <rect x="123.1" y="356" width="6" height="6" fill="#c9a227" stroke="none" stroke-width="0"/>
+    <rect x="46" y="374" width="127" height="86" fill="#1b1f24" stroke="#8c959f" stroke-width="1"/>
+    <rect x="55" y="381" width="109" height="55" fill="#4ac0ff" stroke="#4ac0ff" stroke-width="1" fill-opacity="0.3" stroke-dasharray="3 2"/>
+    <rect x="96.5" y="460" width="26" height="9" fill="#c98d2e" stroke="none" stroke-width="0"/>
+    <line x1="42" y1="352" x2="42" y2="339" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="177" y1="352" x2="177" y2="339" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="42" y1="343" x2="177" y2="343" stroke="#0969da" stroke-width="1"/>
+    <line x1="42" y1="339" x2="42" y2="347" stroke="#0969da" stroke-width="1"/>
+    <line x1="177" y1="339" x2="177" y2="347" stroke="#0969da" stroke-width="1"/>
+    <text x="109.5" y="338" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">O1</text>
+    <line x1="42" y1="352" x2="23" y2="352" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="42" y1="487" x2="23" y2="487" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="27" y1="352" x2="27" y2="487" stroke="#0969da" stroke-width="1"/>
+    <line x1="23" y1="352" x2="31" y2="352" stroke="#0969da" stroke-width="1"/>
+    <line x1="23" y1="487" x2="31" y2="487" stroke="#0969da" stroke-width="1"/>
+    <text x="21" y="423.5" font-size="11" text-anchor="end" fill="#0969da" font-weight="700">O1</text>
+    <line x1="173" y1="388" x2="212" y2="380" stroke="#0969da" stroke-width="0.8"/>
+    <circle cx="173" cy="388" r="1.8" fill="#0969da"/>
+    <circle cx="212" cy="380" r="11" fill="#0969da" stroke="#fff" stroke-width="1.5"/>
+    <text x="212" y="383.8" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">O2</text>
+    <line x1="164" y1="414" x2="212" y2="414" stroke="#0969da" stroke-width="0.8"/>
+    <circle cx="164" cy="414" r="1.8" fill="#0969da"/>
+    <circle cx="212" cy="414" r="11" fill="#0969da" stroke="#fff" stroke-width="1.5"/>
+    <text x="212" y="417.8" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">O4</text>
+    <line x1="165" y1="475" x2="212" y2="483" stroke="#0969da" stroke-width="0.8"/>
+    <circle cx="165" cy="475" r="1.8" fill="#0969da"/>
+    <circle cx="212" cy="483" r="11" fill="#0969da" stroke="#fff" stroke-width="1.5"/>
+    <text x="212" y="486.8" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">O5</text>
+    <line x1="109.5" y1="469" x2="109.5" y2="513" stroke="#0969da" stroke-width="0.8"/>
+    <circle cx="109.5" cy="469" r="1.8" fill="#0969da"/>
+    <circle cx="109.5" cy="513" r="11" fill="#0969da" stroke="#fff" stroke-width="1.5"/>
+    <text x="109.5" y="516.8" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">O7</text>
+    <rect x="262" y="374" width="7" height="86" fill="#1b1f24" stroke="#8c959f" stroke-width="1"/>
+    <rect x="269" y="352" width="8" height="135" fill="#2f3b4a" stroke="none" stroke-width="0"/>
+    <rect x="277" y="354" width="12.5" height="12" fill="#1f2328" stroke="none" stroke-width="0"/>
+    <line x1="277" y1="360" x2="307" y2="360" stroke="#c9a227" stroke-width="2.5"/>
+    <rect x="277" y="422" width="4" height="18" fill="#8c959f" stroke="none" stroke-width="0"/>
+    <line x1="277" y1="352" x2="277" y2="339" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="307" y1="360" x2="307" y2="339" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="277" y1="343" x2="307" y2="343" stroke="#0969da" stroke-width="1"/>
+    <line x1="277" y1="339" x2="277" y2="347" stroke="#0969da" stroke-width="1"/>
+    <line x1="307" y1="339" x2="307" y2="347" stroke="#0969da" stroke-width="1"/>
+    <text x="292" y="338" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">O6</text>
+    <line x1="262" y1="460" x2="262" y2="500" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="277" y1="487" x2="277" y2="500" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="262" y1="496" x2="277" y2="496" stroke="#0969da" stroke-width="1"/>
+    <line x1="262" y1="492" x2="262" y2="500" stroke="#0969da" stroke-width="1"/>
+    <line x1="277" y1="492" x2="277" y2="500" stroke="#0969da" stroke-width="1"/>
+    <text x="284" y="500" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">O3</text>
+    <rect x="386" y="300" width="368" height="254" fill="none" stroke="#d0d7de" stroke-width="1" rx="6"/>
+    <text x="570" y="322" font-size="13" text-anchor="middle" fill="#1f2328" font-weight="600">Sensor board with a cable plugged in</text>
+    <rect x="540" y="345" width="114.3" height="102.9" fill="#2a2d33" stroke="none" stroke-width="0" rx="8"/>
+    <rect x="574.4" y="373.7" width="45.4" height="45.4" fill="#b9bec5" stroke="none" stroke-width="0"/>
+    <rect x="542" y="382.7" width="19" height="27.4" fill="#e8e3d6" stroke="none" stroke-width="0"/>
+    <rect x="633.3" y="382.7" width="19" height="27.4" fill="#e8e3d6" stroke="none" stroke-width="0"/>
+    <rect x="523" y="385.4" width="21" height="22" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+    <path d="M523,392.7 H493 A29.8,29.8 0 0 0 463.2,422.4 V470.4" fill="none" stroke="#1f2328" stroke-width="2"/>
+    <path d="M523,395.2 H493 A27.2,27.2 0 0 0 465.8,422.4 V470.4" fill="none" stroke="#cf222e" stroke-width="2"/>
+    <path d="M523,397.7 H493 A24.8,24.8 0 0 0 468.2,422.4 V470.4" fill="none" stroke="#0969da" stroke-width="2"/>
+    <path d="M523,400.2 H493 A22.2,22.2 0 0 0 470.8,422.4 V470.4" fill="none" stroke="#d4a72c" stroke-width="2"/>
+    <line x1="493" y1="390.4" x2="493" y2="353" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="493" y1="357" x2="540" y2="357" stroke="#0969da" stroke-width="1"/>
+    <line x1="493" y1="353" x2="493" y2="361" stroke="#0969da" stroke-width="1"/>
+    <line x1="540" y1="353" x2="540" y2="361" stroke="#0969da" stroke-width="1"/>
+    <text x="516.5" y="352" font-size="11" text-anchor="middle" fill="#0969da" font-weight="700">S3</text>
+    <text x="597.1" y="461.9" font-size="10" text-anchor="middle" fill="#57606a">SCD-41 from above</text>
+    <rect x="540" y="518" width="114.3" height="7.2" fill="#2a2d33" stroke="none" stroke-width="0"/>
+    <rect x="574.4" y="488.7" width="45.4" height="29.3" fill="#b9bec5" stroke="none" stroke-width="0"/>
+    <rect x="542" y="504.7" width="19" height="13.3" fill="#e8e3d6" stroke="none" stroke-width="0"/>
+    <rect x="633.3" y="504.7" width="19" height="13.3" fill="#e8e3d6" stroke="none" stroke-width="0"/>
+    <line x1="619.9" y1="488.7" x2="676.3" y2="488.7" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="654.3" y1="518" x2="676.3" y2="518" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="672.3" y1="488.7" x2="672.3" y2="518" stroke="#0969da" stroke-width="1"/>
+    <line x1="668.3" y1="488.7" x2="676.3" y2="488.7" stroke="#0969da" stroke-width="1"/>
+    <line x1="668.3" y1="518" x2="676.3" y2="518" stroke="#0969da" stroke-width="1"/>
+    <text x="678.3" y="507.4" font-size="11" text-anchor="start" fill="#0969da" font-weight="700">S2</text>
+    <line x1="540" y1="525.2" x2="518" y2="525.2" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="540" y1="518" x2="518" y2="518" stroke="#0969da" stroke-width="0.7" stroke-dasharray="2 2"/>
+    <line x1="522" y1="518" x2="522" y2="525.2" stroke="#0969da" stroke-width="1"/>
+    <line x1="518" y1="518" x2="526" y2="518" stroke="#0969da" stroke-width="1"/>
+    <line x1="518" y1="525.2" x2="526" y2="525.2" stroke="#0969da" stroke-width="1"/>
+    <text x="516" y="525.6" font-size="11" text-anchor="end" fill="#0969da" font-weight="700">S1</text>
+    <text x="597.1" y="540" font-size="10" text-anchor="middle" fill="#57606a">from the side</text>
+    </svg>
+    <figcaption>Figure 13 &ndash; Where to measure (sketches, not to scale). Top left: breadboard and ESP32 seen from the USB end, column a on the right. Top right: the breadboard from above, row 1 (USB end) on the left as in Figure 9. Bottom left: the OLED from the front and, beside it, from the side (glass on the left, pins on the right). Bottom right: a sensor board from above with a cable plugged in, and from the side. Blue: the IDs from the table.</figcaption>
+  </figure>
+
+  <div class="box warn"><span class="label">Also still needed.</span>
+    <ul>
+      <li><b>3D printer:</b> the case is printed on the school's 3D printer. Model, nozzle, material, slicer and file format are being asked from the teachers by email. Until the answer comes, the model is built for the most common set-up, a 0.4&nbsp;mm nozzle and PLA, with all fit gaps set in one place, so they can be changed after a short test print (screw holes, button hole, breadboard fit).</li>
+      <li><b>Screws:</b> M3 available for the lid? Otherwise the lid gets snap hooks.</li>
+      <li><b>Dust mesh:</b> type and thickness (P5), which set the size of its groove.</li>
+    </ul>
+  </div>
 </section>
 
 <!-- ============================================================ 14 -->
@@ -1373,6 +1639,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.14</td><td>1 Nov 2026</td><td>Case (section 13): the list at the end is now a measurement sheet, <i>Measurements for the 3D model</i>. It has 27 values with IDs (breadboard, ESP32, wires, OLED, sensor boards, case parts), how to measure them, the value the drawings use so far and an empty column to write in. New Figure 13 shows where each value is measured. The printer, screw and mesh questions are in a box below it. Adafruit's 3D models of the SCD-40, SHT45, BMP390, right-angle VEML7700 and speaker boards are now in <code>cad/adafruit/</code> (MIT licence). The sensor-board table gives each board's overall height from them, and a new list gives the parts on the boards: boards 1.57&nbsp;mm thick, SCD-41 sensor 10.1 &times; 10.1 &times; 6.3&nbsp;mm, STEMMA QT sockets 6.0 &times; 4.95 &times; 3.0&nbsp;mm. First measurements entered (breadboard, USB height, wires, OLED, SCD-41, SHT45, panel button, speaker), with a new row P6 for the speaker. OLED glass, lit area, holes and flex strip read from Joy-it's photo. Breadboard height, nub positions, USB position, the tallest cable and the OLED hole size added. Wiring (section 4): the ESP32 moved one row towards the USB end, to rows 3&ndash;18, so its USB-C ports reach past the breadboard&rsquo;s joining nubs; all its holes moved by one row (for example 3V3 in i18, GND a18, SCL a13, SDA a14, GPIO2 j7), and so did the planned RGB LED (a9&ndash;a11) and speaker (a12) holes. The GPIO numbers and the firmware are unchanged.</td></tr>
     <tr><td>0.13</td><td>31 Oct 2026</td><td>Case (section 13): the sensor boards are screwed on with M2.5 &times; 6 hex socket screws to standoffs on the double wall; the 3 sensor clips are gone. The chamber's side vents are now 4&nbsp;mm vertical slots in two rows, so a 2&nbsp;mm hex screwdriver reaches the screws from outside, with a removable dust mesh behind them. New subsection <i>Sensor mounting and side slots</i> with the boards' mounting holes and Figure 12. BMP580 (6411) added as the in-stock pressure sensor. New <i>Still open</i> notes: sensor layout and the 50&nbsp;mm cables, mesh size, light sensor. The case is printed on the school's printer.</td></tr>
     <tr><td>0.12</td><td>31 Oct 2026</td><td>Sleep mode (section 6): the RGB LED is off and the display shows a small moon, while measuring, history and the web page carry on. Switched by holding the button for 2&nbsp;s (new settings <code>LONG_PRESS_MS</code>, <code>SLEEP_MESSAGE_MS</code>), by a switch on the web page (new address <code>/api/sleep</code>) or with <code>sleep on|off</code> in the Serial Monitor; remembered through restarts. New in section 11: the power LEDs that no software can switch off, and Figure 7, where tape may cover the SCD-41 and SHT45 boards (drawn from Adafruit's board files). The case drawings are now Figures 8&ndash;11. New test step 10 and troubleshooting rows. <code>OLED_BRIGHTNESS</code> in the settings table now shows the sketch's value, 10. Tested on the board: web switch, <code>/api/sleep</code>, Serial commands, restart.</td></tr>
     <tr><td>0.11</td><td>29 Oct 2026</td><td>Web page: the graphs are now right below the live values, with a heading that names the time shown. New buttons <i>Last 1 / 3 / 6 / 12 / 24 h</i> above them; the range moves along with the time (they replace <i>Last 24 h</i>). On a phone the day box now comes before the calendar. New screenshot (Figure 6), updated 8.3, 8.5 and test step 9. Tested on the board, on a PC and at phone width.</td></tr>
@@ -1506,15 +1773,15 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     for (const r of [1, 5, 10, 15, 20, 30]) el('text', { x: X(r), y: 181, 'font-size': 8.5, fill: '#8c7f63', 'text-anchor': 'middle' }, holes, r);
 
     const pins = document.getElementById('bb-esp-pins');
-    for (let r = 4; r <= 19; r++) {
+    for (let r = 3; r <= 18; r++) {
       for (const y of [210, 390]) el('rect', { x: X(r) - 4, y: y - 4, width: 8, height: 8, fill: '#d4a72c', stroke: '#7d5a00', 'stroke-width': 0.8 }, pins);
     }
 
     const ends = document.getElementById('wire-ends');
     const dots = [
-      [430, 410, '#24292f'], [590, 370, '#24292f'], [430, 190, '#d32f2f'], [610, 370, '#d32f2f'],
-      [330, 410, '#e2b100'], [630, 370, '#e2b100'], [350, 410, '#1e63d6'], [650, 370, '#1e63d6'],
-      [210, 190, '#2e9d4a'], [550, 190, '#2e9d4a'],
+      [410, 410, '#24292f'], [590, 370, '#24292f'], [410, 190, '#d32f2f'], [610, 370, '#d32f2f'],
+      [310, 410, '#e2b100'], [630, 370, '#e2b100'], [330, 410, '#1e63d6'], [650, 370, '#1e63d6'],
+      [190, 190, '#2e9d4a'], [550, 190, '#2e9d4a'],
       [590, 350, '#24292f'], [610, 350, '#d32f2f'], [630, 350, '#e2b100'], [650, 350, '#1e63d6']
     ];
     for (const [cx, cy, color] of dots) el('circle', { cx, cy, r: 4, fill: color, stroke: '#fff', 'stroke-width': 1.2 }, ends);
