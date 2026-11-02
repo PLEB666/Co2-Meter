@@ -1,0 +1,4 @@
+# CAD model of the case (cad/case.py). Install into cad/.venv with Python 3.13:
+#   "C:\Program Files\Python313\python.exe" -m venv cad\.venv
+#   cad\.venv\Scripts\python.exe -m pip install -r cad\requirements.txt
+build123d==0.13.0

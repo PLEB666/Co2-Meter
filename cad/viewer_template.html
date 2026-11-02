@@ -1,0 +1,203 @@
+<!doctype html>
+<!-- Template for cad/out/viewer.html: cad/case.py replaces the DATA placeholder with the parts (STL, base64). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CO2 Case Viewer</title>
+<style>
+  :root { --bg: #e9edf1; --panel: #ffffff; --text: #1f2328; --muted: #57606a; --line: #d0d7de; --accent: #0969da; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16191d; --panel: #22272e; --text: #e6edf3; --muted: #9198a1; --line: #3d444d; --accent: #4493f8; }
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; }
+  #view { position: fixed; inset: 0; }
+  #panel { position: fixed; top: 12px; left: 12px; width: 210px; max-height: calc(100% - 24px); overflow: auto;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  h1 { font-size: 14px; margin: 0; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 4px; }
+  .muted { color: var(--muted); font-size: 11px; }
+  label { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+  .sw { width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--line); }
+  .btns { display: flex; flex-wrap: wrap; gap: 4px; }
+  button { font: inherit; padding: 3px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--text); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  input[type=range] { width: 100%; }
+  select { font: inherit; width: 100%; }
+  #error { position: fixed; bottom: 12px; left: 12px; right: 12px; color: #cf222e; }
+  @media (max-width: 600px) { #panel { width: auto; right: 12px; max-height: 45%; } }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="view"></div>
+<div id="panel">
+  <h1>CO2 monitor case</h1>
+  <div class="muted" id="stamp"></div>
+  <h2>Printed</h2><div id="print"></div>
+  <h2>Sensors and cables</h2><div id="sensor"></div>
+  <h2>Reference, not printed</h2><div id="ref"></div>
+  <h2>View</h2>
+  <div class="btns">
+    <button data-view="iso">Iso</button><button data-view="front">Front</button><button data-view="back">Back</button>
+    <button data-view="top">Top</button><button data-view="bottom">Bottom</button>
+    <button data-view="sideA">Side a</button><button data-view="sideJ">Side j</button>
+  </div>
+  <h2>Lid lifted <span id="liftVal">0</span> mm</h2>
+  <input type="range" id="lift" min="0" max="40" value="0">
+  <label><input type="checkbox" id="ghost"> see-through lid</label>
+  <h2>Cut</h2>
+  <select id="cutAxis">
+    <option value="">no cut</option><option value="x">across (x)</option>
+    <option value="y">along (y)</option><option value="z">height (z)</option>
+  </select>
+  <input type="range" id="cutPos" min="0" max="1000" value="500">
+  <div class="muted" id="cutVal"></div>
+</div>
+<div id="error"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+const DATA = /*DATA*/null;
+
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.localClippingEnabled = true;
+view.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -5000, 5000);   // no perspective, like a drawing
+camera.up.set(0, 0, 1);
+scene.add(camera);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a96a3, 1.7));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(0.4, 0.8, 1);
+camera.add(sun);
+const controls = new OrbitControls(camera, renderer.domElement);
+
+const clip = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+const clipping = [];
+const meshes = {}, boxes = {};
+const all = new THREE.Box3();
+const loader = new STLLoader();
+
+for (const p of DATA.parts) {
+  const bytes = Uint8Array.from(atob(p.stl), c => c.charCodeAt(0));
+  const geom = loader.parse(bytes.buffer);
+  const mat = new THREE.MeshStandardMaterial({
+    color: p.color, roughness: 0.75, metalness: 0, side: THREE.DoubleSide,
+    transparent: p.opacity < 1, opacity: p.opacity, clippingPlanes: clipping,
+  });
+  const mesh = new THREE.Mesh(geom, mat);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom, 25),
+    new THREE.LineBasicMaterial({ color: 0x1f2328, transparent: true, opacity: 0.35, clippingPlanes: clipping }));
+  mesh.add(edges);
+  mesh.userData = { opacity: p.opacity };
+  scene.add(mesh);
+  meshes[p.name] = mesh;
+  if (p.group === 'print') { geom.computeBoundingBox(); all.union(geom.boundingBox); }
+
+  const row = document.createElement('label');
+  row.innerHTML = `<input type="checkbox" checked><span class="sw" style="background:${p.color}"></span>${p.name}`;
+  boxes[p.name] = row.querySelector('input');
+  boxes[p.name].addEventListener('change', e => { mesh.visible = e.target.checked; });
+  document.getElementById(p.group).appendChild(row);
+}
+document.getElementById('stamp').textContent = DATA.stamp;
+
+const centre = all.getCenter(new THREE.Vector3());
+const size = all.getSize(new THREE.Vector3()).length();
+const VIEWS = {
+  iso: [1, -1.1, 0.9], front: [1, 0, 0.0001], back: [-1, 0, 0.0001],
+  top: [0, -0.0001, 1], bottom: [0, -0.0001, -1], sideA: [0, -1, 0.0001], sideJ: [0, 1, 0.0001],
+};
+function setView(name) {
+  const d = new THREE.Vector3(...VIEWS[name]).normalize().multiplyScalar(size * 2);
+  camera.position.copy(centre).add(d);
+  camera.zoom = 1;
+  camera.updateProjectionMatrix();
+  controls.target.copy(centre);
+  controls.update();
+}
+
+function setLift(mm) {
+  for (const p of DATA.parts) if (p.lid) meshes[p.name].position.z = mm;   // parts fixed to the lid
+  document.getElementById('liftVal').textContent = mm;
+  document.getElementById('lift').value = mm;
+}
+function setGhost(on) {
+  const m = meshes.lid.material;
+  m.transparent = on; m.opacity = on ? 0.3 : 1; m.depthWrite = !on; m.needsUpdate = true;
+}
+function setCut(axis, t) {
+  clipping.length = 0;
+  const out = document.getElementById('cutVal');
+  if (!axis) { out.textContent = ''; return; }
+  const v = all.min[axis] + (all.max[axis] - all.min[axis]) * t;
+  clip.normal.set(axis === 'x' ? -1 : 0, axis === 'y' ? -1 : 0, axis === 'z' ? -1 : 0);
+  clip.constant = v;
+  clipping.push(clip);
+  out.textContent = `showing ${axis} < ${v.toFixed(1)} mm`;
+}
+
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.getElementById('lift').addEventListener('input', e => setLift(+e.target.value));
+document.getElementById('ghost').addEventListener('change', e => setGhost(e.target.checked));
+const cutAxis = document.getElementById('cutAxis'), cutPos = document.getElementById('cutPos');
+const cut = () => setCut(cutAxis.value, cutPos.value / 1000);
+cutAxis.addEventListener('change', cut);
+cutPos.addEventListener('input', cut);
+
+function resize() {
+  renderer.setSize(view.clientWidth, view.clientHeight);
+  const half = size * 0.6, aspect = view.clientWidth / view.clientHeight;
+  Object.assign(camera, { left: -half * aspect, right: half * aspect, top: half, bottom: -half });
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+// draw on every change instead of in a loop (a loop pauses while the page is in the background)
+const render = () => renderer.render(scene, camera);
+controls.addEventListener('change', render);
+document.getElementById('panel').addEventListener('input', () => requestAnimationFrame(render));
+window.addEventListener('resize', render);
+// start view from the address, e.g. viewer.html#bottom or #iso&lift=30&hide=lid,cables&zoom=2&at=90,-10,10&cut=y,-12
+const opts = new URLSearchParams(location.hash.slice(1));
+if (opts.has('cut')) {
+  const [axis, mm] = opts.get('cut').split(',');
+  cutAxis.value = axis;
+  cutPos.value = Math.round(1000 * (+mm - all.min[axis]) / (all.max[axis] - all.min[axis]));
+  cut();
+}
+setView([...opts.keys()].find(k => VIEWS[k]) || 'iso');
+if (opts.has('at')) {
+  const at = new THREE.Vector3(...opts.get('at').split(',').map(Number));
+  camera.position.add(at.clone().sub(controls.target));
+  controls.target.copy(at);
+  controls.update();
+}
+if (opts.has('zoom')) { camera.zoom = +opts.get('zoom'); camera.updateProjectionMatrix(); }
+if (opts.has('lift')) setLift(+opts.get('lift'));
+if (opts.has('ghost')) { setGhost(true); document.getElementById('ghost').checked = true; }
+for (const name of (opts.get('hide') || '').split(',')) if (meshes[name]) { meshes[name].visible = false; boxes[name].checked = false; }
+render();
+
+// for driving the view from outside (screenshots)
+const after = f => (...a) => { const r = f(...a); render(); return r; };
+window.viewer = {
+  setView: after(setView), setLift: after(setLift), setGhost: after(setGhost), setCut: after(setCut),
+  show: after((name, on) => { meshes[name].visible = on; boxes[name].checked = on; }), meshes, camera, controls, render,
+};
+</script>
+<script>
+  window.addEventListener('error', e => { document.getElementById('error').textContent = 'Viewer error: ' + e.message; });
+</script>
+</body>
+</html>

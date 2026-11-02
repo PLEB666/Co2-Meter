@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "case-viewer",
+      "runtimeExecutable": "cad/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "cad/out"],
+      "port": 8765
+    }
+  ]
+}
