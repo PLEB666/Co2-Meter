@@ -115,7 +115,7 @@ document.getElementById('stamp').textContent = DATA.stamp;
 const centre = all.getCenter(new THREE.Vector3());
 const size = all.getSize(new THREE.Vector3()).length();
 const VIEWS = {
-  iso: [1, -1.1, 0.9], front: [1, 0, 0.0001], back: [-1, 0, 0.0001],
+  iso: [1, -1.1, 0.9], isoBack: [-1, 1.1, 0.9], front: [1, 0, 0.0001], back: [-1, 0, 0.0001],
   top: [0, -0.0001, 1], bottom: [0, -0.0001, -1], sideA: [0, -1, 0.0001], sideJ: [0, 1, 0.0001],
 };
 function setView(name) {
@@ -169,7 +169,12 @@ controls.addEventListener('change', render);
 document.getElementById('panel').addEventListener('input', () => requestAnimationFrame(render));
 window.addEventListener('resize', render);
 // start view from the address, e.g. viewer.html#bottom or #iso&lift=30&hide=lid,cables&zoom=2&at=90,-10,10&cut=y,-12
+// (&clean hides the panel and uses a white background, for pictures in the docs)
 const opts = new URLSearchParams(location.hash.slice(1));
+if (opts.has('clean')) {
+  document.getElementById('panel').style.display = 'none';
+  document.body.style.background = '#ffffff';
+}
 if (opts.has('cut')) {
   const [axis, mm] = opts.get('cut').split(',');
   cutAxis.value = axis;
