@@ -35,6 +35,8 @@ What changed from v4 (cad/case_v4.py). The outside is 86.3 x 77 x 41.43 (v4: 86.
 - The SGP40/BMP580 compartment gets a double wall like the chamber's, from the back wall, open at
   the front. The ESP32's I2C cable goes through a hole at its bottom, at the rear end. The ESP32
   sits 2 mm nearer the chamber's double wall to make room beside it.
+- All 4 ESP32 posts are the same and all 4 corners are screwed (v4's 4th post was cut flat on the
+  module's side and only carried the board).
 
 Coordinates: x along the case (0 = inside of the back wall, at the USB port), y across
 (0 = bay face of the double wall; + = electronics bay, towards the column-j wall;
@@ -179,14 +181,16 @@ ESP_ZT = ESP_ZB + ESP_T
 ESP_HOLE_IN, ESP_HOLE_D = 1.77, 2.0
 ESP_HOLES = [(ESP_HOLE_IN, ESP_HOLE_IN), (ESP_HOLE_IN, ESP_W - ESP_HOLE_IN),
              (ESP_L - ESP_HOLE_IN, ESP_HOLE_IN), (ESP_L - ESP_HOLE_IN, ESP_W - ESP_HOLE_IN)]
-ESP_SCREWED = 3
 ESP_NECK_D, ESP_NECK_H, ESP_POST_D = 3.4, 3.6, 5.0
 ESP_PILOT = 1.2
 ESP_ROW_Y = {"P1": ESP_Y0 + 1.25, "P2": ESP_Y0 + ESP_W - 1.25}
 HEADER_H, PIN_UP, JUMPER_L = 2.5, 6.0, 14.0
 USED_PINS = {"P1": (1, 12, 13, 14, 15),
              "P2": (1, 5, 6, 10, 12, 15)}
-ESP_MODULE = (29.2, 55.0, 3.9, 22.6, 3.2)
+# Module (x from the USB end, y from the P1 edge, height): ESP32-C6-WROOM-1, 18.0 wide per its datasheet,
+# centred across the board (ASSUMED; Waveshare's photo suggested y 3.9..22.6). Centred, it clears the
+# 3.4 necks of the two antenna-end posts by 0.21 on each side, so all 4 posts are the same.
+ESP_MODULE = (29.2, 55.0, (ESP_W - 18.0) / 2, (ESP_W + 18.0) / 2, 3.2)
 ESP_USB = (-0.8, 6.55, ESP_W / 2, 8.94, 3.26)
 ESP_BUTTONS = ((3.9, 9.5, 0.9, 3.9), (3.9, 9.5, 21.46, 24.46))
 
@@ -450,17 +454,11 @@ def make_base():
     base -= Pos((hx0 + hx1) / 2, (ja + jb) / 2, FLOOR + CABLE_HOLE_H) * Rot(0, 45, 0) * Box(
         w / math.sqrt(2), 6, w / math.sqrt(2))
 
-    # ESP32 posts: as v4
+    # ESP32 posts: 4 the same (v4 cut the 4th flat on the module's side and left it unscrewed)
     neck_z = ESP_ZB - ESP_NECK_H
-    for i in range(4):
+    for i in range(len(ESP_HOLES)):
         x, y = esp_hole(i)
-        post = rod(x, y, FLOOR, neck_z, ESP_POST_D) + rod(x, y, neck_z, ESP_ZB, ESP_NECK_D)
-        if i >= ESP_SCREWED:
-            module_edge = ESP_Y0 + ESP_MODULE[3] + 0.3
-            post -= block(x - 3, y - 3, neck_z, x + 3, module_edge, ESP_ZB + 1)
-        base += post
-    for i in range(ESP_SCREWED):
-        x, y = esp_hole(i)
+        base += rod(x, y, FLOOR, neck_z, ESP_POST_D) + rod(x, y, neck_z, ESP_ZB, ESP_NECK_D)
         base -= rod(x, y, ESP_ZB - 5.0, ESP_ZB + 1, ESP_PILOT)
 
     # display: recess for its glass (open at the top), rail and lip at the header end, and a block
@@ -851,7 +849,7 @@ def make_speaker():
 def make_screws():
     """Screw heads, to check that the screwdriver and the heads have room."""
     heads = []
-    for i in range(ESP_SCREWED):                      # M2 x 6 button head (ISO 7380: 3.5 x 1.1)
+    for i in range(len(ESP_HOLES)):                   # M2 x 6 button head (ISO 7380: 3.5 x 1.1)
         x, y = esp_hole(i)
         heads.append(rod(x, y, ESP_ZT, ESP_ZT + 1.1, 3.5))
     for _, wall, sx, sz in sensor_screws():           # M2.5 x 6 socket head, on the parts side
