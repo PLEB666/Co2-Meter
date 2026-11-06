@@ -105,8 +105,8 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.22: hardware list for the case, prototyping chapter</span>
-    <span><b>Updated</b> 5 Nov 2026</span>
+    <span><b>Version</b> 0.23: case v5 viewer and print files in git</span>
+    <span><b>Updated</b> 6 Nov 2026</span>
     <span><b>Status</b> case v5 designed, its parts ordered; firmware still on the prototype</span>
   </div>
 </header>
@@ -235,7 +235,8 @@
     <tr><td><code>docs/web_page.png</code></td><td>Screenshot of the web page (Figure 5).</td></tr>
     <tr><td><code>docs/case_v5_*.png</code></td><td>Pictures of the case model (Figures 7-11). The <code>case_v4_*.png</code> pictures belong to the earlier v4 model.</td></tr>
     <tr><td><code>cad/adafruit/*.step</code>, <code>LICENSE</code></td><td>Adafruit's 3D models of the sensor and speaker boards (MIT licence), the reference for the case model (section 13).</td></tr>
-    <tr><td><code>cad/case_v5.py</code>, <code>viewer_template.html</code>, <code>requirements.txt</code></td><td>The case model, design v5 (section 13): one Python script with every size. It writes the STEP files for the printer, STL files and a 3D viewer page into <code>cad/out/v5/</code>. The output folders and the Python environment <code>cad/.venv/</code> are not stored in git.</td></tr>
+    <tr><td><code>cad/case_v5.py</code>, <code>viewer_template.html</code>, <code>requirements.txt</code></td><td>The case model, design v5 (section 13): one Python script with every size. It writes the STEP files for the printer, STL files and a 3D viewer page into <code>cad/out/v5/</code>.</td></tr>
+    <tr><td><code>cad/out/v5/</code></td><td>The files <code>case_v5.py</code> writes: <code>viewer.html</code>, <code>base.step</code> and <code>lid.step</code>, and an STL of every part. They are stored in git, so the viewer and the print files are there without running the script. After a change to the script, commit the new files together with it. The older output folders (<code>cad/out/</code>, <code>cad/out/v4/</code>) and the Python environment <code>cad/.venv/</code> are not stored in git.</td></tr>
     <tr><td><code>cad/case_v4.py</code>, <code>cad/case.py</code></td><td>Earlier case designs (v4 and v3), kept for reference; they write into <code>cad/out/v4/</code> and <code>cad/out/</code>.</td></tr>
   </table>
 </section>
@@ -1480,7 +1481,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       </ul>
     </li>
   </ul>
-  <p class="muted">Not in the model yet: the dust-mesh groove, and the button, LED and speaker wires. <code>cad/out/</code> and <code>cad/.venv/</code> are not stored in git; the setup and the scripts make them again.</p>
+  <p class="muted">Not in the model yet: the dust-mesh groove, and the button, LED and speaker wires. <code>cad/out/v5/</code> is stored in git, so the viewer and the print files come with the project. The older output folders and <code>cad/.venv/</code> are not; the setup and the scripts make them again.</p>
 </section>
 
 <!-- ============================================================ 14 -->
@@ -1488,6 +1489,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.23</td><td>6 Nov 2026</td><td>The files of case v5 in <code>cad/out/v5/</code> (the 3D viewer, the STEP files for the school and the STL files) are now stored in git, so they come with the project without running the script. The older output folders stay out of git. Section 1 lists the folder; section 13 says so too.</td></tr>
     <tr><td>0.22</td><td>5 Nov 2026</td><td>The document now covers only the hardware that goes into the case. The case parts are ordered.
       <ul>
         <li>Section 2 lists the parts for the case with their status. Ordered: the Waveshare board, the 1.5" OLED, the light sensor, the BMP580, the SGP40, the panel button, the LED and its diode, and the 100, 200 and 150&nbsp;mm STEMMA QT cables. Here already: the SCD-41, the SHT45, the speaker and 2 &times; 50&nbsp;mm cables. Still to buy: a third 50&nbsp;mm cable, the speaker's JST PH cable, jumper wires, screws and nuts, rubber feet, the dust mesh and some tools. The parts table in section 13 has the same status column.</li>

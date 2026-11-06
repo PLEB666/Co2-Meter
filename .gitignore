@@ -17,5 +17,7 @@ secrets.h
 
 # CAD: Python environment and the files cad/case.py writes
 cad/.venv/
-cad/out/
+cad/out/*
+# ...except the current case, so the 3D viewer and print files are in the repo
+!cad/out/v5/
 __pycache__/
