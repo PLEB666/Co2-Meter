@@ -172,8 +172,10 @@ J_END_SLOT_Y = (J_END_SLOT_MID - SLOT_PITCH / 2, J_END_SLOT_MID + SLOT_PITCH / 2
 
 # ---- Waveshare ESP32-C6-DEV-KIT-N16, upside down: as v4
 ESP_L, ESP_W, ESP_T = 55.0, 25.36, 1.6
-# The board's USB end is 0.5 from the back wall as in v4, so the USB-C socket (0.8 past the board edge)
-# is 1.7 inside the outside face and the plug's grip goes into the opening.
+# The board's USB end is 0.5 from the back wall as in v4. The USB-C socket sticks out 0.5 past the board
+# edge (7 Nov: Berrybase's straight top-view photo 0.4-0.5, "almost flush"; Waveshare's drawing reads
+# up to 0.9), so its face is flush with the inside of the back wall, 2.0 inside the outside face, and the
+# plug's grip goes into the opening.
 ESP_X0, ESP_Y0 = 0.5, 1.5              # y: 2 mm nearer the double wall than in v4: room for the I2C cable beside it
 ESP_POST_H = 5.6
 ESP_ZB = FLOOR + ESP_POST_H
@@ -191,8 +193,9 @@ USED_PINS = {"P1": (1, 12, 13, 14, 15),
 # centred across the board (ASSUMED; Waveshare's photo suggested y 3.9..22.6). Centred, it clears the
 # 3.4 necks of the two antenna-end posts by 0.21 on each side, so all 4 posts are the same.
 ESP_MODULE = (29.2, 55.0, (ESP_W - 18.0) / 2, (ESP_W + 18.0) / 2, 3.2)
-ESP_USB = (-0.8, 6.55, ESP_W / 2, 8.94, 3.26)
-ESP_BUTTONS = ((3.9, 9.5, 0.9, 3.9), (3.9, 9.5, 21.46, 24.46))
+ESP_USB = (-0.5, 6.55, ESP_W / 2, 8.94, 3.26)
+# RESET and BOOT, with their legs, from Waveshare's drawing (7 Nov): right at the long edges
+ESP_BUTTONS = ((3.9, 9.1, 0.3, 3.3), (3.9, 9.1, ESP_W - 3.3, ESP_W - 0.3))
 
 
 def pin_x(k):
@@ -202,7 +205,10 @@ def pin_x(k):
 
 USB_Y = ESP_Y0 + ESP_USB[2]
 USB_Z = ESP_ZB - ESP_USB[4] / 2
-USB_CUT_W, USB_CUT_H, USB_CUT_R = 12.5, 7.5, 1.0    # ASSUMED, as v4: set to the cable's plug grip + 0.5 once measured
+# USB-C opening: the four cables' plug grips (7 Nov) are at most 12.0 wide (Samsung) and 6.5 thick
+# (Ugreen, Toocki, Nintendo), so at least 0.5 per side for each. 7.5 is the most it can be: centred on
+# the socket, its bottom edge is 0.22 above the floor.
+USB_CUT_W, USB_CUT_H, USB_CUT_R = 13.0, 7.5, 1.0
 ESP_FLOOR_VENT_X = [ESP_X0 + 12.0 + k * SLOT_PITCH for k in range(6)]
 ESP_FLOOR_VENT_Y = (USB_Y - VENT_L / 2, USB_Y + VENT_L / 2)       # under the middle of the board
 # back wall over the ESP32: 4 slots centred on the board, upper row only (the USB port is below them)

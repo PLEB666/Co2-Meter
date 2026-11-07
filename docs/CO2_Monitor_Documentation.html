@@ -105,8 +105,8 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.25: test pieces for the case</span>
-    <span><b>Updated</b> 6 Nov 2026</span>
+    <span><b>Version</b> 0.26: USB-C opening sized to the cables</span>
+    <span><b>Updated</b> 7 Nov 2026</span>
     <span><b>Status</b> case v5 designed, its parts ordered; firmware still on the prototype</span>
   </div>
 </header>
@@ -939,7 +939,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>16&nbsp;MB flash.</b> The present board settings (8&nbsp;MB, <code>default_8MB</code>) work on it unchanged. The stored history stays on the prototype's board: download the CSV first (8.4).</li>
     <li><b>On board:</b> BOOT button (GPIO9), RESET button, the RGB LED and a red power LED (2&nbsp;k&Omega;, no jumper), brighter than the DevKitC-1's. In the case the board lies upside down, so both LEDs face the floor, next to the floor vents: tape over the red one for the night.</li>
     <li><b>Strapping pins</b> GPIO4, 5, 8, 9, 15: don't connect buttons or pull-downs to them.</li>
-    <li><b>Size and holes:</b> 55 &times; 25.36&nbsp;mm, first pin 12.0&nbsp;mm from the USB end, 4 corner holes &#8960;2 at 1.77&nbsp;mm from both edges. In the case it lies upside down on 4 posts (section 13).</li>
+    <li><b>Size and holes:</b> 55 &times; 25.36&nbsp;mm, first pin 12.0&nbsp;mm from the USB end, 4 corner holes &#8960;2 at 1.77&nbsp;mm from both edges. The USB-C port sits in the middle of the short end and sticks out about 0.5&nbsp;mm past it; RESET and BOOT sit right at the long edges, 3.9-9.1&nbsp;mm from the USB end. In the case it lies upside down on 4 posts (section 13).</li>
     <li>Sold by Berrybase with the headers soldered on (WS-30547, &euro;9.90). Waveshare is a long-standing Shenzhen maker; its board is a clean copy of Espressif's design, but its wiki is partly out of date.</li>
   </ul>
 
@@ -1196,7 +1196,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Size:</b> 86.3 &times; 77 &times; 41.4&nbsp;mm, 44.9&nbsp;mm high with the rubber feet. The height comes from the display standing on its long edge with a plug in its top socket; the width from the two 18&nbsp;mm sensor bays and the ESP32 between them.</li>
     <li><b>Sensor chamber along one long side</b>, 18&nbsp;mm deep, behind a double wall with an air gap. It holds the <b>SCD-41</b> (back) and the <b>SHT45</b> (front, farthest from the ESP32), 8.5&nbsp;mm apart. A double cross wall behind the display closes it at the front.</li>
     <li><b>SGP40/BMP580 compartment along the other long side:</b> the same 18&nbsp;mm, behind its own double wall with an air gap, closed at its front end by a cross piece. The <b>BMP580</b> stands in its front half and the <b>SGP40</b> in its back half. Its posts, side slots and vents are the chamber's, mirrored. Both sensor bays get room air straight through their slots, away from the ESP32's warmth.</li>
-    <li><b>ESP32:</b> the Waveshare board lies <b>upside down</b> on 4 posts at the back, its pins pointing up, so the jumper-wire plugs go straight onto them. Its USB end is 0.5&nbsp;mm from the back wall, its USB-C port low in the back wall. All 4 posts are the same and all 4 corners are screwed (M2).</li>
+    <li><b>ESP32:</b> the Waveshare board lies <b>upside down</b> on 4 posts at the back, its pins pointing up, so the jumper-wire plugs go straight onto them. Its USB end is 0.5&nbsp;mm from the back wall, its USB-C port low in the back wall. All 4 posts are the same and all 4 corners are screwed (M2). The <b>USB-C opening</b> is 13.0 &times; 7.5&nbsp;mm with 1&nbsp;mm corners: at least 0.5&nbsp;mm on each side of every cable's plug grip (E5). The socket sticks out about 0.5&nbsp;mm past the board, so its face is flush with the inside of the back wall, 2.0&nbsp;mm inside the outside face: the grip goes into the opening, and the board goes straight down onto its posts. If the socket catches on the wall, put the board in about 1&nbsp;mm forward of its posts (there are over 5&nbsp;mm free at the antenna end), lower it and slide it back.</li>
     <li><b>Display:</b> the 1.5" OLED stands behind a 29.9&nbsp;mm square window in the front wall, turned 90&deg; so that its 35.6&nbsp;mm side is the height. Its bottom edge sits in a 1&nbsp;mm groove in the floor and its glass 1&nbsp;mm deep in the front wall. Two hidden <b>M2.5 screws</b> from behind hold its end near the light sensor; the other end is held by the floor groove, a block behind its lower corner and a tab of the lid.</li>
     <li><b>Light sensor</b> (right-angle VEML7700): it stands on its edge right beside the display, screwed to a wall that is also the display's rail, and looks out through a 7.5 &times; 3.1&nbsp;mm window.</li>
     <li><b>Panel button</b> (Berrybase 10130) and <b>8&nbsp;mm LED</b> (PL9823-F8): 7&nbsp;mm above and below the middle of the display, beside the light sensor. The button is held by its own nut; the LED sits in a sleeve, its dome 1.5&nbsp;mm out of the front.</li>
@@ -1245,7 +1245,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td class="c">1</td><td><b>Base:</b> floor, walls, the two double walls with their air gaps and cable holes, the double cross wall behind the display, posts for the four sensor boards, the light sensor's wall with its window, ESP32 posts, the display's floor groove, glass recess, lip and two screw spacers, LED sleeve, lid-screw bosses, vents, USB opening, display window, button hole</td><td>upright</td></tr>
     <tr><td class="c">2</td><td><b>Lid</b> with the speaker grille, 4 speaker standoffs, 2 pegs on the display's top edge, a tab behind its upper ear and a pocket over its plug</td><td>upside down</td></tr>
   </table>
-  <p class="muted">Both parts print without supports. The only exceptions are short bridges over open holes: the slot tops (4&nbsp;mm), the light-sensor window (3.1&nbsp;mm), the USB opening (10.5&nbsp;mm), the button and LED holes, and the top of the display window, a 29.9&nbsp;mm bridge in the 1&nbsp;mm skin in front of the glass (check it in the slicer's preview). The feet are bought stick-on rubber feet, so the floor lies flat on the build plate.</p>
+  <p class="muted">Both parts print without supports. The only exceptions are short bridges over open holes: the slot tops (4&nbsp;mm), the light-sensor window (3.1&nbsp;mm), the USB opening (11.0&nbsp;mm), the button and LED holes, and the top of the display window, a 29.9&nbsp;mm bridge in the 1&nbsp;mm skin in front of the glass (check it in the slicer's preview). The feet are bought stick-on rubber feet, so the floor lies flat on the build plate.</p>
 
   <h3>Parts for the case</h3>
   <p>The status is the same as in section 2 (5 Nov 2026).</p>
@@ -1344,8 +1344,8 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   </ul>
   <div class="box warn"><span class="label">Still open.</span>
     <ul>
-      <li><b>USB-C opening:</b> 12.5 &times; 7.5&nbsp;mm for now, as in v4. The socket sits 1.7&nbsp;mm inside the outside face, so the plug's grip goes into the opening. Measure your cable's grip (E5); the opening then becomes the grip plus 0.5&nbsp;mm.</li>
-      <li><b>Waveshare board, underneath:</b> the module's position and the height of the parts under the board are read from Waveshare's photo. The model draws the module 18.0&nbsp;mm wide (its data sheet) and centred across the board; the photo put its edge about 0.9&nbsp;mm nearer the 4th post. Check them when the board is here (E6, E7): centred, the module clears the two posts at the antenna end by 0.2&nbsp;mm on each side, and nothing under the board may be taller than the USB-C port (3.3&nbsp;mm). If the module does reach a post's neck, file that neck flat on the module's side.</li>
+      <li><b>USB-C opening:</b> 13.0 &times; 7.5&nbsp;mm, sized to your four cables (E5). Try all four in the ESP32 floor test piece before the full print: each must go fully into the socket without touching the edge.</li>
+      <li><b>Waveshare board, underneath:</b> the module's position and the height of the parts under the board are read from Waveshare's drawing and photo. The model draws the module 18.0&nbsp;mm wide (its data sheet) and centred across the board. Waveshare's dimension drawing, measured again on 7 Nov 2026, shows it centred to within 0.1&nbsp;mm; an earlier product photo put its edge about 0.9&nbsp;mm nearer the 4th post. Check them when the board is here (E6, E7): centred, the module clears the two posts at the antenna end by 0.2&nbsp;mm on each side, and nothing under the board may be taller than the USB-C port (3.3&nbsp;mm). If the module does reach a post's neck, file that neck flat on the module's side.</li>
       <li><b>ESP32 screws at the antenna end:</b> each button head leaves about 0.1&nbsp;mm to the plug on pin 1 of its row (3V3 and GND). If one touches, leave that screw out; the other three hold the board.</li>
       <li><b>1.5" OLED:</b> the glass and tape thickness and the hole size are assumed (O8-O10). Check them on the board, or in Adafruit's 3D model of it, before printing.</li>
       <li><b>Display window:</b> its top edge is a 29.9&nbsp;mm bridge in the 1&nbsp;mm skin in front of the glass. No test piece has it: check it in the slicer's preview before the full print.</li>
@@ -1366,10 +1366,10 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <table class="measure">
     <tr><th class="c" style="width:7%">ID</th><th>What to measure (mm)</th><th style="width:17%">So far</th><th style="width:19%">Measured</th></tr>
     <tr><td colspan="4" class="grp">Waveshare ESP32-C6 board and USB-C cable</td></tr>
-    <tr><td class="c">E5</td><td>Your USB-C cable: width &times; thickness of the plug's plastic grip, and how far the metal part sticks out of the grip</td><td>12.5 &times; 7.5 opening (as v4)</td><td><i>needed:</i> the opening becomes the grip + 0.5</td></tr>
+    <tr><td class="c">E5</td><td>Your USB-C cable: width &times; thickness of the plug's plastic grip, and how far the metal part sticks out of the grip</td><td>13.0 &times; 7.5 opening</td><td>grips: Ugreen 11.10 &times; 6.50, Toocki 11.00 &times; 6.50, Nintendo 11.65 &times; 6.50, Samsung 12.00 &times; 6.00. The metal part's length doesn't matter: the grip fits through the whole wall.</td></tr>
     <tr><td class="c">E6</td><td>Gap between the module's long edges and the two corner holes at the antenna end, on both sides</td><td>0.2 left to each post (module 18.0 wide, centred)</td><td></td></tr>
     <tr><td class="c">E7</td><td>Tallest part under the board, apart from the USB-C port</td><td>below the USB-C port's 3.3 (photo)</td><td></td></tr>
-    <tr><td class="c">E8</td><td>USB-C port: distance of its middle from the board's long edges</td><td>in the middle (Waveshare's drawing)</td><td></td></tr>
+    <tr><td class="c">E8</td><td>USB-C port: distance of its middle from the board's long edges, and how far it sticks out past the USB end</td><td>in the middle (to 0.1); 0.5 out (Berrybase's top-view photo 0.4-0.5; Waveshare's drawing reads up to 0.9)</td><td></td></tr>
     <tr><td colspan="4" class="grp">STEMMA QT cables</td></tr>
     <tr><td class="c">W2</td><td>STEMMA QT cables: how many plug-to-plug cables, and how long each one is</td><td>50 plug-plug</td><td>2 &times; 50&nbsp;mm plug-plug; 100, 200 and 150&nbsp;mm (female sockets) ordered</td></tr>
     <tr><td colspan="4" class="grp">1.5" OLED (Adafruit 4741)</td></tr>
@@ -1392,7 +1392,6 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
 
   <div class="box warn"><span class="label">Still to measure.</span>
     <ul>
-      <li><b>USB-C cable:</b> the plug's grip (E5), which sets the USB opening.</li>
       <li><b>Waveshare board:</b> E6-E8, when it is here.</li>
       <li><b>1.5" OLED:</b> glass, board and holes (O8-O10), when it is here.</li>
       <li><b>LED:</b> its size (P2), which sets the sleeve.</li>
@@ -1420,7 +1419,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Colour:</b> in direct sun a black case warms up more than an ivory one, and the SHT45 would read that warmth; out of the sun it makes no difference. Neither colour lets much light through, so the light sensor gets an open window. Black is the better choice next to the LED: ivory walls glow a little around it.</li>
     <li><b>Test pieces first:</b> <code>cad/test_pieces_v5.py</code> cuts small pieces out of the real base, so they always match the model. Each one is tried with the parts that go there:
       <ul>
-        <li><b>ESP32 floor</b> (<code>esp32_floor.stl</code>, 59.5 &times; 28 &times; 14&nbsp;mm): the back wall, the floor and the 4 ESP32 posts. The USB-C opening with the real cable, the posts against the module and the parts under the board (E6, E7), and the screw heads against the jumper plugs at the antenna end. Needs the Waveshare board.</li>
+        <li><b>ESP32 floor</b> (<code>esp32_floor.stl</code>, 59.5 &times; 28 &times; 14&nbsp;mm): the back wall, the floor and the 4 ESP32 posts. The USB-C opening with all four cables, the posts against the module and the parts under the board (E6, E7), and the screw heads against the jumper plugs at the antenna end. Needs the Waveshare board.</li>
         <li><b>Sensor posts</b> (<code>posts_sht45.stl</code>, 26.3 &times; 8 &times; 26.2&nbsp;mm): the SHT45's two posts on a strip of floor, with the double wall's skin behind them, cut off 1&nbsp;mm above the posts. Drill the pilot holes to &#8960;2.1, 5&nbsp;mm deep (tape on the drill), and screw the board on with M2.5 &times; 6 screws: do the holes line up, and does the thread hold? The other sensor boards have the same hole spacing (20.32&nbsp;mm) on taller posts (SGP40 and BMP580 2&nbsp;mm, SCD-41 5&nbsp;mm), so this one piece stands for all of them. Needs the SHT45 and the screws.</li>
       </ul>
       Each piece also comes as <code>*_no_drill.stl</code>, with the screw holes printed at their drilled size (&#8960;1.6 in the ESP32 posts, &#8960;2.1 in the sensor posts), so the screws go straight in. Use those while you have no drills: they check the fits and the screws, but not the drilling. The files are ready to print floor down, as the base is printed. Print them at home on the Bambu Lab P1S (PLA or PETG is fine for a fit test), change the model where something doesn't fit, and run both scripts again. The case itself is ABS or ASA, which drills and takes self-tapping screws a little differently, so tighten its screws gently the first time.</li>
@@ -1482,7 +1481,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Bought parts</b> (not printed):
       <ul>
         <li>The SCD-41 is drawn with Adafruit's SCD-40 model (same board), and the BMP580 with the BMP390 model (same board and holes). The SGP40, the VEML7700 5378 and the speaker 3885 are Adafruit's models too.</li>
-        <li>The Waveshare ESP32 is drawn from Waveshare's drawing: board, holes, pin rows, the module (its data-sheet size), USB-C port and buttons underneath (from the photo), and the jumper plugs on the pins it uses.</li>
+        <li>The Waveshare ESP32 is drawn from Waveshare's drawing: board, holes, pin rows, the module (its data-sheet size), USB-C port and buttons underneath, and the jumper plugs on the pins it uses.</li>
         <li>The 1.5" OLED is drawn from its board file (outline, holes, glass, sockets); the button from its product sheet; the LED from Adafruit's 8&nbsp;mm LED.</li>
         <li>The STEMMA QT plugs and cables, the speaker's JST PH plug, and the heads of all screws (with the light sensor's nuts) are drawn too.</li>
       </ul>
@@ -1496,6 +1495,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.26</td><td>7 Nov 2026</td><td>USB-C opening now 13.0 &times; 7.5&nbsp;mm (was 12.5 &times; 7.5), sized to the four cables' plug grips (E5 measured): at least 0.5&nbsp;mm on each side of each grip. The Waveshare board was measured again on Waveshare's dimension drawing. Board, holes and pin rows match the model to about 0.1&nbsp;mm, and the module and USB-C port are centred. The USB-C port sticks out about 0.5&nbsp;mm (Berrybase's top-view photo; the model had 0.8), so its face is now flush with the inside of the back wall, 2.0&nbsp;mm inside the outside face; new note on putting the board in. RESET and BOOT moved to the long edges (3.9-9.1&nbsp;mm from the USB end). Model, viewer, print files and the ESP32 floor test pieces made again; sections 11 and 13 updated.</td></tr>
     <tr><td>0.25</td><td>6 Nov 2026</td><td>Test pieces: the new script <code>cad/test_pieces_v5.py</code> cuts small pieces out of the v5 base (the ESP32 floor with the USB-C opening, and the SHT45's two posts) and writes ready-to-print STL files into <code>cad/out/v5/test_pieces/</code>, each also as a no-drill version with the screw holes at their drilled size. <i>Printing at school</i> now lists what each piece checks and which parts it needs; they are printed on the P1S. Sections 1 and 13 updated.</td></tr>
     <tr><td>0.24</td><td>6 Nov 2026</td><td>The 4th ESP32 post is now like the other three: round, with a pilot hole and an M2 screw (it was cut flat on the module's side and only carried the board). The model now draws the module at its data-sheet width (18.0&nbsp;mm), centred across the board, which clears both posts at the antenna end by 0.2&nbsp;mm; E6 checks it. 4 instead of 3 M2 button-head screws; Figure 8 redrawn; sections 2, 13 and the measurement table updated.</td></tr>
     <tr><td>0.23</td><td>6 Nov 2026</td><td>The files of case v5 in <code>cad/out/v5/</code> (the 3D viewer, the STEP files for the school and the STL files) are now stored in git, so they come with the project without running the script. The older output folders stay out of git. Section 1 lists the folder; section 13 says so too.</td></tr>
