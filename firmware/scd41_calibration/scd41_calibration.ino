@@ -15,12 +15,17 @@
     5. The SCD-41 is corrected to FRC_TARGET_PPM. The correction is stored
        inside the sensor automatically and survives power cycles.
     6. Upload co2_monitor again.
+
+  If the BMP580 is connected, the SCD-41 corrects for the air pressure it measures, as in
+  co2_monitor. The correction FRC stores then fits the main program. Without it, set
+  SENSOR_ALTITUDE_M.
 */
 
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <SensirionI2cScd4x.h>
+#include <Adafruit_BMP5xx.h>
 
 constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 12 (pin 1 = USB end)
 constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 11
@@ -30,7 +35,9 @@ constexpr uint8_t OLED_ROTATION = 0;  // same value as in co2_monitor
 
 // CO2 in outdoor fresh air. The global background level is about 420-430 ppm (2026).
 constexpr uint16_t FRC_TARGET_PPM = 425;
-constexpr uint16_t SENSOR_ALTITUDE_M = 0;              // same value as in co2_monitor
+constexpr uint16_t SENSOR_ALTITUDE_M = 0;              // only used without a BMP580
+constexpr float SCD_PRESSURE_STEP_HPA = 1.0f;          // same value as in co2_monitor
+constexpr uint32_t BMP_INTERVAL_MS = 2000;
 constexpr uint32_t MIN_RUN_TIME_MS = 5UL * 60 * 1000;  // datasheet asks for at least 3 minutes
 constexpr uint8_t HISTORY_SIZE = 12;                   // 12 readings x 5 s = last minute
 
@@ -38,8 +45,12 @@ enum class FrcResult { None, Done, Failed };
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 SensirionI2cScd4x scd4x;
+Adafruit_BMP5xx bmp;
 
 bool displayFound = false;
+bool bmpFound = false;
+float pressureHpa = NAN;
+float scdPressureHpa = NAN;  // the pressure the SCD-41 corrects for (NAN = from the altitude)
 uint32_t measuringSince = 0;
 uint16_t co2Ppm = 0;
 uint16_t history[HISTORY_SIZE];
@@ -78,6 +89,31 @@ uint16_t spreadPpm() {
     highest = max(highest, history[i]);
   }
   return highest - lowest;
+}
+
+// The BMP580's address depends on its jumper, so both are tried
+bool initBmp580() {
+  for (uint8_t address : {0x46, 0x47}) {
+    if (bmp.begin(address, &Wire)) {
+      Serial.printf("BMP580 found at 0x%02X\n", address);
+      return true;
+    }
+  }
+  Serial.printf("BMP580 not found - the SCD-41 uses the altitude (%u m)\n", SENSOR_ALTITUDE_M);
+  return false;
+}
+
+// Reads the pressure and sends it to the SCD-41 when it has moved by SCD_PRESSURE_STEP_HPA
+// (the SCD-41 takes whole hPa, 700-1200, also while it measures)
+void updatePressure() {
+  pressureHpa = bmp.performReading() ? bmp.pressure : NAN;
+  if (isnan(pressureHpa) || pressureHpa < 700 || pressureHpa > 1200) return;
+  if (!isnan(scdPressureHpa) && fabsf(pressureHpa - scdPressureHpa) < SCD_PRESSURE_STEP_HPA) return;
+  uint16_t hPa = (uint16_t)lroundf(pressureHpa);
+  if (scd4x.setAmbientPressureRaw(hPa) == 0) {
+    scdPressureHpa = hPa;
+    Serial.printf("SCD-41 corrects for %u hPa (BMP580)\n", hPa);
+  }
 }
 
 void startMeasuring() {
@@ -186,6 +222,8 @@ void setup() {
   scd4x.getAutomaticSelfCalibrationEnabled(ascEnabled);
   Serial.printf("ASC is %s\n", ascEnabled ? "enabled" : "disabled");
   scd4x.setSensorAltitude(SENSOR_ALTITUDE_M);
+  bmpFound = initBmp580();
+  if (bmpFound) updatePressure();  // replaces the altitude
 
   startMeasuring();
   Serial.printf("Put the sensor in fresh outdoor air. After 5 minutes press the button "
@@ -195,6 +233,12 @@ void setup() {
 void loop() {
   static uint32_t lastPoll = 0;
   static uint32_t lastDraw = 0;
+  static uint32_t lastBmpRead = 0;
+
+  if (bmpFound && millis() - lastBmpRead >= BMP_INTERVAL_MS) {
+    lastBmpRead = millis();
+    updatePressure();
+  }
 
   if (millis() - lastPoll >= 1000) {
     lastPoll = millis();
@@ -211,6 +255,7 @@ void loop() {
 
       Serial.printf("t=%4lus  CO2 %u ppm", (millis() - measuringSince) / 1000, co2Ppm);
       if (historyCount == HISTORY_SIZE) Serial.printf("  spread(1 min) %u ppm", spreadPpm());
+      if (!isnan(pressureHpa)) Serial.printf("  %.1f hPa", pressureHpa);
       Serial.println();
     }
   }

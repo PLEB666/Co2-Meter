@@ -105,7 +105,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.36: the display and the LED fade to every new brightness, colour and on/off, like a smart bulb</span>
+    <span><b>Version</b> 0.38: how much the air pressure changes the CO<sub>2</sub> value, measured (about 5.5&nbsp;%); new <code>pressure</code> command</span>
     <span><b>Updated</b> 13 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
@@ -345,7 +345,7 @@
   <p class="muted">Upside down in the case, J1 lies along the sensor chamber's double wall and J3 along the compartment's. None of these is a strapping pin. Still to do in the firmware:</p>
   <ul class="muted">
     <li>The speaker on GPIO3.</li>
-    <li>What the other new sensors control: the BMP580's pressure goes to the SCD-41, the VOC index warns. (The room light already sets the brightness of the display and the LED, section 6.)</li>
+    <li>What the VOC index controls: warnings. (The room light already sets the brightness of the display and the LED, and the BMP580's pressure goes to the SCD-41, section 6.)</li>
     <li>Check <code>OLED_ROTATION</code> once the display is in the case: 3 is worked out from the case model (section 6).</li>
   </ul>
 
@@ -552,12 +552,12 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
       <h3 style="margin-top:0">What it does</h3>
       <ul>
         <li>Starts the I&sup2;C bus on GPIO23 (SDA) / GPIO22 (SCL) and looks for each part.</li>
-        <li><b>SCD-41</b>: periodic measurement, a new CO<sub>2</sub> value every 5&nbsp;s. Altitude compensation is set at every start.</li>
+        <li><b>SCD-41</b>: periodic measurement, a new CO<sub>2</sub> value every 5&nbsp;s. It corrects the value for the air pressure from the BMP580 (<i>Air pressure for the SCD-41</i> below).</li>
         <li><b>SHT45</b>: high-precision reading every 2&nbsp;s, heater off.</li>
-        <li><b>BMP580</b>: air pressure every 2&nbsp;s, at 0x46 or 0x47, whichever answers.</li>
+        <li><b>BMP580</b>: air pressure every 2&nbsp;s, at 0x46 or 0x47, whichever answers. It goes to the SCD-41, so it is read from the start, during the warm-up too.</li>
         <li><b>VEML7700</b>: light in lux every second, in steps of 0.06&nbsp;lux up to about 3700&nbsp;lux. Brighter light gives the top value, and <code>status</code> adds "(or more)". It sets the <b>brightness</b> of the display and the LED (see <i>Brightness</i> below), so it is read from the start, during the warm-up too.</li>
         <li><b>SGP40</b>: one raw reading per second, compensated with the SHT45's temperature and humidity. Sensirion's algorithm turns it into the <b>VOC index</b>: 100 = the room's usual air, higher = more VOCs (smells, solvents, cooking), lower = fewer. The index starts 45&nbsp;s after start-up, settles near 100 within minutes, and learns the room over the first hours. It keeps learning during the warm-up and in sleep mode.</li>
-        <li>Pressure and the VOC index are <b>only printed</b> for now (Serial, <code>status</code>, <code>/api/now</code>). They are not on the display, nothing depends on them yet, and they are not stored. Neither is the light, which is also shown at the bottom of the web page.</li>
+        <li>The VOC index is <b>only printed</b> for now (Serial, <code>status</code>, <code>/api/now</code>). It is not on the display, nothing depends on it yet, and it is not stored. Pressure and light are printed the same way and not stored either; the light is also shown at the bottom of the web page.</li>
         <li><b>Warm-up</b>: for the first 30&nbsp;s after start-up the sensors measure, but no value is shown, printed or saved. The values from this time are thrown away. The display counts down ("warming up", 30&nbsp;s &hellip; 1&nbsp;s).</li>
         <li><b>Display</b>: the 1.5" OLED, turned for the case, with the prototype's screen: CO<sub>2</sub> large, temperature and humidity at the bottom (Figure 4). On during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press. Pressing while it's on restarts the 30&nbsp;s. It fades in and out in 1&nbsp;s; when off, the panel is fully dark and the content is kept. A whole picture takes about 0.2&nbsp;s on the I&sup2;C bus, so it is redrawn at most once a second. Its brightness follows the room light (<i>Brightness</i> below).</li>
         <li><b>8&nbsp;mm LED</b> (GPIO18, Figure 3): dimmed to suit the room light, on all the time except in sleep mode, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value after the warm-up, then fades in.</li>
@@ -619,12 +619,13 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     </figure>
   </div>
 
-  <div class="box note"><span class="label">New sensors:</span> the light sensor sets the brightness (below). The firmware reads the BMP580 and the SGP40 and prints their values, but they are not on the display and nothing depends on them yet. What they will control comes later, and so does the speaker (section 3, <i>Pins used in the case</i>).</div>
+  <div class="box note"><span class="label">New sensors:</span> the light sensor sets the brightness, and the BMP580's air pressure corrects the CO<sub>2</sub> value (both below). The firmware reads the SGP40 and prints its VOC index, but it is not on the display and nothing depends on it yet. What it will control comes later, and so does the speaker (section 3, <i>Pins used in the case</i>).</div>
 
   <h3>Settings at the top of the sketch</h3>
   <table>
     <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
-    <tr><td><code>SENSOR_ALTITUDE_M</code></td><td>0</td><td><b>Set this to your altitude in metres above sea level.</b> The SCD-41 uses it for air-pressure compensation. Without it, readings at e.g. 500&nbsp;m are a few percent off.</td></tr>
+    <tr><td><code>SCD_PRESSURE_STEP_HPA</code></td><td>1.0</td><td>The BMP580's pressure is sent to the SCD-41 again when it has moved by this much (hPa) from the value the SCD-41 has. The SCD-41 takes whole hPa.</td></tr>
+    <tr><td><code>SENSOR_ALTITUDE_M</code></td><td>0</td><td>Only used <b>without a BMP580</b>: your altitude in metres above sea level, from which the SCD-41 estimates the air pressure. With a BMP580 its measured pressure replaces it right after the start.</td></tr>
     <tr><td><code>WARMUP_TIME_MS</code></td><td>30000</td><td>Warm-up after start-up (ms): the sensors measure, but nothing is shown, printed or saved.</td></tr>
     <tr><td><code>OLED_ADDRESS</code></td><td>0x3D</td><td>0x3C if the A0 jumper on the back of the display is closed.</td></tr>
     <tr><td><code>OLED_ROTATION</code></td><td>3</td><td>0-3: each step turns the picture a quarter turn clockwise. 0 = upright with the display's pin header at the top. 3 = as in the case: seen from the front, the display is turned a quarter turn clockwise, its pin header on the right next to the light sensor. If the text stands on its head there, use 1.</td></tr>
@@ -654,6 +655,20 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   </table>
   <p class="muted">The Wi-Fi name and password are in <code>secrets.h</code> (5.8). The history settings are in <code>history.cpp</code> (7.9).</p>
 
+  <div style="break-inside: avoid">
+  <h3 id="pressure">Air pressure for the SCD-41</h3>
+  <p>The SCD-41's CO<sub>2</sub> value depends on the air pressure. Unless it is told otherwise, it assumes 1013&nbsp;hPa, the pressure at sea level. Here the BMP580 measures about 983&nbsp;hPa, and the weather moves the pressure up and down by a few percent. So the firmware sends the SCD-41 the BMP580's pressure:</p>
+  <ul>
+    <li><b>When:</b> right after the SCD-41 starts measuring, then whenever the pressure has moved by <code>SCD_PRESSURE_STEP_HPA</code> (1&nbsp;hPa) from the value the SCD-41 has. The SCD-41 takes the new value while it measures, in whole hPa.</li>
+    <li><b>It replaces the altitude.</b> <code>SENSOR_ALTITUDE_M</code> is still sent at every start, but only counts until the first BMP580 value. Without a BMP580, set it to your altitude.</li>
+    <li><b>No valid reading</b> (BMP580 unplugged, or a value outside 700-1200&nbsp;hPa, the range the SCD-41 accepts): the SCD-41 keeps the last pressure it got.</li>
+    <li><b>This is not calibration.</b> ASC and FRC (section 10) correct the sensor's zero point. The pressure only tells the sensor how dense the air is. The FRC tool uses the BMP580 the same way, so a correction it stores fits the main program.</li>
+    <li><code>status</code> and <code>pressure</code> show the value: "SCD-41 pressure: 983 hPa, from the BMP580", or "from the altitude" when there is no BMP580 value. <code>pressure 1013</code> gives the SCD-41 a fixed value for tests, <code>pressure auto</code> the BMP580's again (7.6).</li>
+    <li><b>How much it matters, measured on this monitor</b> (13-14 Nov 2026, at about 980&nbsp;ppm): the SCD-41 got the BMP580's 984&nbsp;hPa and a fixed 1013&nbsp;hPa in turn, three times each for 3 minutes. With 1013&nbsp;hPa it read lower: 3.7&nbsp;% after 2.5 minutes, and still sinking. The SCD-41 smooths its values over 1-2 minutes; with that taken into account the reading ends about <b>5.5&nbsp;% (5-6&nbsp;%) lower, about 54&nbsp;ppm</b>. That is about 0.19&nbsp;% of the reading per hPa, more than the 2.9&nbsp;% pressure difference alone. At 1000&nbsp;ppm a 10&nbsp;hPa change of the weather moves the reading by about 20&nbsp;ppm.</li>
+  </ul>
+  </div>
+
+  <div style="break-inside: avoid">
   <h3>CO<sub>2</sub> rating on the display and the LED</h3>
   <table>
     <tr><th>CO<sub>2</sub> (ppm)</th><th>Display</th><th>LED</th><th>Meaning</th></tr>
@@ -663,6 +678,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td>2000 and above</td><td><b>BAD AIR</b> (inverted)</td><td><span class="wire" style="background:#e02020"></span>red</td><td>Ventilate now. Tiredness and poor concentration are common at these levels.</td></tr>
   </table>
   <p class="muted">The LED colour changes smoothly with the CO<sub>2</sub> value; for example, 1500&nbsp;ppm is orange. It fades to the new colour with every new reading (every 5&nbsp;s) and stays on while the display is off. In sleep mode it is off.</p>
+  </div>
 
   <div style="break-inside: avoid">
   <h3 id="brightness">Brightness</h3>
@@ -719,14 +735,17 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   <h2><span class="n">7</span>History storage</h2>
   <p>The monitor keeps a long-term record of its values in the ESP32's own flash memory, with no extra hardware. The web page (section 8) draws its graphs from it and offers it as a CSV download. You can also read it in the Serial Monitor (7.6). The code is in <code>history.h</code> and <code>history.cpp</code>.</p>
 
+  <div style="break-inside: avoid">
   <h3>7.1 Two levels of detail</h3>
   <table>
     <tr><th>Level</th><th>Each record holds</th><th>Record</th><th>Files</th><th>Kept</th></tr>
     <tr><td><b>1-minute</b> (<code>m1</code>)</td><td>average CO<sub>2</sub>, temperature, humidity and air pressure</td><td class="nowrap">12 bytes</td><td><code>/m1/20261028.bin</code>, one per day, up to 17&nbsp;KB</td><td>14 days</td></tr>
     <tr><td><b>5-minute</b> (<code>m5</code>)</td><td>the same</td><td class="nowrap">12 bytes</td><td><code>/m5/20261028.bin</code>, one per day, up to 3.5&nbsp;KB</td><td>3 years; nothing older is kept</td></tr>
   </table>
+  </div>
   <ul>
-    <li>Air pressure stays empty until the BMP580 is in the firmware. The light level isn't stored; the VEML7700 sets the brightness (section 6).</li>
+    <li>Air pressure stays empty: the BMP580's value goes to the SCD-41 (section 6) but isn't stored. Neither is the light level; the VEML7700 sets the brightness.</li>
+    <li>CO<sub>2</sub> values stored <b>before 13 Nov 2026, 23:01</b> were measured without the air pressure and read about 5&nbsp;% low (section 6, <i>Air pressure for the SCD-41</i>). While the <code>pressure</code> command sets a fixed test value, nothing is stored, so those minutes stay empty.</li>
     <li>For the last 14 days both levels exist. The 5-minute values are worked out at every save, not only when the 1-minute values are deleted. That costs about 56&nbsp;KB, and a power cut or a long time switched off can never lose them.</li>
     <li>Each file starts with a format version, so a later firmware can add values without losing the older data.</li>
   </ul>
@@ -800,7 +819,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   <p>Type a command in the Serial Monitor's input line and press <kbd>Enter</kbd>. The line-ending box next to it must not be set to "No Line Ending".</p>
   <table>
     <tr><th style="width:22%">Command</th><th>What it shows or does</th></tr>
-    <tr><td><code>status</code></td><td>Wi-Fi and the monitor's MAC address, which parts were found, the current values, brightness, sleep mode, clock, flash use, minutes not saved yet, and the files of each level with their newest value.</td></tr>
+    <tr><td><code>status</code></td><td>Wi-Fi and the monitor's MAC address, which parts were found, the current values, the air pressure the SCD-41 corrects for, brightness, sleep mode, clock, flash use, minutes not saved yet, and the files of each level with their newest value.</td></tr>
     <tr><td><code>files</code></td><td>Every history file with its size and number of values.</td></tr>
     <tr><td><code>csv m1 1</code></td><td>The 1-minute values of the last day as CSV. <code>m5</code> = 5-minute; the number is how many days back (<code>csv m5 7</code> = the last week of 5-minute values).</td></tr>
     <tr><td><code>save</code></td><td>Saves the minutes waiting in RAM now, for example before you unplug the monitor.</td></tr>
@@ -808,12 +827,15 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td><code>brightness</code></td><td>Shows the brightness: the level, Auto or fixed, and what the display and the LED are set to at that level (at the end of a fade).</td></tr>
     <tr><td><code>brightness auto</code>, <code>brightness 40</code></td><td>Lets the light sensor set the brightness, or sets a fixed level, 0-100&nbsp;% (section 6, <i>Brightness</i>). The answer is the <code>brightness</code> line.</td></tr>
     <tr><td><code>led</code></td><td>LED test: red, green and blue for 1&nbsp;s each on the 8&nbsp;mm LED, then the CO<sub>2</sub> colour again. If it stays dark or the colours come out wrong, see section 12.</td></tr>
+    <tr><td><code>pressure</code>, <code>pressure 1013</code>, <code>pressure auto</code></td><td>Shows the air pressure the SCD-41 corrects for. With a number (700-1200&nbsp;hPa) it gets that fixed value instead of the BMP580's, for tests; <code>auto</code> goes back to the BMP580. A fixed value is gone after a restart, and while it is set no CO<sub>2</sub> value goes into the history.</td></tr>
   </table>
+  <div style="break-inside: avoid">
   <p>Example answer to <code>status</code>:</p>
 <pre>Wi-Fi: connected to "MyNetwork", signal -46 dBm, web page at http://192.168.178.40/
 Wi-Fi MAC address: AA:BB:CC:DD:EE:FF (fixed address)
 Parts: display ok, SCD-41 ok, SHT45 ok, BMP580 ok (0x47), SGP40 ok, VEML7700 ok
 Now: 730 ppm, 21.25 C, 37.1 %RH, 983.06 hPa, 1.7 lux, VOC index 107 (raw 25693)
+SCD-41 pressure: 983 hPa, from the BMP580
 Brightness: 9 % (auto, from the light sensor), display 8 of 255, LED 1.3 of 255
 Sleep mode: off
 Clock: 2026-10-28 17:21:40 UTC
@@ -821,6 +843,7 @@ Flash: 32 KB of 10112 KB used (0%)
 Not saved yet (in RAM): 2 minutes, next save in 505 s
 1-minute values (m1): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:19 UTC
 5-minute values (m5): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:15 UTC</pre>
+  </div>
   <p>And the start of <code>csv m1 1</code>:</p>
 <pre>time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa
 2026-10-28 17:05,612,22.41,45.30,
@@ -969,7 +992,7 @@ Not saved yet (in RAM): 2 minutes, next save in 505 s
   </ul>
 
   <h3 style="break-before: page">Step 3: Main program (<code>co2_monitor.ino</code>)</h3>
-  <p>Set <code>SENSOR_ALTITUDE_M</code>, upload, open the Serial Monitor. Expected output:</p>
+  <p>Upload and open the Serial Monitor. (Set <code>SENSOR_ALTITUDE_M</code> first only if there is no BMP580.) Expected output:</p>
 <pre>CO2 monitor starting
 Display found
 SHT45 found
@@ -979,6 +1002,7 @@ SGP40 found, self-test passed
 SCD-41 found, serial 0x...
 SCD-41 automatic self-calibration (ASC): enabled
 SCD-41 measuring
+SCD-41 corrects for 1013 hPa (BMP580)
 Warm-up: the first values follow in 30 s
 Warm-up done, values are shown and saved from now on
 CO2_ppm:612 Temperature_C:22.41 Humidity_pct:45.3 Pressure_hPa:1012.84 Light_lux:41.3 VOC_index:0 Brightness_pct:62
@@ -1000,7 +1024,7 @@ CO2_ppm:614 Temperature_C:22.42 Humidity_pct:45.2 Pressure_hPa:1012.85 Light_lux
     <li><b>Humidity:</b> breathe near the SHT45. RH jumps by several percent and recovers within a minute.</li>
     <li><b>Temperature:</b> hold a finger near (not on) the SHT45. Temperature rises slowly. Compare with another thermometer once it has settled; the SHT45 (&plusmn;0.1&nbsp;&deg;C) is usually the more accurate one.</li>
     <li><b>Air pressure, light and VOC index</b> are not on the display: watch them in the Serial lines or with <code>status</code>.</li>
-    <li><b>Air pressure:</b> steady to about 0.1&nbsp;hPa. Compare it with a weather report: that gives the sea-level value, about 1.2&nbsp;hPa more for each 10&nbsp;m of your height (step 2).</li>
+    <li><b>Air pressure:</b> steady to about 0.1&nbsp;hPa. Compare it with a weather report: that gives the sea-level value, about 1.2&nbsp;hPa more for each 10&nbsp;m of your height (step 2). The "SCD-41 pressure" line of <code>status</code> should be within 1&nbsp;hPa of it.</li>
     <li><b>Light:</b> cover the light sensor's window with a finger. The value drops to almost 0 within a second, and on <i>Auto</i> the display and the LED dim over the next few seconds (step 11).</li>
     <li><b>VOC index:</b> it starts low, rises above 100 in the first minutes and settles near 100. Hold an open felt pen or a drop of hand sanitiser near the SGP40: within seconds the index climbs well above 100, then sinks back over some minutes. Right after a start it reacts less, because the algorithm is still learning the room.</li>
   </ul>
@@ -1066,7 +1090,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
 
 <!-- ============================================================ 10 -->
 <section id="calibration">
-  <h2><span class="n">10</span>CO<sub>2</sub> calibration (SCD-41)</h2>
+  <h2 style="break-before: page"><span class="n">10</span>CO<sub>2</sub> calibration (SCD-41)</h2>
   <p>The SCD-41 is <b>calibrated at the factory</b> by Sensirion and works out of the box. Over time, mechanical stress, soldering, shipping and ageing can shift its zero point (the "offset"). Two mechanisms correct this:</p>
 
   <table>
@@ -1082,7 +1106,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h3>Your questions, answered</h3>
   <div class="qa">
     <div class="q">Is the CO<sub>2</sub> sensor calibrated by the code or by the sensor itself?</div>
-    <p><span class="a-short">Both</span><b>Normally the sensor does it itself.</b> ASC runs inside the SCD-41 and is switched on at the factory, so no code is needed. Our main program doesn't touch the calibration; it only sends the altitude at every start. <b>FRC</b> is triggered by code when you know the true CO<sub>2</sub> level. The separate <code>scd41_calibration.ino</code> sketch does exactly that.</p>
+    <p><span class="a-short">Both</span><b>Normally the sensor does it itself.</b> ASC runs inside the SCD-41 and is switched on at the factory, so no code is needed. Our main program doesn't touch the calibration; it only tells the sensor the air pressure (from the BMP580, or the altitude without one). That is a correction, not a calibration. <b>FRC</b> is triggered by code when you know the true CO<sub>2</sub> level. The separate <code>scd41_calibration.ino</code> sketch does exactly that.</p>
   </div>
   <div class="qa">
     <div class="q">How should I start testing: open the door and let fresh air in, or just plug it in?</div>
@@ -1093,12 +1117,14 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <p><span class="a-short">No</span>The SCD-41 stores its calibration history (ASC and FRC) in its <b>own EEPROM automatically</b>, so it survives unplugging. You only need fresh air regularly <i>for ASC to keep working long term</i>: at least once per week of operating time, while the sensor runs for 4+ hours at a stretch. Normal airing of the room does that. Short sessions (unplugged after an hour) don't advance ASC, but they don't lose anything either.</p>
   </div>
 
+  <div style="break-inside: avoid">
   <h3>What is stored where</h3>
   <table>
     <tr><th>Item</th><th>Stored</th><th>After unplugging</th></tr>
     <tr><td>Factory calibration, ASC history, FRC correction</td><td>Sensor EEPROM (automatically)</td><td><b>Kept</b></td></tr>
-    <tr><td>Altitude, ASC on/off, temperature offset, ASC target</td><td>Sensor RAM; EEPROM only after <code>persistSettings()</code></td><td>Lost, back to the saved values. Our code re-sends the altitude at every start, so there's no need to persist it.</td></tr>
+    <tr><td>Altitude, air pressure, ASC on/off, temperature offset, ASC target</td><td>Sensor RAM; EEPROM only after <code>persistSettings()</code> (not the air pressure)</td><td>Lost, back to the saved values. Our code re-sends the altitude and the BMP580's pressure at every start, so there's no need to persist them.</td></tr>
   </table>
+  </div>
   <div class="box warn">The EEPROM is rated for only ~2000 writes. <b>Never call <code>persistSettings()</code> in <code>loop()</code></b>, only once after a deliberate settings change. Our sketches never call it.</div>
 
   <h3>When ASC can go wrong</h3>
@@ -1109,7 +1135,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
 
   <h3>FRC procedure (only if needed)</h3>
   <ol>
-    <li>Upload <code>firmware/scd41_calibration/scd41_calibration.ino</code> (set <code>SENSOR_ALTITUDE_M</code> the same as in the main sketch).</li>
+    <li>Upload <code>firmware/scd41_calibration/scd41_calibration.ino</code>. With the BMP580 connected it corrects for the measured air pressure, like the main program. Without one, set <code>SENSOR_ALTITUDE_M</code> to your altitude. The tool still drives the prototype's 0.96" OLED (0x3C), so with the case's 1.5" display follow it in the Serial Monitor on a laptop instead.</li>
     <li>Take the complete setup <b>outdoors</b> on a power bank or laptop: shade, away from roads, chimneys and people. Don't do it at an open window indoors; indoor air near a window is often 450-600&nbsp;ppm.</li>
     <li>Wait. The display counts down 5 minutes and shows the CO<sub>2</sub> value and the <b>spread</b> (max &minus; min) of the last minute. A spread under ~20&nbsp;ppm means stable air.</li>
     <li>When it shows "press button", press the button (or send <code>c</code> in the Serial Monitor).</li>
@@ -1117,6 +1143,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li>Upload <code>co2_monitor.ino</code> again.</li>
   </ol>
   <div class="box note">The target is <code>FRC_TARGET_PPM = 425</code> (global outdoor background in 2026 is about 420-430&nbsp;ppm). A wrong reference makes the sensor worse, not better, so only run FRC in genuinely fresh air.</div>
+  <div class="box note"><span class="label">Why the pressure matters here:</span> FRC stores the difference between the sensor's reading and 425&nbsp;ppm. If the sensor assumed the wrong pressure during FRC, that error would be stored too, and the main program, which corrects for the real pressure, would then read a little off. That is why both sketches use the BMP580.</div>
 </section>
 
 <!-- ============================================================ 11 -->
@@ -1144,10 +1171,11 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Modes:</b> periodic (every 5&nbsp;s, ~17&nbsp;mA; used here), low-power periodic (every 30&nbsp;s), single shot (SCD-41 only, ~0.5&nbsp;mA at one reading per 5&nbsp;min; useful for battery operation later).</li>
     <li><b>I&sup2;C address 0x62</b> (fixed). 3.3-5&nbsp;V supply; the breakout has a regulator and level shifting. A clean, stable supply matters for accuracy.</li>
     <li><b>Built-in T/RH:</b> the SCD-41 always measures temperature and humidity; it needs them internally to compensate the CO<sub>2</sub> value, and this cannot be switched off. Every reading returns all three values. The code reads them and simply ignores T/RH, because the sensor warms itself slightly and the SHT45 is more accurate. Ignoring them has <b>no effect on CO<sub>2</sub> accuracy</b>, and neither does its temperature offset setting (it only shifts the reported T/RH). The SCD-41 cannot take temperature or humidity from the SHT45.</li>
-    <li><b>Air pressure:</b> this <i>does</i> affect CO<sub>2</sub> accuracy, so set your altitude in the code. Weather changes air pressure by a few percent; the BMP580 in the case will feed live values with <code>setAmbientPressure()</code>, which works during periodic measurement.</li>
+    <li><b>Air pressure:</b> this <i>does</i> affect CO<sub>2</sub> accuracy. The SCD-41 assumes 1013&nbsp;hPa unless it gets the altitude or the pressure; weather changes the pressure by a few percent. The firmware sends the BMP580's value with <code>setAmbientPressureRaw()</code> (whole hPa, 700-1200), which works during periodic measurement and replaces the altitude. Measured here: 984 instead of 1013&nbsp;hPa changes the reading by about 5.5&nbsp;%, about 0.19&nbsp;% per hPa (section 6). Sensirion publishes no figure for this.</li>
     <li><b>Handling:</b> the weak spot is the <b>white membrane on top of the metal cap</b>. It keeps dust and water out and lets CO<sub>2</sub> in. Sensirion: don't remove, damage, imprint or cover it. So don't touch or press it, and don't tape over it, clean it, or blow compressed air at it. The sensor is an optical system: avoid strong force on the cap, especially sideways, and drops onto hard floors. ESD rating is only 2&nbsp;kV (HBM), so touch something metal first. Chemical fumes don't affect the CO<sub>2</sub> measurement the way they affect the SHT45's humidity reading. Keep dust, direct sunlight and strong drafts off it. Leave space for air to reach it. If it ever reads clearly wrong in fresh air after a knock, a forced recalibration fixes the offset (section 10). Calibration persists in its EEPROM.</li>
   </ul>
 
+  <div style="break-inside: avoid">
   <h3>Sensor choice: SCD-41 vs SCD-30</h3>
   <table>
     <tr><th style="width:22%"></th><th>SCD-41 (used)</th><th>SCD-30</th></tr>
@@ -1160,6 +1188,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Self-calibration</td><td>Fresh air once per week of operation, runs of &ge; 4&nbsp;h</td><td>7 days continuous operation, &ge; 1&nbsp;h fresh air per day</td></tr>
     <tr><td>Adafruit breakout</td><td>STEMMA QT, 0x62</td><td>STEMMA QT, 0x61; $58.95 and often out of stock</td></tr>
   </table>
+  </div>
   <p><b>Conclusion:</b> for a room monitor the SCD-41 is the better fit. It is small, has trouble-free I&sup2;C, and offers a low-power mode for a later battery version, and indoor air stays well inside 400-5000&nbsp;ppm. The SCD-30 wins on paper accuracy, range and long-term stability. Choose it for mains-powered builds that may exceed 5000&nbsp;ppm (greenhouse, grow tent, fermentation room) or where the best absolute accuracy matters more than size and power.</p>
 
   <h3>Adafruit SHT45 (Sensirion SHT45)</h3>
@@ -1373,6 +1402,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Button does nothing</td><td>Check its two wires: one lug to GPIO2 (J1-5), the other to GND. A cold solder joint on a lug.</td></tr>
     <tr><td>A value stays <code>--</code> on the display or <code>nan</code> / <code>null</code> in Serial and on the web</td><td>Its sensor was not found at the start: the Serial Monitor shows "&hellip; not found", <code>status</code> shows "MISSING". Check its STEMMA QT plugs and press RESET; the parts are only looked for at the start. The VOC index is 0 for its first 45&nbsp;s anyway.</td></tr>
     <tr><td>Web page not at 192.168.178.40</td><td>Another device has the address, or the network is different: check <code>FIXED_IP</code> and <code>ROUTER_IP</code> (8.2). <code>status</code> shows the address in use.</td></tr>
+    <tr><td><code>status</code>: "SCD-41 pressure: from the altitude"</td><td>The SCD-41 got no pressure from the BMP580. Check the "Parts" line: if the BMP580 is MISSING, push its STEMMA QT plugs in and restart. Until then the SCD-41 uses <code>SENSOR_ALTITUDE_M</code> (0 = sea level), so CO<sub>2</sub> reads a little low at 983&nbsp;hPa.</td></tr>
     <tr><td>"measuring&hellip;" never goes away after the warm-up</td><td>SCD-41 is not delivering values; check Serial for "SCD-41 not found" and the STEMMA cable.</td></tr>
     <tr><td>CO<sub>2</sub> fluctuates by 10-30&nbsp;ppm</td><td>Normal. People nearby, drafts and doors cause real changes too.</td></tr>
     <tr><td>Temperature reads 1-3&nbsp;&deg;C too high</td><td>The monitor stands in sunlight or next to something warm. Move it (section 11, <i>Sensor placement</i>).</td></tr>
@@ -1698,6 +1728,8 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.38</td><td>14 Nov 2026</td><td><b>Measured how much the air pressure changes the CO<sub>2</sub> value.</b> New Serial command <code>pressure</code>: it shows the pressure the SCD-41 corrects for, <code>pressure 1013</code> gives it a fixed value for tests, <code>pressure auto</code> the BMP580's again; with a fixed value nothing goes into the history. Test on the monitor at about 980&nbsp;ppm: 984 and 1013&nbsp;hPa in turn, three times each for 3 minutes. With 1013&nbsp;hPa the reading was 3.7&nbsp;% lower after 2.5 minutes and still sinking; with the SCD-41's smoothing of 1-2 minutes taken into account the final difference is about 5.5&nbsp;% (5-6&nbsp;%), about 0.19&nbsp;% per hPa. So the history before 13 Nov, 23:01 reads about 5&nbsp;% low. The test also confirmed on Serial that the SCD-41 takes the pressure ("SCD-41 corrects for 984 hPa"). Opening the USB-serial port from a PC program can restart the board. Uploaded to the Waveshare board. Sections 6, 7, 7.6 and 11 updated.</td></tr>
+    <tr><td>0.37</td><td>13 Nov 2026</td><td>The <b>BMP580's air pressure now goes to the SCD-41</b>, which corrects its CO<sub>2</sub> value for it. Until now the SCD-41 assumed 1013&nbsp;hPa (altitude 0); here it is about 983&nbsp;hPa. The pressure is sent right after the SCD-41 starts and again whenever it has moved by 1&nbsp;hPa (new setting <code>SCD_PRESSURE_STEP_HPA</code>), and the BMP580 is now read during the warm-up too. <code>SENSOR_ALTITUDE_M</code> only counts without a BMP580. <code>status</code> shows the pressure the SCD-41 corrects for. The FRC tool (<code>scd41_calibration.ino</code>) does the same, so a correction it stores fits the main program. The pressure stays off the display and the web page (<code>/api/now</code> has it). New subsection <i>Air pressure for the SCD-41</i> in section 6, a troubleshooting row; sections 3, 6, 7, 9, 10 and 11 updated.</td></tr>
     <tr><td>0.36</td><td>13 Nov 2026</td><td>The light now <b>fades</b> like a smart bulb instead of jumping: a new brightness (Auto, the slider, <code>brightness</code>), the LED's colour with each CO<sub>2</sub> reading, the LED going off and on (sleep mode, first CO<sub>2</sub> value) and the display going on and off all take 1&nbsp;s. Fades run through the same % steps as the brightness, also below 0&nbsp;% when switching off, so they look even. A new change during a fade starts from the light as it is, so the slider is followed smoothly. New setting <code>FADE_TIME_MS</code> (1000, 0 = no fading). The display is now drawn before it is switched on, so the new picture fades in. The firmware updates the display and the LED every 20&nbsp;ms and only sends a value when it has changed. Uploaded to the Waveshare board; the fades were not watched by eye. New subsection <i>Fading</i> in section 6, a troubleshooting row; sections 6, 7.6, 8.3 and 9 (steps 4, 10 and 11) updated.</td></tr>
     <tr><td>0.35</td><td>13 Nov 2026</td><td>The <b>light sensor sets the brightness</b> of the display and the LED: one level, 0-100&nbsp;%, for both together. On <b>Auto</b> it goes from 0&nbsp;% at 1&nbsp;lux to 100&nbsp;% at 400&nbsp;lux, gliding to a new light within about 5&nbsp;s. New settings <code>LUX_DARK</code>, <code>LUX_BRIGHT</code>, <code>OLED_BRIGHTNESS_MIN</code>/<code>MAX</code> (6/255), <code>LED_BRIGHTNESS_MIN</code>/<code>MAX</code> (1/25), <code>AUTO_BRIGHTNESS_SPEED</code>, <code>BRIGHTNESS_START</code>, <code>BRIGHTNESS_SAVE_DELAY_MS</code>; <code>OLED_BRIGHTNESS</code> and <code>LED_BRIGHTNESS</code> are gone. The <b>web page</b> has a brightness slider with an <i>Auto</i> switch next to <i>Sleep mode</i>: moving the slider overrides Auto with a fixed level, the switch hands it back. New address <code>/api/brightness</code>; <code>/api/now</code> also gives <code>brightness</code> and <code>autoBrightness</code>, and the page's bottom line shows the room light. New Serial command <code>brightness [auto|0-100]</code>; <code>status</code> and the Serial lines show the brightness. Auto and the level survive a restart (NVS). The light sensor is now read during the warm-up too. Uploaded to the Waveshare board and checked over Wi-Fi: Auto gave 25&nbsp;% at 4.6&nbsp;lux, a fixed level of 40&nbsp;% survived a reset, wrong values gave error 400. The display, the LED and the slider on the page were not checked by eye; Figure 6 still shows the page without the slider. New subsection <i>Brightness</i> in section 6, test step 11, three troubleshooting rows. Sections 3, 6, 7, 8, 9, 11 and 12 updated.</td></tr>
     <tr><td>0.34</td><td>13 Nov 2026</td><td>The <b>display</b> shows the prototype's screen again, only larger: CO<sub>2</sub> and its rating at the top (digits 30&nbsp;&times;&nbsp;40 pixels), temperature and humidity at the bottom, all white. Pressure, light and the VOC index are off the display for now; they are still read and printed (Serial, <code>status</code>, <code>/api/now</code>). The picture is turned for the case: <code>OLED_ROTATION</code> is now 3, worked out from the case model (pin header on the right, seen from the front), assuming that at 0 the picture is upright with the pin header at the top. Figure 4 redrawn, the grey-level settings removed. Uploaded to the Waveshare board, which is back at 192.168.178.40 with believable values; the turned picture is not yet checked by eye. The parts table in section 13 now has the same status as section 2 (board, display, the three new sensors and the LED: <i>have</i>). Sections 3, 6, 9, 12 and 13 updated.</td></tr>

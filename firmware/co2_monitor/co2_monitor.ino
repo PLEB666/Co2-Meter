@@ -5,7 +5,8 @@
 
   - SCD-41   -> CO2 in periodic mode (a new value every 5 s)
   - SHT45    -> temperature and humidity (more accurate than the SCD-41's own values)
-  - BMP580   -> air pressure (0x46 or 0x47, whichever answers)
+  - BMP580   -> air pressure (0x46 or 0x47, whichever answers), sent to the SCD-41 so it
+                can correct its CO2 value for the pressure (SCD_PRESSURE_STEP_HPA)
   - SGP40    -> VOC index (air quality, 100 = the room's usual air), worked out from
                 its raw signal once per second with Sensirion's algorithm
   - VEML7700 -> light in lux, sets the brightness of the display and the LED
@@ -30,14 +31,14 @@
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
   - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off,
-    brightness [auto|0-100], led
+    brightness [auto|0-100], led, pressure [auto|700-1200]
 
   The sensors keep measuring while the display is off and in sleep mode. This matters for the
   SCD-41's automatic self-calibration, which needs uninterrupted operation, and for the SGP40's
   VOC index, which learns the room's usual air over hours.
 
-  Not used yet: the speaker. Pressure and the VOC index are only printed; what they will
-  control (pressure for the SCD-41, VOC warnings) comes later.
+  Not used yet: the speaker. The VOC index is only printed; what it will control (VOC
+  warnings) comes later.
 
   Libraries (Arduino IDE -> Library Manager):
     Adafruit SSD1327, Adafruit SHT4x Library, Sensirion I2C SCD4x,
@@ -86,8 +87,11 @@ constexpr uint32_t DISPLAY_ON_TIME_MS = 30000;
 constexpr uint32_t DISPLAY_REDRAW_MS = 1000;
 
 // ---------- Sensors ----------
-// Height of your location above sea level in metres. The SCD-41 uses it to
-// compensate the CO2 reading for air pressure. Find it on any map / GPS app.
+// The SCD-41's CO2 value depends on the air pressure. The BMP580 measures it, and it is
+// sent to the SCD-41 again whenever it has moved by this much (the SCD-41 takes whole hPa).
+constexpr float SCD_PRESSURE_STEP_HPA = 1.0f;
+// Only used when there is no BMP580: the height of your location above sea level in
+// metres, from which the SCD-41 estimates the pressure. Find it on any map / GPS app.
 constexpr uint16_t SENSOR_ALTITUDE_M = 0;
 // After start-up the sensors measure this long before any value is shown, printed
 // or saved. Values measured during the warm-up are thrown away.
@@ -266,6 +270,11 @@ float temperatureC = NAN;
 float humidityPct = NAN;
 uint16_t co2Ppm = 0;  // 0 = no valid reading yet
 float pressureHpa = NAN;
+float scdPressureHpa = NAN;  // the pressure the SCD-41 corrects for (NAN = from SENSOR_ALTITUDE_M)
+// For tests: a fixed pressure for the SCD-41 instead of the BMP580's (0 = none). Set with
+// the Serial command "pressure", gone after a restart. While it is set, no CO2 value is
+// stored in the history, because the values are not right for the room.
+uint16_t pressureFixedHpa = 0;
 float lightLux = NAN;
 bool lightTooBright = false;  // the light sensor is at the top of its range
 uint16_t vocIndex = 0;        // 0 = no value yet (the algorithm gives none in its first 45 s)
@@ -672,7 +681,9 @@ bool initScd41() {
   }
 
   // Stored in the sensor's RAM only, so it is sent on every boot (no EEPROM wear).
+  // The BMP580's pressure replaces it as soon as there is one (sendPressureToScd41()).
   scd4x.setSensorAltitude(SENSOR_ALTITUDE_M);
+  scdPressureHpa = NAN;
 
   return scd4x.startPeriodicMeasurement() == 0;
 }
@@ -716,8 +727,21 @@ void readSht45() {
   screenChanged = true;
 }
 
+// Read during the warm-up too, so the SCD-41 measures with the right pressure from the start
 void readBmp580() {
   pressureHpa = bmp.performReading() ? bmp.pressure : NAN;
+  sendPressureToScd41();
+}
+
+// The SCD-41 assumes 1013 hPa (sea level) unless it is told otherwise. It takes a new
+// pressure while it measures, so the BMP580's value is sent whenever it has moved by
+// SCD_PRESSURE_STEP_HPA. Without a valid reading the SCD-41 keeps the last value it got.
+void sendPressureToScd41() {
+  if (!scdFound || pressureFixedHpa != 0 || isnan(pressureHpa)) return;
+  if (pressureHpa < 700 || pressureHpa > 1200) return;  // the range the SCD-41 accepts
+  if (!isnan(scdPressureHpa) && fabsf(pressureHpa - scdPressureHpa) < SCD_PRESSURE_STEP_HPA) return;
+  uint16_t hPa = (uint16_t)lroundf(pressureHpa);
+  if (scd4x.setAmbientPressureRaw(hPa) == 0) scdPressureHpa = hPa;
 }
 
 // Read during the warm-up too, because it sets the brightness from the start
@@ -741,7 +765,8 @@ void readScd41() {
 
   co2Ppm = co2;
   screenChanged = true;  // the LED follows by itself (updateLed())
-  historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);  // pressure is not stored
+  // Pressure is not stored. With a fixed test pressure nothing is (see pressureFixedHpa).
+  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);
 
   // "name:value" pairs can be read by people and by the Serial Plotter
   Serial.printf(
@@ -804,8 +829,8 @@ void updateSgp40() {
 }
 
 // Reads every sensor that is due. The SCD-41 is polled during the warm-up too, so its
-// first value after the warm-up is a new one. The light sensor sets the brightness,
-// so it is read from the start as well.
+// first value after the warm-up is a new one. The light sensor sets the brightness and
+// the BMP580 gives the SCD-41 its pressure, so they are read from the start as well.
 void readSensors() {
   uint32_t now = millis();
   if (scdFound && now - lastScdPoll >= SCD_POLL_INTERVAL_MS) {
@@ -817,14 +842,14 @@ void readSensors() {
     lastVemlRead = now;
     readVeml7700();
   }
+  if (bmpFound && now - lastBmpRead >= BMP_INTERVAL_MS) {
+    lastBmpRead = now;
+    readBmp580();
+  }
   if (warmingUp) return;
   if (shtFound && now - lastShtRead >= SHT_INTERVAL_MS) {
     lastShtRead = now;
     readSht45();
-  }
-  if (bmpFound && now - lastBmpRead >= BMP_INTERVAL_MS) {
-    lastBmpRead = now;
-    readBmp580();
   }
 }
 
@@ -845,14 +870,10 @@ void updateWarmup() {
   warmingUp = false;
   Serial.println(F("Warm-up done, values are shown and saved from now on"));
   // First values at once (the SGP40 and SCD-41 follow within 1 s and 5 s; the light
-  // sensor has been read all along)
+  // sensor and the BMP580 have been read all along)
   if (shtFound) {
     lastShtRead = millis();
     readSht45();
-  }
-  if (bmpFound) {
-    lastBmpRead = millis();
-    readBmp580();
   }
   displayWake();  // shows the first values for DISPLAY_ON_TIME_MS
 }
@@ -895,6 +916,33 @@ void updateWifi() {
 
 // ---------- Serial Monitor ----------
 
+void printScdPressure() {
+  if (pressureFixedHpa != 0) {
+    Serial.printf("SCD-41 pressure: %u hPa, fixed by the pressure command (no history meanwhile)\n",
+                  pressureFixedHpa);
+  } else if (isnan(scdPressureHpa)) {
+    Serial.printf("SCD-41 pressure: from the altitude, %u m (no BMP580 value)\n", SENSOR_ALTITUDE_M);
+  } else {
+    Serial.printf("SCD-41 pressure: %.0f hPa, from the BMP580\n", scdPressureHpa);
+  }
+}
+
+// "pressure 1013" gives the SCD-41 a fixed pressure, "pressure auto" the BMP580's again
+void setScdPressure(uint16_t fixedHpa) {
+  if (fixedHpa != 0) {
+    if (scd4x.setAmbientPressureRaw(fixedHpa) != 0) {
+      Serial.println(F("The SCD-41 did not take the pressure"));
+      return;
+    }
+    pressureFixedHpa = fixedHpa;
+    scdPressureHpa = fixedHpa;
+  } else {
+    pressureFixedHpa = 0;
+    scdPressureHpa = NAN;   // so the BMP580's value is sent at once
+    if (bmpFound) readBmp580();
+  }
+}
+
 void printStatus() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("Wi-Fi: connected to \"%s\", signal %d dBm, web page at http://%s/\n", WIFI_SSID, WiFi.RSSI(),
@@ -914,6 +962,7 @@ void printStatus() {
     Serial.printf("Now: %u ppm, %.2f C, %.1f %%RH, %.2f hPa, %.1f lux%s, VOC index %u (raw %u)\n", co2Ppm, temperatureC,
                   humidityPct, pressureHpa, lightLux, lightTooBright ? " (or more)" : "", vocIndex, vocRaw);
   }
+  if (scdFound) printScdPressure();
   printBrightness();
   Serial.printf("Sleep mode: %s\n", sleepMode ? "on (LED off)" : "off");
   historyPrintStatus(Serial);
@@ -954,8 +1003,24 @@ void runCommand(char *line) {
     printBrightness();  // without an option it only shows the brightness
   } else if (strcmp(command, "led") == 0) {
     testLed();
+  } else if (strcmp(command, "pressure") == 0) {
+    char *end = nullptr;
+    long hPa = option ? strtol(option, &end, 10) : -1;
+    if (!scdFound) {
+      Serial.println(F("No SCD-41"));
+      return;
+    } else if (option && strcmp(option, "auto") == 0) {
+      setScdPressure(0);
+    } else if (option && (end == option || *end != '\0' || hPa < 700 || hPa > 1200)) {
+      Serial.println(F("Use: pressure auto, or pressure 700-1200 for a fixed value in hPa (for tests)"));
+      return;
+    } else if (option) {
+      setScdPressure(hPa);
+    }
+    printScdPressure();  // without an option it only shows the pressure
   } else {
-    Serial.println(F("Commands: status, files, csv m1|m5 [days], save, sleep on|off, brightness [auto|0-100], led"));
+    Serial.println(F("Commands: status, files, csv m1|m5 [days], save, sleep on|off, brightness [auto|0-100], led, "
+                     "pressure [auto|700-1200]"));
   }
 }
 
@@ -1044,6 +1109,11 @@ void setup() {
   scdFound = initScd41();
   if (scdFound) {
     Serial.println(F("SCD-41 measuring"));
+    if (bmpFound) {  // its first pressure at once
+      lastBmpRead = millis();
+      readBmp580();
+      if (!isnan(scdPressureHpa)) Serial.printf("SCD-41 corrects for %.0f hPa (BMP580)\n", scdPressureHpa);
+    }
   } else {
     Serial.println(F("SCD-41 not found - check wiring"));
   }
