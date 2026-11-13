@@ -8,7 +8,7 @@
   - BMP580   -> air pressure (0x46 or 0x47, whichever answers)
   - SGP40    -> VOC index (air quality, 100 = the room's usual air), worked out from
                 its raw signal once per second with Sensirion's algorithm
-  - VEML7700 -> light in lux
+  - VEML7700 -> light in lux, sets the brightness of the display and the LED
   - Warm-up: for the first 30 s after start-up the sensors measure, but no value
     is shown, printed or saved. The display counts down meanwhile.
   - The display shows CO2, temperature and humidity, laid out as on the prototype.
@@ -16,6 +16,9 @@
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
   - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 level all the time, dimmed:
     green -> yellow -> red.
+  - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
+    light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
+    can switch Auto off and set a fixed level instead. Both survive a restart.
   - Sleep mode for the night: the LED is off and the display shows a small moon.
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
@@ -24,14 +27,15 @@
     averages (history.h explains how). Pressure, light and VOC are not stored.
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
-  - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off, led
+  - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off,
+    brightness [auto|0-100], led
 
   The sensors keep measuring while the display is off and in sleep mode. This matters for the
   SCD-41's automatic self-calibration, which needs uninterrupted operation, and for the SGP40's
   VOC index, which learns the room's usual air over hours.
 
-  Not used yet: the speaker. The new sensors' values are only printed; what they will
-  control (display brightness, pressure for the SCD-41, VOC warnings) comes later.
+  Not used yet: the speaker. Pressure and the VOC index are only printed; what they will
+  control (pressure for the SCD-41, VOC warnings) comes later.
 
   Libraries (Arduino IDE -> Library Manager):
     Adafruit SSD1327, Adafruit SHT4x Library, Sensirion I2C SCD4x,
@@ -73,9 +77,6 @@ constexpr uint8_t OLED_ADDRESS = 0x3D;  // 0x3C if the A0 jumper on its back is 
 // quarter turn clockwise (seen from the front): pin header on the right, next to the
 // light sensor. If the text stands on its head there, use 1.
 constexpr uint8_t OLED_ROTATION = 3;
-// Brightness 0-255 (the controller's "contrast"). 47 is the library default.
-// Lower also slows OLED burn-in.
-constexpr uint8_t OLED_BRIGHTNESS = 47;
 constexpr uint8_t OLED_SIZE = 128;  // 128 x 128 pixels
 constexpr uint32_t DISPLAY_ON_TIME_MS = 30000;
 // Drawing the whole screen takes about 0.2 s on the I2C bus, so it is redrawn at most
@@ -107,9 +108,7 @@ constexpr uint16_t CO2_OK_BELOW = 1000;
 constexpr uint16_t CO2_VENTILATE_BELOW = 2000;
 
 // ---------- LED ----------
-// The 8 mm LED on LED_PIN shows the CO2 colour.
-// Brightness 1-255, 0 = LED off. For comparison, the BlinkRGB example uses 64.
-constexpr uint8_t LED_BRIGHTNESS = 5;
+// The 8 mm LED on LED_PIN shows the CO2 colour. Its brightness: see "Brightness" below.
 // true = the board's own RGB LED (GPIO8) shows the colour as well. In the case the
 // board's LED faces the floor, so it stays off there.
 constexpr bool BOARD_LED_TOO = false;
@@ -122,6 +121,29 @@ struct LedColour {
 constexpr LedColour LED_GREEN = {0, 255, 0};
 constexpr LedColour LED_YELLOW = {255, 160, 0};
 constexpr LedColour LED_RED = {255, 0, 0};
+
+// ---------- Brightness ----------
+// One level, 0-100 %, sets the display and the LED together. On Auto the light sensor
+// sets it: room light at or below LUX_DARK gives 0 %, at or above LUX_BRIGHT 100 %.
+// In between every tenfold of light adds the same step (the eye sees light that way).
+constexpr float LUX_DARK = 1;      // a dark room, a street lamp outside
+constexpr float LUX_BRIGHT = 400;  // a bright room, daylight indoors
+// The display (the SSD1327's "contrast", 0-255; the library uses 47) and the LED
+// (1-255, the strongest of its three colours) at 0 % and at 100 %. In between each
+// % step makes them brighter by the same factor, so the steps look even.
+constexpr uint8_t OLED_BRIGHTNESS_MIN = 6;
+constexpr uint8_t OLED_BRIGHTNESS_MAX = 255;
+constexpr uint8_t LED_BRIGHTNESS_MIN = 1;
+constexpr uint8_t LED_BRIGHTNESS_MAX = 25;
+// How fast Auto follows a change of light: the share of the way taken with each
+// reading (one a second). 0.3 = most of the way in 5 s, so a shadow doesn't flicker it.
+constexpr float AUTO_BRIGHTNESS_SPEED = 0.3;
+// Level of a new monitor before the light sensor's first reading, and the level
+// Auto keeps if the light sensor is missing
+constexpr uint8_t BRIGHTNESS_START = 50;
+// A level set on the web page is saved this long after the last change, so moving
+// the slider doesn't write the flash every few milliseconds
+constexpr uint32_t BRIGHTNESS_SAVE_DELAY_MS = 3000;
 
 // ---------- Sleep mode ----------
 // For the night: the RGB LED stays off and the display shows a small moon. The sensors,
@@ -153,7 +175,7 @@ Adafruit_BMP5xx bmp;
 Adafruit_VEML7700 veml;
 Adafruit_SGP40 sgp;
 VocAlgorithmParams vocAlgorithm;  // Sensirion's VOC index algorithm and what it has learned
-Preferences settings;             // keeps the sleep mode through a restart
+Preferences settings;             // keeps sleep mode and brightness through a restart
 
 // 8 x 8 moon, shown in the top line of the display while sleep mode is on
 const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0x3C};
@@ -174,6 +196,14 @@ uint32_t lastDraw = 0;
 bool sleepMode = false;
 bool sleepMessageShown = false;  // the display confirms a long press
 uint32_t sleepMessageSince = 0;
+
+bool autoBrightness = true;        // false = a fixed level, set on the web page or by Serial
+uint8_t brightness = BRIGHTNESS_START;  // 0-100 %, what the display and the LED use now
+float autoLevel = NAN;             // 0-100 %, from the light sensor, smoothed; NAN = no reading yet
+float ledScale = 0;                // what a full LED colour (255) is dimmed to
+uint8_t oledContrast = 0;          // what the display is set to
+bool brightnessUnsaved = false;
+uint32_t brightnessChangedAt = 0;
 
 bool warmingUp = true;
 uint32_t warmupStart = 0;  // when the sensors started measuring
@@ -254,7 +284,7 @@ LedColour co2Colour(uint16_t ppm) {
 }
 
 uint8_t dimmed(uint8_t value) {
-  return (value * LED_BRIGHTNESS + 127) / 255;
+  return (uint8_t)lroundf(value * ledScale / 255);
 }
 
 // Sends a colour to the 8 mm LED. The PL9823 takes 24 bits like the board's WS2812B, but
@@ -459,6 +489,65 @@ void toggleSleepMode() {
   displayWake();
 }
 
+// ---------- Brightness ----------
+
+// min at 0 %, max at 100 %, the same factor for every % in between
+float brightnessBetween(uint8_t min, uint8_t max, uint8_t level) {
+  return min * powf((float)max / min, level / 100.0f);
+}
+
+// Sets the display and the LED to a level, 0-100 %
+void applyBrightness(uint8_t level) {
+  brightness = level;
+  ledScale = brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level);
+  uint8_t contrast = lroundf(brightnessBetween(OLED_BRIGHTNESS_MIN, OLED_BRIGHTNESS_MAX, level));
+  if (displayFound && contrast != oledContrast) display.setContrast(contrast);  // also while it is off
+  oledContrast = contrast;
+  updateLed();
+}
+
+// After every light reading. The level from the light is smoothed, and Auto only
+// moves the brightness once it is a whole % away, so noise in the reading can't make
+// the LED flicker between two steps.
+void updateAutoBrightness() {
+  float lux = constrain(lightLux, LUX_DARK, LUX_BRIGHT);
+  float target = 100 * logf(lux / LUX_DARK) / logf(LUX_BRIGHT / LUX_DARK);
+  autoLevel = isnan(autoLevel) ? target : autoLevel + (target - autoLevel) * AUTO_BRIGHTNESS_SPEED;
+  if (autoBrightness && fabsf(autoLevel - brightness) >= 1) applyBrightness(lroundf(autoLevel));
+}
+
+// The level is saved BRIGHTNESS_SAVE_DELAY_MS after the last change (in loop())
+void saveBrightnessSoon() {
+  brightnessUnsaved = true;
+  brightnessChangedAt = millis();
+}
+
+void saveBrightnessWhenDue() {
+  if (!brightnessUnsaved || millis() - brightnessChangedAt < BRIGHTNESS_SAVE_DELAY_MS) return;
+  settings.putBool("autobright", autoBrightness);
+  settings.putUChar("brightness", brightness);
+  brightnessUnsaved = false;
+}
+
+// From the web page or the Serial Monitor: BRIGHTNESS_AUTO, or a fixed level 0-100 %.
+// Returns the level now in use.
+uint8_t setBrightness(int level) {
+  autoBrightness = level == BRIGHTNESS_AUTO;
+  if (!autoBrightness) {
+    applyBrightness(constrain(level, 0, 100));
+  } else if (!isnan(autoLevel)) {
+    applyBrightness(lroundf(autoLevel));
+  }  // Auto without a light reading keeps the level it has
+  saveBrightnessSoon();
+  return brightness;
+}
+
+void printBrightness() {
+  Serial.printf("Brightness: %u %% (%s), display %u of 255, LED %.1f of 255\n", brightness,
+                autoBrightness ? (vemlFound ? "auto, from the light sensor" : "auto, but no light sensor") : "fixed",
+                oledContrast, ledScale);
+}
+
 // ---------- Sensors ----------
 
 bool initScd41() {
@@ -529,10 +618,12 @@ void readBmp580() {
   pressureHpa = bmp.performReading() ? bmp.pressure : NAN;
 }
 
+// Read during the warm-up too, because it sets the brightness from the start
 void readVeml7700() {
   // The newest value, without waiting, with the library's correction for bright light
   lightLux = veml.readLux(VEML_LUX_CORRECTED_NOWAIT);
   lightTooBright = veml.readALS() == 0xFFFF;  // the same value again, raw
+  updateAutoBrightness();
 }
 
 void readScd41() {
@@ -552,8 +643,9 @@ void readScd41() {
   historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);  // pressure is not stored
 
   // "name:value" pairs can be read by people and by the Serial Plotter
-  Serial.printf("CO2_ppm:%u Temperature_C:%.2f Humidity_pct:%.1f Pressure_hPa:%.2f Light_lux:%.1f VOC_index:%u\n",
-                co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex);
+  Serial.printf(
+      "CO2_ppm:%u Temperature_C:%.2f Humidity_pct:%.1f Pressure_hPa:%.2f Light_lux:%.1f VOC_index:%u Brightness_pct:%u\n",
+      co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, brightness);
 }
 
 // Sensirion's checksum, sent and received after every 2 bytes
@@ -611,7 +703,8 @@ void updateSgp40() {
 }
 
 // Reads every sensor that is due. The SCD-41 is polled during the warm-up too, so its
-// first value after the warm-up is a new one.
+// first value after the warm-up is a new one. The light sensor sets the brightness,
+// so it is read from the start as well.
 void readSensors() {
   uint32_t now = millis();
   if (scdFound && now - lastScdPoll >= SCD_POLL_INTERVAL_MS) {
@@ -619,6 +712,10 @@ void readSensors() {
     readScd41();
   }
   updateSgp40();
+  if (vemlFound && now - lastVemlRead >= VEML_INTERVAL_MS) {
+    lastVemlRead = now;
+    readVeml7700();
+  }
   if (warmingUp) return;
   if (shtFound && now - lastShtRead >= SHT_INTERVAL_MS) {
     lastShtRead = now;
@@ -627,10 +724,6 @@ void readSensors() {
   if (bmpFound && now - lastBmpRead >= BMP_INTERVAL_MS) {
     lastBmpRead = now;
     readBmp580();
-  }
-  if (vemlFound && now - lastVemlRead >= VEML_INTERVAL_MS) {
-    lastVemlRead = now;
-    readVeml7700();
   }
 }
 
@@ -650,7 +743,8 @@ void updateWarmup() {
 
   warmingUp = false;
   Serial.println(F("Warm-up done, values are shown and saved from now on"));
-  // First values at once (the SGP40 and SCD-41 follow within 1 s and 5 s)
+  // First values at once (the SGP40 and SCD-41 follow within 1 s and 5 s; the light
+  // sensor has been read all along)
   if (shtFound) {
     lastShtRead = millis();
     readSht45();
@@ -658,10 +752,6 @@ void updateWarmup() {
   if (bmpFound) {
     lastBmpRead = millis();
     readBmp580();
-  }
-  if (vemlFound) {
-    lastVemlRead = millis();
-    readVeml7700();
   }
   displayWake();  // shows the first values for DISPLAY_ON_TIME_MS
 }
@@ -696,7 +786,7 @@ void updateWifi() {
       configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);  // UTC, updated every 3 hours
       timeStarted = true;
     }
-    webBegin(CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW, setSleepMode);  // only the first time
+    webBegin(CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW, setSleepMode, setBrightness);  // only the first time
   } else {
     Serial.println(F("Wi-Fi lost, reconnecting"));
   }
@@ -723,6 +813,7 @@ void printStatus() {
     Serial.printf("Now: %u ppm, %.2f C, %.1f %%RH, %.2f hPa, %.1f lux%s, VOC index %u (raw %u)\n", co2Ppm, temperatureC,
                   humidityPct, pressureHpa, lightLux, lightTooBright ? " (or more)" : "", vocIndex, vocRaw);
   }
+  printBrightness();
   Serial.printf("Sleep mode: %s\n", sleepMode ? "on (LED off)" : "off");
   historyPrintStatus(Serial);
 }
@@ -730,7 +821,7 @@ void printStatus() {
 // Commands typed in the Serial Monitor (line ending: New Line, Carriage Return or Both)
 void runCommand(char *line) {
   const char *command = strtok(line, " ");
-  const char *option = strtok(nullptr, " ");  // csv: the level, sleep: on or off
+  const char *option = strtok(nullptr, " ");  // csv: the level, sleep: on or off, brightness: auto or a level
   const char *days = strtok(nullptr, " ");
   if (!command) return;
 
@@ -748,10 +839,22 @@ void runCommand(char *line) {
     setSleepMode(true);
   } else if (strcmp(command, "sleep") == 0 && option && strcmp(option, "off") == 0) {
     setSleepMode(false);
+  } else if (strcmp(command, "brightness") == 0) {
+    char *end = nullptr;
+    long level = option ? strtol(option, &end, 10) : -1;
+    if (option && strcmp(option, "auto") == 0) {
+      setBrightness(BRIGHTNESS_AUTO);
+    } else if (option && (end == option || *end != '\0' || level < 0 || level > 100)) {
+      Serial.println(F("Use: brightness auto, or brightness 0-100 for a fixed level"));
+      return;
+    } else if (option) {
+      setBrightness(level);
+    }
+    printBrightness();  // without an option it only shows the brightness
   } else if (strcmp(command, "led") == 0) {
     testLed();
   } else {
-    Serial.println(F("Commands: status, files, csv m1|m5 [days], save, sleep on|off, led"));
+    Serial.println(F("Commands: status, files, csv m1|m5 [days], save, sleep on|off, brightness [auto|0-100], led"));
   }
 }
 
@@ -788,15 +891,17 @@ void setup() {
   settings.begin("co2monitor");
   sleepMode = settings.getBool("sleep", false);
   if (sleepMode) Serial.println(F("Sleep mode on: LED off"));
+  autoBrightness = settings.getBool("autobright", true);
 
-  // Both LEDs keep their last colour through a reset (for example from BlinkRGB), so clear them
+  // Both LEDs keep their last colour through a reset (for example from BlinkRGB), so clear them.
+  // The saved level is used until the light sensor's first reading (on Auto, about 1 s).
   rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
-  updateLed();
+  applyBrightness(min(settings.getUChar("brightness", BRIGHTNESS_START), (uint8_t)100));
 
   displayFound = display.begin(OLED_ADDRESS);
   if (displayFound) {
     display.setRotation(OLED_ROTATION);
-    display.setContrast(OLED_BRIGHTNESS);
+    display.setContrast(oledContrast);
     display.clearDisplay();
     printCentred("CO2", 3, 40);
     printCentred("starting...", 1, 76);
@@ -850,7 +955,9 @@ void loop() {
   historyLoop();
   updateWarmup();
   readSensors();
-  webLoop({co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, warmupSecondsLeft(), sleepMode});
+  saveBrightnessWhenDue();
+  webLoop({co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, warmupSecondsLeft(), sleepMode,
+           brightness, autoBrightness});
 
   if (displayOn) {
     if (sleepMessageShown && millis() - sleepMessageSince >= SLEEP_MESSAGE_MS) {

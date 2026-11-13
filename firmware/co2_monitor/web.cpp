@@ -19,9 +19,10 @@ constexpr uint32_t MAX_SPAN_DAYS = 45 * SECONDS_PER_DAY;    // calendar markers
 
 static WebServer server(80);
 static bool started = false;
-static LiveValues live = {0, NAN, NAN, NAN, NAN, 0, 0, false};
+static LiveValues live = {0, NAN, NAN, NAN, NAN, 0, 0, false, 0, true};
 static uint16_t co2Limits[3];
 static void (*sleepModeSetter)(bool on) = nullptr;
+static uint8_t (*brightnessSetter)(int level) = nullptr;
 
 // Sends everything printed to it as one HTTP answer, in pieces ("chunked"),
 // so the size doesn't have to be known in advance
@@ -102,7 +103,8 @@ static void handleNow() {
   printJsonNumber(out, "light", live.lightLux, 1);
   out.print(',');
   printJsonNumber(out, "voc", live.vocIndex > 0 ? live.vocIndex : NAN, 0);
-  out.printf(",\"sleep\":%s,\"limits\":[%u,%u,%u],\"rssi\":%d}", live.sleepMode ? "true" : "false", co2Limits[0],
+  out.printf(",\"sleep\":%s,\"brightness\":%u,\"autoBrightness\":%s,\"limits\":[%u,%u,%u],\"rssi\":%d}",
+             live.sleepMode ? "true" : "false", live.brightness, live.autoBrightness ? "true" : "false", co2Limits[0],
              co2Limits[1], co2Limits[2], WiFi.RSSI());
 }
 
@@ -115,6 +117,27 @@ static void handleSleep() {
   live.sleepMode = on == "1";
   sleepModeSetter(live.sleepMode);
   server.send(200, "application/json", live.sleepMode ? "{\"sleep\":true}" : "{\"sleep\":false}");
+}
+
+// auto=1, or level=0..100 (whole %)
+static void handleBrightness() {
+  String level = server.arg("level");
+  int wanted;
+  if (server.arg("auto") == "1") {
+    wanted = BRIGHTNESS_AUTO;
+  } else if (level.length() >= 1 && level.length() <= 3 && strspn(level.c_str(), "0123456789") == level.length() &&
+             level.toInt() <= 100) {
+    wanted = level.toInt();
+  } else {
+    server.send(400, "text/plain", "Needs auto=1 or level=0..100");
+    return;
+  }
+  live.brightness = brightnessSetter(wanted);
+  live.autoBrightness = wanted == BRIGHTNESS_AUTO;
+  char answer[48];
+  snprintf(answer, sizeof answer, "{\"auto\":%s,\"brightness\":%u}", live.autoBrightness ? "true" : "false",
+           live.brightness);
+  server.send(200, "application/json", answer);
 }
 
 static void handleInfo() {
@@ -142,12 +165,14 @@ static void handleData() {
   historyWriteRecords(out, minutes, from, to);
 }
 
-void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateBelow, void (*setSleepMode)(bool on)) {
+void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateBelow, void (*setSleepMode)(bool on),
+              uint8_t (*setBrightness)(int level)) {
   if (started) return;
   co2Limits[0] = co2GoodBelow;
   co2Limits[1] = co2OkBelow;
   co2Limits[2] = co2VentilateBelow;
   sleepModeSetter = setSleepMode;
+  brightnessSetter = setBrightness;
 
   // Lets a copy of the page opened on the PC ask the monitor (index.html?device=<address>)
   server.enableCORS(true);
@@ -157,6 +182,7 @@ void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateB
   server.on("/api/days", HTTP_GET, handleDays);
   server.on("/api/data", HTTP_GET, handleData);
   server.on("/api/sleep", HTTP_POST, handleSleep);
+  server.on("/api/brightness", HTTP_POST, handleBrightness);
   server.onNotFound([]() {
     server.send(404, "text/plain", "Not found");
   });

@@ -57,6 +57,13 @@ h1{font-size:22px;font-weight:600;margin:0}
 .switch[aria-checked=true] svg{color:var(--acc)}
 .switch[aria-checked=true] .track{background:var(--acc)}
 .switch[aria-checked=true] .knob{left:14px}
+.bright{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.bright>svg{width:16px;height:16px;flex:none;color:var(--sub)}
+.bright input{width:110px;height:auto;padding:0;margin:0;border:0;background:none;accent-color:var(--acc);cursor:pointer}
+.bright.auto input{accent-color:var(--sub)}
+.bright input:disabled,.bright input:disabled+.pct{opacity:.4;cursor:default}
+.pct{min-width:2.9em;text-align:right;font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
+.bright .switch{border:0;background:none;height:30px;padding:0 6px}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px}
 .big{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
@@ -125,6 +132,12 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
     <div class="status"><span id="dot" class="dot"></span><span id="status">Connecting…</span></div>
   </div>
   <div class="line">
+    <div class="bright" id="brightbox" role="group" aria-label="Brightness of the display and LED" title="Brightness of the monitor's display and LED together. Auto: the light sensor sets it, the darker the room the dimmer. Moving the slider switches Auto off and keeps that level.">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.8v2.6M12 19.6v2.6M1.8 12h2.6M19.6 12h2.6M4.8 4.8l1.8 1.8M17.4 17.4l1.8 1.8M4.8 19.2l1.8-1.8M17.4 6.6l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input type="range" id="bright" min="0" max="100" step="1" value="50" disabled aria-label="Brightness in percent">
+      <span id="brightval" class="pct">–</span>
+      <button id="autobright" class="switch" role="switch" aria-checked="false" disabled>Auto<span class="track"><span class="knob"></span></span></button>
+    </div>
     <button id="sleep" class="switch" role="switch" aria-checked="false" disabled title="Turns the LED off and shows a moon on the display. Holding the monitor's button for 2 s does the same."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Sleep mode<span class="track"><span class="knob"></span></span></button>
     <div class="seg" id="theme" role="group" aria-label="Colour theme">
       <button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
@@ -283,6 +296,35 @@ async function toggleSleep() {
   showLive();
 }
 
+// Brightness of the display and LED together. Auto: the light sensor sets it.
+// Moving the slider switches Auto off and sends the level while it moves, one request
+// at a time, always the newest level.
+let brightWish = null, brightSending = false, brightMoved = 0;
+async function sendBrightness(query) {
+  brightWish = query;
+  brightMoved = Date.now();
+  if (brightSending) return;  // the loop below sends the newest wish next
+  brightSending = true;
+  while (brightWish) {
+    const q = brightWish;
+    brightWish = null;
+    liveToken++;  // a reading already on its way still has the old state
+    try {
+      const r = await (await get('/api/brightness?' + q, {method: 'POST'})).json();
+      Object.assign(live, {brightness: r.brightness, autoBrightness: r.auto});
+    } catch (e) {}
+  }
+  brightSending = false;
+  showLive();
+}
+
+function showBrightness(level, auto) {
+  $('bright').value = level;
+  $('brightval').textContent = level + ' %';
+  $('autobright').setAttribute('aria-checked', auto);
+  $('brightbox').classList.toggle('auto', auto);
+}
+
 function showLive() {
   const ok = live && Date.now() - liveAt < 15000;
   $('dot').className = 'dot ' + (ok ? 'on' : live ? 'off' : '');
@@ -297,6 +339,9 @@ function showLive() {
     $('sleep').disabled = !ok;
     $('sleep').setAttribute('aria-checked', !!(live && live.sleep));
   }
+  $('bright').disabled = $('autobright').disabled = !(ok && live.brightness != null);
+  // Not while the slider is being moved, so it doesn't jump back under the finger
+  if (ok && live.brightness != null && !brightSending && Date.now() - brightMoved > 2000) showBrightness(live.brightness, live.autoBrightness);
   if (!live) return;
 
   const warm = live.warmup > 0;
@@ -316,6 +361,7 @@ function showLive() {
 
   const up = live.uptime, d = Math.floor(up / DAY), h = Math.floor(up % DAY / 3600), m = Math.floor(up % 3600 / 60);
   const parts = ['Wi-Fi signal ' + live.rssi + ' dBm'];
+  if (live.light != null) parts.push('Room light ' + fmt(live.light, live.light < 10 ? 1 : 0) + ' lux');
   if (info && info.on) parts.push(`History ${fmt(info.usedKB, 0)} of ${fmt(info.totalKB, 0)} KB used`);
   parts.push('Running for ' + (d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`));
   $('foot').textContent = parts.join(' · ');
@@ -662,6 +708,15 @@ function setup() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   showTheme();
   $('sleep').onclick = toggleSleep;
+  $('bright').oninput = () => {
+    showBrightness(+$('bright').value, false);
+    sendBrightness('level=' + $('bright').value);
+  };
+  $('autobright').onclick = () => {
+    const on = $('autobright').getAttribute('aria-checked') !== 'true';
+    showBrightness(+$('bright').value, on);
+    sendBrightness(on ? 'auto=1' : 'level=' + $('bright').value);
+  };
 
   for (let i = 0; i < 7; i++) $('wd').innerHTML += '<span>' + new Date(2024, 0, 1 + i).toLocaleDateString([], {weekday: 'short'}).slice(0, 2) + '</span>';
   $('prev').onclick = () => moveMonth(-1);
