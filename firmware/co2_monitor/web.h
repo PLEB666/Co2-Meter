@@ -2,13 +2,14 @@
   Web page - live values, graphs and CSV downloads in a browser on the home network
 
   Open http://<address of the monitor>/ - the Serial Monitor prints the address when
-  Wi-Fi connects. Give the monitor a fixed address in your router so it doesn't change.
+  Wi-Fi connects. The address is set in co2_monitor.ino (FIXED_IP).
 
   The page is written in web/index.html. web_page.h holds a compressed copy that is
   built into the firmware; make it again with web/make_web_page.ps1 after a change.
 
   The page gets its data from these addresses (all times are UTC seconds):
     /api/now                              live values, warm-up, sleep mode, Wi-Fi signal (JSON)
+                                          (pressure, light and voc are not on the page yet)
     /api/info                             state of the history (JSON)
     /api/days?from=..&to=..               which days have values, for the calendar (JSON)
     /api/data?res=1|5&from=..&to=..      stored values as binary records (history.h)
@@ -23,6 +24,9 @@ struct LiveValues {
   uint16_t co2Ppm;            // 0 = no value yet
   float temperatureC;         // NAN = no value
   float humidityPct;          // NAN = no value
+  float pressureHpa;          // NAN = no value
+  float lightLux;             // NAN = no value
+  uint16_t vocIndex;          // 0 = no value yet
   uint8_t warmupSecondsLeft;  // 0 = warm-up over
   bool sleepMode;             // LED off, moon on the display
 };

@@ -19,7 +19,7 @@ constexpr uint32_t MAX_SPAN_DAYS = 45 * SECONDS_PER_DAY;    // calendar markers
 
 static WebServer server(80);
 static bool started = false;
-static LiveValues live = {0, NAN, NAN, 0, false};
+static LiveValues live = {0, NAN, NAN, NAN, NAN, 0, 0, false};
 static uint16_t co2Limits[3];
 static void (*sleepModeSetter)(bool on) = nullptr;
 
@@ -96,6 +96,12 @@ static void handleNow() {
   printJsonNumber(out, "temperature", live.temperatureC, 2);
   out.print(',');
   printJsonNumber(out, "humidity", live.humidityPct, 1);
+  out.print(',');
+  printJsonNumber(out, "pressure", live.pressureHpa, 2);
+  out.print(',');
+  printJsonNumber(out, "light", live.lightLux, 1);
+  out.print(',');
+  printJsonNumber(out, "voc", live.vocIndex > 0 ? live.vocIndex : NAN, 0);
   out.printf(",\"sleep\":%s,\"limits\":[%u,%u,%u],\"rssi\":%d}", live.sleepMode ? "true" : "false", co2Limits[0],
              co2Limits[1], co2Limits[2], WiFi.RSSI());
 }

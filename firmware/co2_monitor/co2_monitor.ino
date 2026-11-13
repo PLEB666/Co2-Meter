@@ -1,28 +1,41 @@
 /*
-  CO2 Monitor - step 2
-  ESP32-C6-DevKitC-1 + Adafruit SHT45 + Adafruit SCD-41 + Joy-it 0.96" OLED (SSD1306)
+  CO2 Monitor - case version
+  Waveshare ESP32-C6-DEV-KIT-N16 + Adafruit SCD-41, SHT45, BMP580, SGP40, VEML7700
+  + Adafruit 1.5" 128x128 grayscale OLED (SSD1327) + 8 mm LED (PL9823-F8) + button
 
-  - SHT45  -> temperature and humidity (more accurate than the SCD-41's own values)
-  - SCD-41 -> CO2 in periodic mode (a new value every 5 s)
+  - SCD-41   -> CO2 in periodic mode (a new value every 5 s)
+  - SHT45    -> temperature and humidity (more accurate than the SCD-41's own values)
+  - BMP580   -> air pressure (0x46 or 0x47, whichever answers)
+  - SGP40    -> VOC index (air quality, 100 = the room's usual air), worked out from
+                its raw signal once per second with Sensirion's algorithm
+  - VEML7700 -> light in lux
   - Warm-up: for the first 30 s after start-up the sensors measure, but no value
     is shown, printed or saved. The display counts down meanwhile.
+  - The display shows CO2, temperature and humidity, laid out as on the prototype.
+    Pressure, light and the VOC index are only printed (Serial, status, /api/now).
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
   - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 level all the time, dimmed:
     green -> yellow -> red.
   - Sleep mode for the night: the LED is off and the display shows a small moon.
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
-  - Wi-Fi gets the time from the internet. The values are stored in the flash
-    as 1-minute and 5-minute averages (history.h explains how).
+  - Wi-Fi gets the time from the internet and uses the fixed address FIXED_IP.
+    CO2, temperature and humidity are stored in the flash as 1-minute and 5-minute
+    averages (history.h explains how). Pressure, light and VOC are not stored.
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
   - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off, led
 
   The sensors keep measuring while the display is off and in sleep mode. This matters for the
-  SCD-41's automatic self-calibration, which needs uninterrupted operation.
+  SCD-41's automatic self-calibration, which needs uninterrupted operation, and for the SGP40's
+  VOC index, which learns the room's usual air over hours.
+
+  Not used yet: the speaker. The new sensors' values are only printed; what they will
+  control (display brightness, pressure for the SCD-41, VOC warnings) comes later.
 
   Libraries (Arduino IDE -> Library Manager):
-    Adafruit SSD1306, Adafruit SHT4x Library, Sensirion I2C SCD4x
+    Adafruit SSD1327, Adafruit SHT4x Library, Sensirion I2C SCD4x,
+    Adafruit BMP5xx Library, Adafruit VEML7700 Library, Adafruit SGP40 Sensor
   Board: "ESP32C6 Dev Module" (esp32 by Espressif Systems)
     Flash Size "16MB", Partition Scheme "16M Flash (3MB APP/9.9MB FATFS)"
   Wi-Fi: copy secrets_example.h to secrets.h and enter your network there.
@@ -32,9 +45,12 @@
 #include <WiFi.h>
 #include <Preferences.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SSD1327.h>
 #include <Adafruit_SHT4x.h>
 #include <SensirionI2cScd4x.h>
+#include <Adafruit_BMP5xx.h>
+#include <Adafruit_VEML7700.h>
+#include <Adafruit_SGP40.h>  // also brings Sensirion's VOC index algorithm
 #include "history.h"
 #include "web.h"
 
@@ -51,15 +67,20 @@ constexpr uint8_t BUTTON_PIN = 2;    // J1 pin 5, the other side of the button g
 constexpr uint8_t LED_PIN = 18;      // J3 pin 7, DIN of the 8 mm LED (its VDD to 5V, GND to GND)
 
 // ---------- Display ----------
-constexpr uint8_t OLED_ADDRESS = 0x3C;  // 0x3D if the address resistor on the back was moved
-// 0 = normal (header pins at the top). Use 2 if the text appears upside down.
-constexpr uint8_t OLED_ROTATION = 0;
-// Brightness 0-255 (the controller's "contrast"). 207 is the library default.
-// Even 0 stays readable, at roughly half brightness. Lower also slows OLED burn-in.
-constexpr uint8_t OLED_BRIGHTNESS = 10;
-constexpr uint8_t OLED_WIDTH = 128;
-constexpr uint8_t OLED_HEIGHT = 64;
+constexpr uint8_t OLED_ADDRESS = 0x3D;  // 0x3C if the A0 jumper on its back is closed
+// 0-3, each step turns the picture a quarter turn clockwise. 0 = upright with the
+// display's pin header at the top. 3 = as in the case, where the display is turned a
+// quarter turn clockwise (seen from the front): pin header on the right, next to the
+// light sensor. If the text stands on its head there, use 1.
+constexpr uint8_t OLED_ROTATION = 3;
+// Brightness 0-255 (the controller's "contrast"). 47 is the library default.
+// Lower also slows OLED burn-in.
+constexpr uint8_t OLED_BRIGHTNESS = 47;
+constexpr uint8_t OLED_SIZE = 128;  // 128 x 128 pixels
 constexpr uint32_t DISPLAY_ON_TIME_MS = 30000;
+// Drawing the whole screen takes about 0.2 s on the I2C bus, so it is redrawn at most
+// this often while new values come in.
+constexpr uint32_t DISPLAY_REDRAW_MS = 1000;
 
 // ---------- Sensors ----------
 // Height of your location above sea level in metres. The SCD-41 uses it to
@@ -70,6 +91,15 @@ constexpr uint16_t SENSOR_ALTITUDE_M = 0;
 constexpr uint32_t WARMUP_TIME_MS = 30000;
 constexpr uint32_t SHT_INTERVAL_MS = 2000;
 constexpr uint32_t SCD_POLL_INTERVAL_MS = 1000;
+constexpr uint32_t BMP_INTERVAL_MS = 2000;
+constexpr uint32_t VEML_INTERVAL_MS = 1000;
+// The VOC index algorithm expects exactly one SGP40 reading per second
+constexpr uint32_t SGP_INTERVAL_MS = 1000;
+constexpr uint32_t SGP_MEASURE_MS = 30;  // the SGP40 needs up to 30 ms per reading
+
+constexpr uint8_t BMP580_ADDRESS_A = 0x46;  // the two addresses its
+constexpr uint8_t BMP580_ADDRESS_B = 0x47;  // address jumper can choose
+constexpr uint8_t SGP40_ADDRESS = 0x59;
 
 // CO2 rating limits in ppm (shown in the top right corner of the display)
 constexpr uint16_t CO2_GOOD_BELOW = 800;
@@ -80,8 +110,8 @@ constexpr uint16_t CO2_VENTILATE_BELOW = 2000;
 // The 8 mm LED on LED_PIN shows the CO2 colour.
 // Brightness 1-255, 0 = LED off. For comparison, the BlinkRGB example uses 64.
 constexpr uint8_t LED_BRIGHTNESS = 5;
-// true = the board's own RGB LED (GPIO8) shows the colour as well, handy while the 8 mm
-// LED is not wired yet. In the case the board's LED faces the floor, so it stays off there.
+// true = the board's own RGB LED (GPIO8) shows the colour as well. In the case the
+// board's LED faces the floor, so it stays off there.
 constexpr bool BOARD_LED_TOO = false;
 
 struct LedColour {
@@ -105,14 +135,25 @@ constexpr uint32_t SLEEP_MESSAGE_MS = 2500;
 // ---------- Wi-Fi and clock ----------
 // The name the monitor shows in your router's list of devices
 constexpr char WIFI_HOSTNAME[] = "co2-monitor";
+// The monitor always uses this address, so the web page stays at http://192.168.178.40/.
+// No other device may use it: reserve it for the monitor in the router, or pick one
+// outside the router's DHCP range. false = the router hands out the address (DHCP).
+constexpr bool USE_FIXED_IP = true;
+const IPAddress FIXED_IP(192, 168, 178, 40);
+const IPAddress ROUTER_IP(192, 168, 178, 1);  // gateway, also asked for names (DNS)
+const IPAddress SUBNET_MASK(255, 255, 255, 0);
 // Internet time servers. The clock runs on UTC; the web page shows local time.
 constexpr char NTP_SERVER_1[] = "pool.ntp.org";
 constexpr char NTP_SERVER_2[] = "time.google.com";
 
-Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
+Adafruit_SSD1327 display(OLED_SIZE, OLED_SIZE, &Wire, -1);
 Adafruit_SHT4x sht4;
 SensirionI2cScd4x scd4x;
-Preferences settings;  // keeps the sleep mode through a restart
+Adafruit_BMP5xx bmp;
+Adafruit_VEML7700 veml;
+Adafruit_SGP40 sgp;
+VocAlgorithmParams vocAlgorithm;  // Sensirion's VOC index algorithm and what it has learned
+Preferences settings;             // keeps the sleep mode through a restart
 
 // 8 x 8 moon, shown in the top line of the display while sleep mode is on
 const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0x3C};
@@ -120,9 +161,15 @@ const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0
 bool displayFound = false;
 bool shtFound = false;
 bool scdFound = false;
+bool bmpFound = false;
+uint8_t bmpAddress = 0;
+bool vemlFound = false;
+bool sgpFound = false;
 
 bool displayOn = false;
 uint32_t displayOnSince = 0;
+bool screenChanged = false;  // something on the display has changed
+uint32_t lastDraw = 0;
 
 bool sleepMode = false;
 bool sleepMessageShown = false;  // the display confirms a long press
@@ -134,10 +181,18 @@ uint32_t warmupStart = 0;  // when the sensors started measuring
 float temperatureC = NAN;
 float humidityPct = NAN;
 uint16_t co2Ppm = 0;  // 0 = no valid reading yet
-bool newData = false;  // something on the display has changed
+float pressureHpa = NAN;
+float lightLux = NAN;
+bool lightTooBright = false;  // the light sensor is at the top of its range
+uint16_t vocIndex = 0;        // 0 = no value yet (the algorithm gives none in its first 45 s)
+uint16_t vocRaw = 0;          // the SGP40's raw signal, for the Serial Monitor
 
 uint32_t lastShtRead = 0;
 uint32_t lastScdPoll = 0;
+uint32_t lastBmpRead = 0;
+uint32_t lastVemlRead = 0;
+uint32_t lastSgpStart = 0;
+bool sgpMeasuring = false;  // a reading was started and is not fetched yet
 
 enum class ButtonEvent { None, Press, LongPress };
 
@@ -177,6 +232,8 @@ const char* co2Rating(uint16_t ppm) {
   if (ppm < CO2_VENTILATE_BELOW) return "VENTILATE";
   return "BAD AIR";
 }
+
+// ---------- LED ----------
 
 // step 0 = from, step == steps = to
 LedColour blendColour(LedColour from, LedColour to, uint16_t step, uint16_t steps) {
@@ -248,102 +305,120 @@ void testLed() {
   Serial.println(F("LED test done"));
 }
 
+// ---------- Display ----------
+
 // Seconds of warm-up left, rounded up. 0 once it is over.
 uint8_t warmupSecondsLeft() {
   uint32_t elapsed = millis() - warmupStart;
   return elapsed >= WARMUP_TIME_MS ? 0 : (WARMUP_TIME_MS - elapsed + 999) / 1000;
 }
 
-// The built-in font is 6 pixels wide per character at size 1
-void printCentred(const char *text, uint8_t size, int16_t y) {
+// The built-in font is 6 x 8 pixels per character at size 1, 12 x 16 at size 2, ...
+int16_t textWidth(const char *text, uint8_t size) {
+  return strlen(text) * 6 * size;
+}
+
+void printAt(const char *text, uint8_t size, int16_t x, int16_t y, uint8_t colour = SSD1327_WHITE) {
   display.setTextSize(size);
-  display.setCursor((OLED_WIDTH - (int16_t)strlen(text) * 6 * size) / 2, y);
+  display.setTextColor(colour);
+  display.setCursor(x, y);
   display.print(text);
+}
+
+void printCentred(const char *text, uint8_t size, int16_t y) {
+  printAt(text, size, (OLED_SIZE - textWidth(text, size)) / 2, y);
+}
+
+void printRight(const char *text, uint8_t size, int16_t y) {
+  printAt(text, size, OLED_SIZE - textWidth(text, size), y);
 }
 
 // Big moon or sun with the new mode, shown for a moment after a long press
 void drawSleepMessage() {
   display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
   if (sleepMode) {
-    display.fillCircle(64, 14, 12, SSD1306_WHITE);
-    display.fillCircle(71, 8, 11, SSD1306_BLACK);
+    display.fillCircle(64, 36, 22, SSD1327_WHITE);
+    display.fillCircle(77, 25, 20, SSD1327_BLACK);
   } else {
-    display.fillCircle(64, 14, 6, SSD1306_WHITE);
+    display.fillCircle(64, 36, 11, SSD1327_WHITE);
     for (uint8_t i = 0; i < 8; i++) {
       float angle = i * PI / 4;
-      display.drawLine(64 + lroundf(cosf(angle) * 9), 14 + lroundf(sinf(angle) * 9), 64 + lroundf(cosf(angle) * 12),
-                       14 + lroundf(sinf(angle) * 12), SSD1306_WHITE);
+      display.drawLine(64 + lroundf(cosf(angle) * 16), 36 + lroundf(sinf(angle) * 16), 64 + lroundf(cosf(angle) * 23),
+                       36 + lroundf(sinf(angle) * 23), SSD1327_WHITE);
     }
   }
-  printCentred("Sleep mode", 2, 32);
-  printCentred(sleepMode ? "on - LED off" : "off - LED on", 1, 54);
+  printCentred("Sleep mode", 2, 72);
+  printCentred(sleepMode ? "on - LED off" : "off - LED on", 1, 96);
   display.display();
 }
 
+/*
+  Screen layout, 128 x 128 pixels, the same as on the prototype's 0.96" display,
+  with more room:
+    y   1  "CO2 ppm"   (moon in sleep mode)        rating
+    y  28            CO2 value, large
+    y  80  ------------------------------------------------
+    y  96  temperature                             humidity
+*/
 void drawScreen() {
-  char text[12];
+  char text[16];
+  lastDraw = millis();
+  screenChanged = false;
   if (sleepMessageShown) {
     drawSleepMessage();
     return;
   }
   display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
 
   // Top line: label left, moon in sleep mode, rating right (inverted when the air is bad)
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.print(F("CO2 ppm"));
-  if (sleepMode) display.drawBitmap(53, 0, MOON_ICON, 8, 8, SSD1306_WHITE);
-  const char* rating = co2Rating(co2Ppm);
-  int16_t ratingX = OLED_WIDTH - strlen(rating) * 6;
+  printAt("CO2 ppm", 1, 0, 1);
+  if (sleepMode) display.drawBitmap(53, 1, MOON_ICON, 8, 8, SSD1327_WHITE);
+  const char *rating = co2Rating(co2Ppm);
   if (co2Ppm >= CO2_OK_BELOW) {
-    display.fillRect(ratingX - 2, 0, OLED_WIDTH - ratingX + 2, 9, SSD1306_WHITE);
-    display.setTextColor(SSD1306_BLACK);
+    int16_t ratingX = OLED_SIZE - textWidth(rating, 1);
+    display.fillRect(ratingX - 2, 0, OLED_SIZE - ratingX + 2, 10, SSD1327_WHITE);
+    printAt(rating, 1, ratingX, 1, SSD1327_BLACK);
+  } else {
+    printRight(rating, 1, 1);
   }
-  display.setCursor(ratingX, 1);
-  display.print(rating);
-  display.setTextColor(SSD1306_WHITE);
 
   // CO2 value, large and centred
   if (!scdFound) {
-    printCentred("SCD-41 missing", 1, 24);
+    printCentred("SCD-41 missing", 1, 41);
   } else if (warmingUp) {
-    printCentred("warming up", 1, 13);
+    printCentred("warming up", 1, 26);
     snprintf(text, sizeof text, "%u s", warmupSecondsLeft());
-    printCentred(text, 2, 26);
+    printCentred(text, 3, 42);
   } else if (co2Ppm > 0) {
     snprintf(text, sizeof text, "%u", co2Ppm);
-    printCentred(text, 3, 15);
+    if (strlen(text) <= 4) {
+      printCentred(text, 5, 28);  // 30 x 40 pixels per digit
+    } else {
+      printCentred(text, 4, 31);  // 10000 ppm and more: 5 digits only fit smaller
+    }
   } else {
-    printCentred("measuring...", 1, 24);  // first value after the warm-up, within 5 s
+    printCentred("measuring...", 1, 41);  // first value after the warm-up, within 5 s
   }
 
-  display.drawFastHLine(0, 44, OLED_WIDTH, SSD1306_WHITE);
+  display.drawFastHLine(0, 80, OLED_SIZE, SSD1327_WHITE);
 
   // Bottom line: temperature left, humidity right
-  display.setTextSize(2);
-  display.setCursor(0, 49);
   if (isnan(temperatureC)) {
-    display.print(F("--.-"));
+    strcpy(text, "--.-");
   } else {
     snprintf(text, sizeof text, "%.1f", temperatureC);
-    display.print(text);
   }
+  printAt(text, 2, 0, 96);
   int16_t unitX = display.getCursorX() + 3;
-  display.drawCircle(unitX, 50, 1, SSD1306_WHITE);  // degree sign
-  display.setTextSize(1);
-  display.setCursor(unitX + 3, 49);
-  display.print('C');
+  display.drawCircle(unitX, 97, 1, SSD1327_WHITE);  // degree sign
+  printAt("C", 1, unitX + 3, 96);
 
   if (isnan(humidityPct)) {
     strcpy(text, "--%");
   } else {
     snprintf(text, sizeof text, "%d%%", (int)lroundf(humidityPct));
   }
-  display.setTextSize(2);
-  display.setCursor(OLED_WIDTH - strlen(text) * 12, 49);
-  display.print(text);
+  printRight(text, 2, 96);
 
   display.display();
 }
@@ -351,7 +426,7 @@ void drawScreen() {
 void displayWake() {
   if (!displayFound) return;
   if (!displayOn) {
-    display.ssd1306_command(SSD1306_DISPLAYON);
+    display.oled_command(SSD1327_DISPLAYON);
     displayOn = true;
   }
   displayOnSince = millis();
@@ -360,7 +435,7 @@ void displayWake() {
 
 void displayOff() {
   if (!displayFound) return;
-  display.ssd1306_command(SSD1306_DISPLAYOFF);
+  display.oled_command(SSD1327_DISPLAYOFF);
   displayOn = false;
   sleepMessageShown = false;
 }
@@ -371,7 +446,7 @@ void setSleepMode(bool on) {
     sleepMode = on;
     settings.putBool("sleep", on);
     updateLed();
-    newData = true;  // adds or removes the moon if the display is on
+    screenChanged = true;  // adds or removes the moon if the display is on
   }
   Serial.println(on ? F("Sleep mode on: LED off") : F("Sleep mode off: LED on"));
 }
@@ -383,6 +458,8 @@ void toggleSleepMode() {
   sleepMessageSince = millis();
   displayWake();
 }
+
+// ---------- Sensors ----------
 
 bool initScd41() {
   scd4x.begin(Wire, SCD41_I2C_ADDR_62);
@@ -409,6 +486,33 @@ bool initScd41() {
   return scd4x.startPeriodicMeasurement() == 0;
 }
 
+// The BMP580's address depends on its jumper, so both are tried. begin() resets it,
+// checks its chip ID and starts it measuring on its own (normal mode).
+bool initBmp580() {
+  for (uint8_t address : {BMP580_ADDRESS_A, BMP580_ADDRESS_B}) {
+    if (bmp.begin(address, &Wire)) {
+      bmpAddress = address;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool initVeml7700() {
+  if (!veml.begin(&Wire)) return false;
+  // Finer steps than the library's gain 1/8, for dim rooms: 0.06 lux per step, up to
+  // about 3700 lux. A new value every 100 ms.
+  veml.setGain(VEML7700_GAIN_1);
+  return true;
+}
+
+// begin() ends with the sensor's self-test (about 0.5 s)
+bool initSgp40() {
+  if (!sgp.begin(&Wire)) return false;
+  VocAlgorithm_init(&vocAlgorithm);
+  return true;
+}
+
 void readSht45() {
   sensors_event_t humidity, temperature;
   if (sht4.getEvent(&humidity, &temperature)) {
@@ -418,7 +522,17 @@ void readSht45() {
     temperatureC = NAN;
     humidityPct = NAN;
   }
-  newData = true;
+  screenChanged = true;
+}
+
+void readBmp580() {
+  pressureHpa = bmp.performReading() ? bmp.pressure : NAN;
+}
+
+void readVeml7700() {
+  // The newest value, without waiting, with the library's correction for bright light
+  lightLux = veml.readLux(VEML_LUX_CORRECTED_NOWAIT);
+  lightTooBright = veml.readALS() == 0xFFFF;  // the same value again, raw
 }
 
 void readScd41() {
@@ -433,12 +547,91 @@ void readScd41() {
   if (warmingUp) return;  // read anyway, so the next value is a new one
 
   co2Ppm = co2;
-  newData = true;
+  screenChanged = true;
   updateLed();
-  historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);  // no pressure sensor yet
+  historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);  // pressure is not stored
 
   // "name:value" pairs can be read by people and by the Serial Plotter
-  Serial.printf("CO2_ppm:%u Temperature_C:%.2f Humidity_pct:%.1f\n", co2Ppm, temperatureC, humidityPct);
+  Serial.printf("CO2_ppm:%u Temperature_C:%.2f Humidity_pct:%.1f Pressure_hPa:%.2f Light_lux:%.1f VOC_index:%u\n",
+                co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex);
+}
+
+// Sensirion's checksum, sent and received after every 2 bytes
+uint8_t sensirionCrc(const uint8_t *data, uint8_t length) {
+  uint8_t crc = 0xFF;
+  for (uint8_t i = 0; i < length; i++) {
+    crc ^= data[i];
+    for (uint8_t bit = 0; bit < 8; bit++) crc = crc & 0x80 ? (crc << 1) ^ 0x31 : crc << 1;
+  }
+  return crc;
+}
+
+// The SGP40 library waits 250 ms for every reading. Here the reading is started, and
+// fetched SGP_MEASURE_MS later, so the button and the web page don't have to wait.
+// The SHT45's values compensate it (25 C and 50 %RH while there are none).
+bool startSgp40Reading() {
+  float t = isnan(temperatureC) ? 25 : constrain(temperatureC, -45.0f, 130.0f);
+  float rh = isnan(humidityPct) ? 50 : constrain(humidityPct, 0.0f, 100.0f);
+  uint16_t rhTicks = (uint16_t)(rh * 65535 / 100 + 0.5f);
+  uint16_t tTicks = (uint16_t)((t + 45) * 65535 / 175 + 0.5f);
+  uint8_t command[8] = {0x26, 0x0F, (uint8_t)(rhTicks >> 8), (uint8_t)rhTicks, 0, (uint8_t)(tTicks >> 8), (uint8_t)tTicks, 0};
+  command[4] = sensirionCrc(command + 2, 2);
+  command[7] = sensirionCrc(command + 5, 2);
+  Wire.beginTransmission(SGP40_ADDRESS);
+  Wire.write(command, sizeof command);
+  return Wire.endTransmission() == 0;
+}
+
+bool fetchSgp40Reading(uint16_t &raw) {
+  uint8_t reply[3];
+  if (Wire.requestFrom(SGP40_ADDRESS, (uint8_t)sizeof reply) != sizeof reply) return false;
+  for (uint8_t &b : reply) b = Wire.read();
+  if (sensirionCrc(reply, 2) != reply[2]) return false;
+  raw = (uint16_t)reply[0] << 8 | reply[1];
+  return true;
+}
+
+// One reading per second, also during the warm-up: the algorithm learns from every one
+void updateSgp40() {
+  if (!sgpFound) return;
+  if (sgpMeasuring) {
+    if (millis() - lastSgpStart < SGP_MEASURE_MS) return;
+    sgpMeasuring = false;
+    uint16_t raw;
+    if (!fetchSgp40Reading(raw)) return;
+    int32_t index = 0;
+    VocAlgorithm_process(&vocAlgorithm, raw, &index);
+    if (warmingUp) return;
+    vocRaw = raw;
+    vocIndex = index;
+  } else if (millis() - lastSgpStart >= SGP_INTERVAL_MS) {
+    lastSgpStart = millis();
+    sgpMeasuring = startSgp40Reading();
+  }
+}
+
+// Reads every sensor that is due. The SCD-41 is polled during the warm-up too, so its
+// first value after the warm-up is a new one.
+void readSensors() {
+  uint32_t now = millis();
+  if (scdFound && now - lastScdPoll >= SCD_POLL_INTERVAL_MS) {
+    lastScdPoll = now;
+    readScd41();
+  }
+  updateSgp40();
+  if (warmingUp) return;
+  if (shtFound && now - lastShtRead >= SHT_INTERVAL_MS) {
+    lastShtRead = now;
+    readSht45();
+  }
+  if (bmpFound && now - lastBmpRead >= BMP_INTERVAL_MS) {
+    lastBmpRead = now;
+    readBmp580();
+  }
+  if (vemlFound && now - lastVemlRead >= VEML_INTERVAL_MS) {
+    lastVemlRead = now;
+    readVeml7700();
+  }
 }
 
 // Counts the warm-up down on the display and ends it after WARMUP_TIME_MS
@@ -450,19 +643,30 @@ void updateWarmup() {
   if (left > 0) {
     if (left != secondsShown) {
       secondsShown = left;
-      newData = true;
+      screenChanged = true;
     }
     return;
   }
 
   warmingUp = false;
   Serial.println(F("Warm-up done, values are shown and saved from now on"));
+  // First values at once (the SGP40 and SCD-41 follow within 1 s and 5 s)
   if (shtFound) {
     lastShtRead = millis();
     readSht45();
   }
+  if (bmpFound) {
+    lastBmpRead = millis();
+    readBmp580();
+  }
+  if (vemlFound) {
+    lastVemlRead = millis();
+    readVeml7700();
+  }
   displayWake();  // shows the first values for DISPLAY_ON_TIME_MS
 }
+
+// ---------- Wi-Fi ----------
 
 void startWifi() {
   if (strlen(WIFI_SSID) == 0 || strcmp(WIFI_SSID, "your-wifi-name") == 0) {
@@ -471,6 +675,9 @@ void startWifi() {
   }
   WiFi.setHostname(WIFI_HOSTNAME);
   WiFi.mode(WIFI_STA);
+  if (USE_FIXED_IP && !WiFi.config(FIXED_IP, ROUTER_IP, SUBNET_MASK, ROUTER_IP)) {
+    Serial.println(F("Wi-Fi: the fixed address could not be set, the router gives one instead"));
+  }
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);  // connects in the background and reconnects by itself
   Serial.printf("Wi-Fi: connecting to \"%s\"\n", WIFI_SSID);
 }
@@ -495,6 +702,8 @@ void updateWifi() {
   }
 }
 
+// ---------- Serial Monitor ----------
+
 void printStatus() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("Wi-Fi: connected to \"%s\", signal %d dBm, web page at http://%s/\n", WIFI_SSID, WiFi.RSSI(),
@@ -502,7 +711,18 @@ void printStatus() {
   } else {
     Serial.println(F("Wi-Fi: not connected"));
   }
-  if (warmingUp) Serial.printf("Warm-up: %u s left\n", warmupSecondsLeft());
+  Serial.printf("Wi-Fi MAC address: %s (%s)\n", WiFi.macAddress().c_str(),
+                USE_FIXED_IP ? "fixed address" : "address from the router");
+  Serial.printf("Parts: display %s, SCD-41 %s, SHT45 %s, BMP580 %s", displayFound ? "ok" : "MISSING",
+                scdFound ? "ok" : "MISSING", shtFound ? "ok" : "MISSING", bmpFound ? "ok" : "MISSING");
+  if (bmpFound) Serial.printf(" (0x%02X)", bmpAddress);
+  Serial.printf(", SGP40 %s, VEML7700 %s\n", sgpFound ? "ok" : "MISSING", vemlFound ? "ok" : "MISSING");
+  if (warmingUp) {
+    Serial.printf("Warm-up: %u s left\n", warmupSecondsLeft());
+  } else {
+    Serial.printf("Now: %u ppm, %.2f C, %.1f %%RH, %.2f hPa, %.1f lux%s, VOC index %u (raw %u)\n", co2Ppm, temperatureC,
+                  humidityPct, pressureHpa, lightLux, lightTooBright ? " (or more)" : "", vocIndex, vocRaw);
+  }
   Serial.printf("Sleep mode: %s\n", sleepMode ? "on (LED off)" : "off");
   historyPrintStatus(Serial);
 }
@@ -551,6 +771,8 @@ void readSerialCommands() {
   }
 }
 
+// ---------- Start and main loop ----------
+
 void setup() {
   Serial.begin(115200);
   uint32_t start = millis();
@@ -571,23 +793,18 @@ void setup() {
   rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
   updateLed();
 
-  displayFound = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS, true, false);
+  displayFound = display.begin(OLED_ADDRESS);
   if (displayFound) {
     display.setRotation(OLED_ROTATION);
-    display.ssd1306_command(SSD1306_SETCONTRAST);
-    display.ssd1306_command(OLED_BRIGHTNESS);
+    display.setContrast(OLED_BRIGHTNESS);
     display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(2);
-    display.setCursor(28, 16);
-    display.print(F("CO2"));
-    display.setTextSize(1);
-    display.setCursor(28, 40);
-    display.print(F("starting..."));
+    printCentred("CO2", 3, 40);
+    printCentred("starting...", 1, 76);
     display.display();
     displayOn = true;
+    Serial.println(F("Display found"));
   } else {
-    Serial.println(F("OLED not found - check wiring and OLED_ADDRESS"));
+    Serial.println(F("Display not found - check wiring and OLED_ADDRESS"));
   }
 
   shtFound = sht4.begin(&Wire);
@@ -598,6 +815,19 @@ void setup() {
   } else {
     Serial.println(F("SHT45 not found - check wiring"));
   }
+
+  bmpFound = initBmp580();
+  if (bmpFound) {
+    Serial.printf("BMP580 found at 0x%02X\n", bmpAddress);
+  } else {
+    Serial.println(F("BMP580 not found - check wiring"));
+  }
+
+  vemlFound = initVeml7700();
+  Serial.println(vemlFound ? F("VEML7700 found") : F("VEML7700 not found - check wiring"));
+
+  sgpFound = initSgp40();
+  Serial.println(sgpFound ? F("SGP40 found, self-test passed") : F("SGP40 not found or self-test failed - check wiring"));
 
   scdFound = initScd41();
   if (scdFound) {
@@ -619,16 +849,8 @@ void loop() {
   updateWifi();
   historyLoop();
   updateWarmup();
-  webLoop({co2Ppm, temperatureC, humidityPct, warmupSecondsLeft(), sleepMode});
-
-  if (shtFound && !warmingUp && millis() - lastShtRead >= SHT_INTERVAL_MS) {
-    lastShtRead = millis();
-    readSht45();
-  }
-  if (scdFound && millis() - lastScdPoll >= SCD_POLL_INTERVAL_MS) {
-    lastScdPoll = millis();
-    readScd41();
-  }
+  readSensors();
+  webLoop({co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, warmupSecondsLeft(), sleepMode});
 
   if (displayOn) {
     if (sleepMessageShown && millis() - sleepMessageSince >= SLEEP_MESSAGE_MS) {
@@ -640,9 +862,8 @@ void loop() {
       }
     } else if (millis() - displayOnSince >= DISPLAY_ON_TIME_MS) {
       displayOff();
-    } else if (newData) {
+    } else if (screenChanged && millis() - lastDraw >= DISPLAY_REDRAW_MS) {
       drawScreen();
     }
   }
-  newData = false;
 }
