@@ -7,16 +7,16 @@
   - Warm-up: for the first 30 s after start-up the sensors measure, but no value
     is shown, printed or saved. The display counts down meanwhile.
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
-  - The RGB LED on the board shows the CO2 level all the time, dimmed:
+  - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 level all the time, dimmed:
     green -> yellow -> red.
-  - Sleep mode for the night: the RGB LED is off and the display shows a small moon.
+  - Sleep mode for the night: the LED is off and the display shows a small moon.
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
   - Wi-Fi gets the time from the internet. The values are stored in the flash
-    as 1-minute, 5-minute and hourly averages (history.h explains how).
+    as 1-minute and 5-minute averages (history.h explains how).
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
-  - Serial Monitor commands: status, files, csv m1|m5|h1 [days], save, sleep on|off
+  - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off, led
 
   The sensors keep measuring while the display is off and in sleep mode. This matters for the
   SCD-41's automatic self-calibration, which needs uninterrupted operation.
@@ -24,7 +24,7 @@
   Libraries (Arduino IDE -> Library Manager):
     Adafruit SSD1306, Adafruit SHT4x Library, Sensirion I2C SCD4x
   Board: "ESP32C6 Dev Module" (esp32 by Espressif Systems)
-    Flash Size "8MB", Partition Scheme "8M with spiffs (3MB APP/1.5MB SPIFFS)"
+    Flash Size "16MB", Partition Scheme "16M Flash (3MB APP/9.9MB FATFS)"
   Wi-Fi: copy secrets_example.h to secrets.h and enter your network there.
 */
 
@@ -45,9 +45,10 @@
 #endif
 
 // ---------- Pins ----------
-constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 5
-constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 6
-constexpr uint8_t BUTTON_PIN = 2;    // J1 pin 12, the other side of the button goes to GND
+constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 12 (pin 1 = USB end)
+constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 11
+constexpr uint8_t BUTTON_PIN = 2;    // J1 pin 5, the other side of the button goes to GND
+constexpr uint8_t LED_PIN = 18;      // J3 pin 7, DIN of the 8 mm LED (its VDD to 5V, GND to GND)
 
 // ---------- Display ----------
 constexpr uint8_t OLED_ADDRESS = 0x3C;  // 0x3D if the address resistor on the back was moved
@@ -75,9 +76,13 @@ constexpr uint16_t CO2_GOOD_BELOW = 800;
 constexpr uint16_t CO2_OK_BELOW = 1000;
 constexpr uint16_t CO2_VENTILATE_BELOW = 2000;
 
-// ---------- RGB LED (on the board, GPIO8) ----------
+// ---------- LED ----------
+// The 8 mm LED on LED_PIN shows the CO2 colour.
 // Brightness 1-255, 0 = LED off. For comparison, the BlinkRGB example uses 64.
 constexpr uint8_t LED_BRIGHTNESS = 5;
+// true = the board's own RGB LED (GPIO8) shows the colour as well, handy while the 8 mm
+// LED is not wired yet. In the case the board's LED faces the floor, so it stays off there.
+constexpr bool BOARD_LED_TOO = false;
 
 struct LedColour {
   uint8_t r, g, b;
@@ -195,10 +200,52 @@ uint8_t dimmed(uint8_t value) {
   return (value * LED_BRIGHTNESS + 127) / 255;
 }
 
+// Sends a colour to the 8 mm LED. The PL9823 takes 24 bits like the board's WS2812B, but
+// red first and slower: a 1 is 1.35 us high and 0.35 us low, a 0 the other way round.
+// rgbLedWrite() uses the WS2812B's faster timing, so the RMT peripheral sends the bits
+// here directly, at 20 MHz (one tick = 0.05 us).
+void pl9823Write(uint8_t r, uint8_t g, uint8_t b) {
+  static bool ready = false;
+  if (!ready) {
+    ready = rmtInit(LED_PIN, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 20000000);
+    if (!ready) {
+      Serial.println(F("LED: RMT start failed on LED_PIN"));
+      return;
+    }
+  }
+  uint32_t colour = (uint32_t)r << 16 | (uint32_t)g << 8 | b;
+  rmt_data_t bits[24];
+  for (uint8_t i = 0; i < 24; i++) {
+    bool one = colour & (1UL << (23 - i));
+    bits[i].level0 = 1;
+    bits[i].duration0 = one ? 27 : 7;
+    bits[i].level1 = 0;
+    bits[i].duration1 = one ? 7 : 27;
+  }
+  rmtWrite(LED_PIN, bits, RMT_SYMBOLS_OF(bits), RMT_WAIT_FOR_EVER);
+}
+
 // LED off until the first CO2 value arrives, and in sleep mode
 void updateLed() {
   LedColour colour = co2Ppm > 0 && !sleepMode ? co2Colour(co2Ppm) : LedColour{0, 0, 0};
-  rgbLedWrite(RGB_BUILTIN, dimmed(colour.r), dimmed(colour.g), dimmed(colour.b));
+  uint8_t r = dimmed(colour.r), g = dimmed(colour.g), b = dimmed(colour.b);
+  pl9823Write(r, g, b);
+  if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, r, g, b);
+}
+
+// Serial Monitor command "led": red, green and blue for 1 s each, then back to the CO2
+// colour. Shows that the LED is wired right and that its colours come in the right order.
+void testLed() {
+  const LedColour steps[] = {{40, 0, 0}, {0, 40, 0}, {0, 0, 40}};
+  const char *names[] = {"red", "green", "blue"};
+  for (uint8_t i = 0; i < 3; i++) {
+    Serial.printf("LED test: %s\n", names[i]);
+    pl9823Write(steps[i].r, steps[i].g, steps[i].b);
+    if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, steps[i].r, steps[i].g, steps[i].b);
+    delay(1000);
+  }
+  updateLed();
+  Serial.println(F("LED test done"));
 }
 
 // Seconds of warm-up left, rounded up. 0 once it is over.
@@ -473,7 +520,7 @@ void runCommand(char *line) {
     historyPrintFiles(Serial);
   } else if (strcmp(command, "csv") == 0) {
     if (!option || !historyPrintCsv(Serial, option, days ? atoi(days) : 1)) {
-      Serial.println(F("Use: csv m1|m5|h1 [days], for example \"csv m1 1\""));
+      Serial.println(F("Use: csv m1|m5 [days], for example \"csv m1 1\""));
     }
   } else if (strcmp(command, "save") == 0) {
     Serial.println(historySave() ? F("History saved") : F("Not saved - see \"status\""));
@@ -481,8 +528,10 @@ void runCommand(char *line) {
     setSleepMode(true);
   } else if (strcmp(command, "sleep") == 0 && option && strcmp(option, "off") == 0) {
     setSleepMode(false);
+  } else if (strcmp(command, "led") == 0) {
+    testLed();
   } else {
-    Serial.println(F("Commands: status, files, csv m1|m5|h1 [days], save, sleep on|off"));
+    Serial.println(F("Commands: status, files, csv m1|m5 [days], save, sleep on|off, led"));
   }
 }
 
@@ -518,7 +567,8 @@ void setup() {
   sleepMode = settings.getBool("sleep", false);
   if (sleepMode) Serial.println(F("Sleep mode on: LED off"));
 
-  // The LED keeps its last colour through a reset (for example from BlinkRGB), so clear it
+  // Both LEDs keep their last colour through a reset (for example from BlinkRGB), so clear them
+  rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
   updateLed();
 
   displayFound = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS, true, false);

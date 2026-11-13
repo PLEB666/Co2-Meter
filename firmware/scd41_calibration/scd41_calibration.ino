@@ -22,9 +22,9 @@
 #include <Adafruit_SSD1306.h>
 #include <SensirionI2cScd4x.h>
 
-constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 5
-constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 6
-constexpr uint8_t BUTTON_PIN = 2;    // J1 pin 12
+constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 12 (pin 1 = USB end)
+constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 11
+constexpr uint8_t BUTTON_PIN = 2;    // J1 pin 5
 constexpr uint8_t OLED_ADDRESS = 0x3C;
 constexpr uint8_t OLED_ROTATION = 0;  // same value as in co2_monitor
 

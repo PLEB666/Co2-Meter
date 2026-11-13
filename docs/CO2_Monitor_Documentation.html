@@ -61,7 +61,7 @@
 
   figure { margin: 8px 0 14px; break-inside: avoid; }
   figure svg { display: block; width: 100%; height: auto; }
-  #pinout figure svg { max-width: 130mm; margin: 0 auto; }
+  #pinout figure svg { max-width: 150mm; margin: 0 auto; }
   #case > figure svg { max-width: 150mm; margin: 0 auto; }
   figcaption { font-size: 8.5pt; color: var(--muted); margin-top: 4px; }
 
@@ -105,9 +105,9 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.26: USB-C opening sized to the cables</span>
-    <span><b>Updated</b> 7 Nov 2026</span>
-    <span><b>Status</b> case v5 designed, its parts ordered; firmware still on the prototype</span>
+    <span><b>Version</b> 0.30: the firmware drives the 8&nbsp;mm LED on GPIO18, new LED wiring diagram</span>
+    <span><b>Updated</b> 13 Nov 2026</span>
+    <span><b>Status</b> case v5 designed, its parts ordered; prototype firmware running on the Waveshare board</span>
   </div>
 </header>
 
@@ -133,7 +133,7 @@
   <h2><span class="n">1</span>Project overview</h2>
   <p><b>Step 1 goal:</b> the OLED shows the temperature and humidity from the <b>SHT45</b> and the CO<sub>2</sub> concentration from the <b>SCD-41</b>. To save power and prevent OLED burn-in, the display switches off after <b>30 seconds</b>. A <b>button</b> wakes it for another 30 seconds. The sensors keep measuring while the display is off, and a dimmed <b>RGB LED</b> shows the CO<sub>2</sub> level all the time as a colour from green through yellow to red.</p>
 
-  <p><b>Step 2:</b> the monitor joins your Wi-Fi, gets the time from the internet and keeps a <b>history</b> of the values in its own flash memory: 1-minute values for 7 days, 5-minute values for 90 days and hourly values for about 3&frac12; years (<a href="#history">section 7</a>).</p>
+  <p><b>Step 2:</b> the monitor joins your Wi-Fi, gets the time from the internet and keeps a <b>history</b> of the values in its own flash memory: 1-minute values for 14 days and 5-minute values for 3 years (<a href="#history">section 7</a>).</p>
 
   <p><b>Step 3:</b> the monitor serves its own <b>web page</b>. Any browser on the home network shows the live values, graphs of any stored day and time range, and a CSV download, in light or dark mode (<a href="#webpage">section 8</a>). A <b>sleep mode</b> for the night switches the RGB LED off and shows a small moon on the display; a long press on the button or a switch on the web page turns it on and off (<a href="#sleepmode">section 6</a>).</p>
 
@@ -221,7 +221,7 @@
   <h3>Project files</h3>
   <table>
     <tr><th>File</th><th>Purpose</th></tr>
-    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program (step 3): sensors &rarr; display, button wake, 30&nbsp;s timeout, CO<sub>2</sub> colour on the RGB LED, sleep mode, serial output, Wi-Fi and internet time, Serial Monitor commands.</td></tr>
+    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program (step 3): sensors &rarr; display, button wake, 30&nbsp;s timeout, CO<sub>2</sub> colour on the 8&nbsp;mm LED, sleep mode, serial output, Wi-Fi and internet time, Serial Monitor commands.</td></tr>
     <tr><td><code>firmware/co2_monitor/history.h</code>, <code>history.cpp</code></td><td>History storage in the flash (section 7). The Arduino IDE shows them as tabs next to the main program.</td></tr>
     <tr><td><code>firmware/co2_monitor/web.h</code>, <code>web.cpp</code></td><td>Web server: the page and the data addresses it uses (section 8).</td></tr>
     <tr><td><code>firmware/co2_monitor/web/index.html</code>, <code>make_web_page.ps1</code>, <code>../web_page.h</code></td><td>The web page; the script packs it into <code>web_page.h</code>, the compressed copy the firmware serves (8.6).</td></tr>
@@ -232,8 +232,8 @@
     <tr><td><code>docs/CO2_Monitor_Documentation.html</code></td><td>This document (source).</td></tr>
     <tr><td><code>docs/CO2_Monitor_Documentation.pdf</code></td><td>PDF version, regenerated from the HTML after every change.</td></tr>
     <tr><td><code>docs/build_pdf.ps1</code></td><td>Script that turns the HTML into the PDF (uses Chrome or Edge in headless mode).</td></tr>
-    <tr><td><code>docs/web_page.png</code></td><td>Screenshot of the web page (Figure 5).</td></tr>
-    <tr><td><code>docs/case_v5_*.png</code></td><td>Pictures of the case model (Figures 7-11). The <code>case_v4_*.png</code> pictures belong to the earlier v4 model.</td></tr>
+    <tr><td><code>docs/web_page.png</code></td><td>Screenshot of the web page (Figure 6).</td></tr>
+    <tr><td><code>docs/case_v5_*.png</code></td><td>Pictures of the case model (Figures 8-12). The <code>case_v4_*.png</code> pictures belong to the earlier v4 model.</td></tr>
     <tr><td><code>cad/adafruit/*.step</code>, <code>LICENSE</code></td><td>Adafruit's 3D models of the sensor and speaker boards (MIT licence), the reference for the case model (section 13).</td></tr>
     <tr><td><code>cad/case_v5.py</code>, <code>viewer_template.html</code>, <code>requirements.txt</code></td><td>The case model, design v5 (section 13): one Python script with every size. It writes the STEP files for the printer, STL files and a 3D viewer page into <code>cad/out/v5/</code>.</td></tr>
     <tr><td><code>cad/test_pieces_v5.py</code></td><td>Cuts small test pieces out of the v5 base (section 13, <i>Printing at school</i>) and writes their STL files into <code>cad/out/v5/test_pieces/</code>.</td></tr>
@@ -257,7 +257,7 @@
     <tr><td class="c">7</td><td><b>Adafruit SGP40</b> (4829)</td><td>Air quality (VOC index)</td><td>I&sup2;C <code>0x59</code>, STEMMA QT</td><td>3-5&nbsp;V</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td class="c">8</td><td><b>Adafruit STEMMA Speaker</b> (3885)</td><td>Alarm beeps</td><td>GPIO3 (PWM), 3-pin JST PH</td><td>5&nbsp;V</td><td><span class="st have">have</span></td></tr>
     <tr><td class="c">9</td><td><b>Panel button</b>, Berrybase 10130 (red)</td><td>Wakes the display, switches sleep mode</td><td>GPIO2</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
-    <tr><td class="c">10</td><td><b>8&nbsp;mm addressable LED</b>, Berrybase PL9823-F8 (diffused), with a <b>1N4148</b> diode</td><td>CO<sub>2</sub> colour on the front</td><td>GPIO18 (one data wire)</td><td>5&nbsp;V through the diode</td><td><span class="st ord">ordered</span></td></tr>
+    <tr><td class="c">10</td><td><b>8&nbsp;mm addressable LED</b>, Berrybase PL9823-F8 (diffused)</td><td>CO<sub>2</sub> colour on the front</td><td>GPIO18 (one data wire)</td><td>5&nbsp;V</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td class="c">11</td><td>STEMMA QT cables, plug to plug, 2 &times; 50&nbsp;mm</td><td>Chain: SHT45 to SCD-41, BMP580 to light sensor</td><td>JST SH 1.0&nbsp;mm</td><td>-</td><td><span class="st have">have</span></td></tr>
     <tr><td class="c">12</td><td>STEMMA QT cables, plug to plug, 100&nbsp;mm and 200&nbsp;mm</td><td>Chain: light sensor to SHT45, SCD-41 to display</td><td>JST SH 1.0&nbsp;mm</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td class="c">13</td><td>STEMMA QT cable with female sockets, 150&nbsp;mm (Adafruit 4397)</td><td>ESP32 pins to the first sensor</td><td>JST SH 1.0&nbsp;mm</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
@@ -283,60 +283,168 @@
 <section id="pinout" class="newpage">
   <h2><span class="n">3</span>ESP32-C6 pin diagram</h2>
   <figure>
-    <svg id="pinout-svg" viewBox="0 0 760 692" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Waveshare ESP32-C6-DEV-KIT-N16 pinout">
+    <svg id="pinout-svg" viewBox="0 0 760 730" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Waveshare ESP32-C6-DEV-KIT-N16 pinout">
+      <defs>
+        <!-- 5V feeds two parts: half speaker, half 8 mm LED -->
+        <linearGradient id="pin-split" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0.5" stop-color="#8250df"/><stop offset="0.5" stop-color="#1a7f37"/>
+        </linearGradient>
+      </defs>
       <g id="pin-legend"></g>
-      <text x="380" y="30" text-anchor="middle" font-size="10" fill="#57606a">antenna: keep metal away</text>
-      <rect x="290" y="88" width="180" height="564" rx="8" fill="#22272e"/>
-      <rect x="318" y="40" width="124" height="200" rx="3" fill="#30363d" stroke="#57606a"/>
-      <path d="M332,82 h12 v-30 h12 v30 h12 v-30 h12 v30 h12 v-30 h12 v30 h12 v-30 h12 v30" fill="none" stroke="#d4a72c" stroke-width="2"/>
-      <rect x="326" y="98" width="108" height="134" rx="2" fill="#c9ced6"/>
-      <text x="380" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="#30363d">ESP32-C6</text>
-      <text x="380" y="176" text-anchor="middle" font-size="9.5" fill="#30363d">WROOM-1</text>
-      <rect x="296" y="100" width="18" height="504" rx="2" fill="#0d1117"/>
-      <rect x="446" y="100" width="18" height="504" rx="2" fill="#0d1117"/>
-      <text x="380" y="400" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">ESP32-C6-DEV-KIT-N16</text>
-      <text x="380" y="418" text-anchor="middle" font-size="10" fill="#c9d1d9">Waveshare &middot; 16 MB flash</text>
-      <text x="380" y="458" text-anchor="middle" font-size="9.5" fill="#c9d1d9">BOOT button = GPIO9</text>
-      <text x="380" y="474" text-anchor="middle" font-size="9.5" fill="#c9d1d9">RGB LED = GPIO8</text>
-      <text x="380" y="490" text-anchor="middle" font-size="9.5" fill="#c9d1d9">RESET button = EN</text>
-      <text x="305" y="622" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">J1</text>
-      <text x="455" y="622" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">J3</text>
-      <rect x="362" y="644" width="36" height="22" rx="5" fill="#b0b8c1" stroke="#6e7781"/>
-      <text x="380" y="684" text-anchor="middle" font-size="10" fill="#57606a">1 &times; USB-C: native USB and a USB-serial chip (CH343P), joined by a hub chip</text>
+      <text x="380" y="58" text-anchor="middle" font-size="10" fill="#57606a">antenna: keep metal away</text>
+      <rect x="290" y="116" width="180" height="564" rx="8" fill="#22272e"/>
+      <rect x="318" y="68" width="124" height="200" rx="3" fill="#30363d" stroke="#57606a"/>
+      <path d="M332,110 h12 v-30 h12 v30 h12 v-30 h12 v30 h12 v-30 h12 v30 h12 v-30 h12 v30" fill="none" stroke="#8c959f" stroke-width="2"/>
+      <rect x="326" y="126" width="108" height="134" rx="2" fill="#c9ced6"/>
+      <text x="380" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#30363d">ESP32-C6</text>
+      <text x="380" y="204" text-anchor="middle" font-size="9.5" fill="#30363d">WROOM-1</text>
+      <rect x="293" y="128" width="22" height="504" rx="2" fill="#0d1117"/>
+      <rect x="445" y="128" width="22" height="504" rx="2" fill="#0d1117"/>
+      <text x="380" y="300" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">ESP32-C6-</text>
+      <text x="380" y="316" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">DEV-KIT-N16</text>
+      <text x="380" y="334" text-anchor="middle" font-size="10" fill="#c9d1d9">Waveshare &middot; 16 MB</text>
+      <!-- on-board RGB LED on GPIO8 (J1-8) -->
+      <rect x="312" y="394.5" width="20" height="3" fill="#f778ba"/>
+      <circle cx="339" cy="396" r="14" fill="#bf3989" opacity="0.35"/>
+      <rect x="332" y="389" width="14" height="14" rx="2" fill="#f6f8fa" stroke="#f778ba" stroke-width="2"/>
+      <circle cx="339" cy="396" r="3.5" fill="#bf3989"/>
+      <text x="357" y="394" font-size="11" font-weight="700" fill="#f778ba">RGB LED</text>
+      <text x="357" y="406" font-size="9" fill="#c9d1d9">on the board</text>
+      <!-- BOOT button on GPIO9 (J3-6) -->
+      <rect x="432" y="459.25" width="16" height="1.5" fill="#8c959f"/>
+      <rect x="418" y="453" width="14" height="14" rx="2" fill="#57606a" stroke="#8c959f"/>
+      <circle cx="425" cy="460" r="4" fill="#8c959f"/>
+      <text x="412" y="458" text-anchor="end" font-size="10" fill="#c9d1d9">BOOT</text>
+      <text x="412" y="470" text-anchor="end" font-size="9" fill="#c9d1d9">button</text>
+      <text x="380" y="556" text-anchor="middle" font-size="9.5" fill="#c9d1d9">RESET button = RST</text>
+      <text x="304" y="652" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">J1</text>
+      <text x="456" y="652" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">J3</text>
+      <rect x="362" y="672" width="36" height="22" rx="5" fill="#b0b8c1" stroke="#6e7781"/>
+      <text x="380" y="718" text-anchor="middle" font-size="10" fill="#57606a">1 &times; USB-C: native USB and a USB-serial chip (CH343P), joined by a hub chip</text>
       <g id="pin-rows"></g>
     </svg>
-    <figcaption>Figure 2: The Waveshare ESP32-C6-DEV-KIT-N16 from the top, antenna up, USB down. In the case it lies upside down (section 13). It has the same two pin rows, in the same order, as Espressif's DevKitC-1 on the prototype, so the firmware's pins don't change. Green = used in the case. "LP" = low-power GPIO (can wake the chip from deep sleep). The drawing is schematic, not to scale; the labels printed on your board are what counts.</figcaption>
+    <figcaption>Figure 2: The Waveshare ESP32-C6-DEV-KIT-N16 from the top, antenna up, USB down. <b>Pin 1 of each row is at the USB end.</b> In the case the board lies upside down (section 13). It has the same two pin rows, in the same order, as Espressif's DevKitC-1 on the prototype, so the firmware's pins don't change. <b>Coloured pins are in use</b>, and the colour shows the part they lead to; the 5V pin feeds both the speaker and the 8&nbsp;mm LED. <b>White pins are free</b>; a dashed outline means use with care (list below). "LP" = low-power GPIO (can wake the chip from deep sleep). The drawing is schematic, not to scale; the labels printed on your board are what counts.</figcaption>
   </figure>
 
   <h3>Pins used in the case</h3>
   <table>
     <tr><th>Header pin</th><th>Signal</th><th>Used for</th><th>Wire</th><th>In the firmware</th></tr>
-    <tr><td>J1-1</td><td><b>3V3</b></td><td>3.3&nbsp;V supply for the I&sup2;C chain</td><td rowspan="4">STEMMA QT cable with female sockets: red, black, blue, yellow</td><td rowspan="4">yes</td></tr>
-    <tr><td>J3-1</td><td><b>GND</b></td><td>Ground for the I&sup2;C chain</td></tr>
-    <tr><td>J3-5</td><td><b>GPIO23</b></td><td>I&sup2;C SDA (Arduino default for ESP32-C6)</td></tr>
-    <tr><td>J3-6</td><td><b>GPIO22</b></td><td>I&sup2;C SCL (Arduino default for ESP32-C6)</td></tr>
-    <tr><td>J1-12</td><td><b>GPIO2</b></td><td>Panel button (internal pull-up, pressed = LOW)</td><td rowspan="2">jumper wire to each lug</td><td rowspan="2">yes</td></tr>
-    <tr><td>J3-15</td><td><b>GND</b></td><td>Panel button, other lug</td></tr>
-    <tr><td>J1-13</td><td><b>GPIO3</b></td><td>Speaker SIG (tones by PWM)</td><td rowspan="3">JST PH 3-pin cable; the LED's 5&nbsp;V wire is joined to it</td><td rowspan="3">later</td></tr>
-    <tr><td>J1-14</td><td><b>5V</b></td><td>Speaker +, and the LED's VDD through the 1N4148</td></tr>
-    <tr><td>J1-15</td><td><b>GND</b></td><td>Speaker &minus;</td></tr>
-    <tr><td>J3-10</td><td><b>GPIO18</b></td><td>8&nbsp;mm LED, DIN</td><td rowspan="2">jumper wires</td><td rowspan="2">later</td></tr>
-    <tr><td>J3-12</td><td><b>GND</b></td><td>8&nbsp;mm LED, GND</td></tr>
-    <tr><td>(J1-9)</td><td><b>GPIO8</b></td><td>On-board RGB LED, the CO<sub>2</sub> colour in today's firmware. In the case it faces the floor.</td><td>no wire</td><td>yes, until GPIO18 takes over</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#0969da"></span>J1-16</td><td><b>3V3</b></td><td>3.3&nbsp;V supply for the I&sup2;C chain</td><td rowspan="4">STEMMA QT cable with female sockets: red, black, blue, yellow</td><td rowspan="4">yes</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#0969da"></span>J3-16</td><td><b>GND</b></td><td>Ground for the I&sup2;C chain</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#0969da"></span>J3-12</td><td><b>GPIO23</b></td><td>I&sup2;C SDA (Arduino default for ESP32-C6)</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#0969da"></span>J3-11</td><td><b>GPIO22</b></td><td>I&sup2;C SCL (Arduino default for ESP32-C6)</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#bc4c00"></span>J1-5</td><td><b>GPIO2</b></td><td>Panel button (internal pull-up, pressed = LOW)</td><td rowspan="2">jumper wire to each lug</td><td rowspan="2">yes</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#bc4c00"></span>J3-2</td><td><b>GND</b></td><td>Panel button, other lug</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#8250df"></span>J1-4</td><td><b>GPIO3</b></td><td>Speaker SIG (tones by PWM)</td><td rowspan="3">JST PH 3-pin cable; the LED's 5&nbsp;V wire is joined to it</td><td rowspan="3">later</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:linear-gradient(90deg,#8250df 50%,#1a7f37 50%)"></span>J1-3</td><td><b>5V</b></td><td>Speaker +, and the LED's VDD</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#8250df"></span>J1-2</td><td><b>GND</b></td><td>Speaker &minus;</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#1a7f37"></span>J3-7</td><td><b>GPIO18</b></td><td>8&nbsp;mm LED, DIN</td><td rowspan="2">jumper wires (Figure 3)</td><td rowspan="2">yes</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#1a7f37"></span>J3-5</td><td><b>GND</b></td><td>8&nbsp;mm LED, GND</td></tr>
+    <tr><td class="nowrap"><span class="sw" style="background:#bf3989"></span>(J1-8)</td><td><b>GPIO8</b></td><td>On-board RGB LED. It stays off now that the CO<sub>2</sub> colour is on GPIO18. In the case it faces the floor.</td><td>no wire</td><td>only with <code>BOARD_LED_TOO</code></td></tr>
   </table>
   <p class="muted">Upside down in the case, J1 lies along the sensor chamber's double wall and J3 along the compartment's. None of these is a strapping pin. Still to do in the firmware when the parts are here:</p>
   <ul class="muted">
     <li>The display moves to the 1.5" OLED: the SSD1327 driver (Adafruit_SSD1327 library) at 0x3D, turned 90&deg; with <code>setRotation()</code>, and a new 128&nbsp;&times;&nbsp;128 screen layout.</li>
-    <li>The CO<sub>2</sub> colour moves from the on-board RGB LED (GPIO8) to the LED on GPIO18, with red and green swapped for the PL9823.</li>
     <li>The speaker, BMP580, light sensor and SGP40 are added. Read the light sensor while the LED is off for 25-50&nbsp;ms (too short to see), so the LED's own light doesn't count.</li>
   </ul>
+
+  <h3>Wiring the 8&nbsp;mm LED</h3>
+  <p>The PL9823-F8 has a small chip inside, like the board's own RGB LED, so it needs <b>no resistors</b> and only one data wire: <b>DIN to GPIO18, VDD straight to 5V, GND to GND</b> (Figure 3). DOUT is only for a second LED and stays free. The two middle legs are the supply, and swapping VDD and GND can destroy the LED, so find the longest leg (GND) first. Test it on the breadboard before it goes into the case: the Serial Monitor command <code>led</code> (7.6) shows red, green and blue for 1&nbsp;s each.</p>
+  <figure>
+    <svg viewBox="0 20 760 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Wiring of the PL9823-F8 LED to the ESP32" font-family="Segoe UI, system-ui, sans-serif">
+      <!-- ESP32 -->
+      <rect x="20" y="30" width="174" height="170" rx="8" fill="#e7f5ee" stroke="#1a7f37" stroke-width="1.5"/>
+      <g text-anchor="middle">
+        <text x="107" y="54" font-size="12" font-weight="700" fill="#1f2328">ESP32-C6</text>
+        <text x="107" y="69" font-size="10.5" fill="#57606a">Waveshare DEV-KIT-N16</text>
+      </g>
+      <g font-size="10.5" fill="#1f2328" text-anchor="end">
+        <text x="180" y="109"><tspan font-weight="700">GPIO18</tspan><tspan fill="#57606a"> J3-7</tspan></text>
+        <text x="180" y="139"><tspan font-weight="700">5V</tspan><tspan fill="#57606a"> J1-3</tspan></text>
+        <text x="180" y="169"><tspan font-weight="700">GND</tspan><tspan fill="#57606a"> J3-5</tspan></text>
+      </g>
+      <g fill="#22272e">
+        <rect x="186" y="101" width="8" height="8" rx="1"/>
+        <rect x="186" y="131" width="8" height="8" rx="1"/>
+        <rect x="186" y="161" width="8" height="8" rx="1"/>
+      </g>
+      <!-- wires -->
+      <g stroke-width="3" stroke-linecap="round" fill="none">
+        <line x1="194" y1="105" x2="390" y2="105" stroke="#1e63d6"/>
+        <line x1="194" y1="135" x2="372" y2="135" stroke="#d32f2f"/>
+        <line x1="194" y1="165" x2="330" y2="165" stroke="#24292f"/>
+      </g>
+      <g font-size="10" fill="#57606a" text-anchor="middle">
+        <text x="262" y="99">3.3 V data</text>
+        <text x="262" y="129">5 V</text>
+      </g>
+      <!-- legs, lengths as in the PL9823-F8 drawing: DIN shortest, GND longest -->
+      <g stroke="#8c959f" stroke-width="3" stroke-linecap="round">
+        <line x1="390" y1="105" x2="482" y2="105"/>
+        <line x1="372" y1="135" x2="482" y2="135"/>
+        <line x1="330" y1="165" x2="482" y2="165"/>
+        <line x1="352" y1="195" x2="482" y2="195"/>
+      </g>
+      <circle cx="390" cy="105" r="4" fill="#1e63d6"/>
+      <circle cx="372" cy="135" r="4" fill="#d32f2f"/>
+      <circle cx="330" cy="165" r="4" fill="#24292f"/>
+      <g font-size="10" fill="#1f2328">
+        <text x="398" y="99"><tspan fill="#57606a">1</tspan> <tspan font-weight="700">DIN</tspan> (shortest)</text>
+        <text x="398" y="129"><tspan fill="#57606a">2</tspan> <tspan font-weight="700">VDD</tspan></text>
+        <text x="398" y="159"><tspan fill="#57606a">3</tspan> <tspan font-weight="700">GND</tspan> (longest)</text>
+        <text x="398" y="189"><tspan fill="#57606a">4</tspan> <tspan font-weight="700">DOUT</tspan></text>
+      </g>
+      <text x="344" y="199" text-anchor="end" font-size="10" fill="#57606a">not connected</text>
+      <!-- the LED lying on its side, dome to the right; the rim is cut flat on the DOUT side -->
+      <rect x="480" y="76" width="10" height="140" rx="2" fill="#eef1f5" stroke="#8c959f" stroke-width="1.5"/>
+      <path d="M490,84 H588 A66,66 0 0 1 588,216 H490 Z" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+      <line x1="479" y1="216" x2="491" y2="216" stroke="#1f2328" stroke-width="2.5"/>
+      <text x="485" y="232" text-anchor="middle" font-size="10" font-weight="700" fill="#1f2328">flat</text>
+      <g text-anchor="middle">
+        <text x="560" y="146" font-size="12" font-weight="700" fill="#1f2328">PL9823-F8</text>
+        <text x="560" y="162" font-size="10" fill="#57606a">8 mm, diffused</text>
+      </g>
+      <!-- the LED seen from the legs, same way round as above -->
+      <text x="515" y="262" text-anchor="end" font-size="10.5" font-weight="700" fill="#1f2328">seen from the legs</text>
+      <path d="M545.9,326 A40,40 0 1 1 588.1,326 Z" fill="#eef1f5" stroke="#8c959f" stroke-width="1.5"/>
+      <line x1="545.9" y1="326" x2="588.1" y2="326" stroke="#1f2328" stroke-width="2.5"/>
+      <g stroke="#8c959f" stroke-width="1">
+        <line x1="571" y1="271" x2="615" y2="271"/>
+        <line x1="571" y1="285" x2="615" y2="285"/>
+        <line x1="571" y1="299" x2="615" y2="299"/>
+        <line x1="571" y1="313" x2="615" y2="313"/>
+      </g>
+      <g fill="#8c959f" stroke="#57606a" stroke-width="1">
+        <circle cx="567" cy="271" r="3.5"/>
+        <circle cx="567" cy="285" r="3.5"/>
+        <circle cx="567" cy="299" r="3.5"/>
+        <circle cx="567" cy="313" r="3.5"/>
+      </g>
+      <g font-size="10" fill="#1f2328">
+        <text x="620" y="274.5"><tspan fill="#57606a">1</tspan> <tspan font-weight="700">DIN</tspan></text>
+        <text x="620" y="288.5"><tspan fill="#57606a">2</tspan> <tspan font-weight="700">VDD</tspan></text>
+        <text x="620" y="302.5"><tspan fill="#57606a">3</tspan> <tspan font-weight="700">GND</tspan></text>
+        <text x="620" y="316.5"><tspan fill="#57606a">4</tspan> <tspan font-weight="700">DOUT</tspan></text>
+      </g>
+      <text x="567" y="343" text-anchor="middle" font-size="10" font-weight="700" fill="#1f2328">flat side</text>
+      <!-- how to find the legs -->
+      <g font-size="10.5" fill="#1f2328">
+        <text x="20" y="262" font-weight="700">Which way round</text>
+        <text x="20" y="280">The rim has a flat side next to DOUT.</text>
+        <text x="20" y="296">GND is the longest leg, DIN the shortest.</text>
+        <text x="20" y="312">From the flat side: DOUT, GND, VDD, DIN.</text>
+      </g>
+    </svg>
+    <figcaption>Figure 3: The 8&nbsp;mm LED (PL9823-F8) on the ESP32. Schematic, not to scale; the wire colours are only examples. The leg order and lengths come from the PL9823-F8's drawing, the flat side from the data sheet of the 5&nbsp;mm PL9823: both put the long legs (GND, DOUT) on the same side. The 5V pin also feeds the speaker's + wire.</figcaption>
+  </figure>
+  <div class="box note"><span class="label">If the LED flickers or shows wrong colours:</span> on 5&nbsp;V the LED officially wants 3.5&nbsp;V on DIN, and the ESP32 sends 3.3&nbsp;V. With a short wire that usually works. If it doesn't, put a 1N4148 diode in the 5V wire, its band toward the LED. The LED then gets about 4.3&nbsp;V, and 3.3&nbsp;V is enough.</div>
 
   <h3>Pins to avoid (or use with care)</h3>
   <ul>
     <li><b>Strapping pins GPIO4, GPIO5, GPIO8, GPIO9, GPIO15:</b> their level during reset decides how the chip boots. A button or sensor pulling one of them low can stop the board from starting. GPIO8 also drives the on-board RGB LED, and GPIO9 is the BOOT button.</li>
     <li><b>GPIO12 / GPIO13:</b> native USB (D&minus; / D+). Using them breaks the native USB port.</li>
     <li><b>GPIO16 / GPIO17:</b> UART0 TX/RX, used by the USB-serial chip and the Serial Monitor.</li>
-    <li><b>5V pin:</b> carries 5&nbsp;V from USB. In the case it feeds only the speaker and, through the diode, the LED. <b>The GPIOs are not 5&nbsp;V tolerant.</b> Never connect 5&nbsp;V to a GPIO or to the I&sup2;C chain.</li>
+    <li><b>5V pin:</b> carries 5&nbsp;V from USB. In the case it feeds only the speaker and the LED. <b>The GPIOs are not 5&nbsp;V tolerant.</b> Never connect 5&nbsp;V to a GPIO or to the I&sup2;C chain.</li>
     <li><b>Good free pins for later:</b> GPIO0, 1, 6, 7 (low-power GPIOs, some with ADC), GPIO10, 11, 19, 20, 21.</li>
   </ul>
   <div class="box warn"><span class="label">Power the sensors from 3.3&nbsp;V only.</span> The Adafruit boards would accept 5&nbsp;V, but their I&sup2;C pull-up resistors connect to their supply pin. At 5&nbsp;V they would pull SDA/SCL to 5&nbsp;V, and the ESP32-C6 pins are not 5&nbsp;V tolerant.</div>
@@ -394,8 +502,8 @@
     <tr><td>Board</td><td><b>ESP32C6 Dev Module</b> (Tools &rarr; Board &rarr; esp32)</td></tr>
     <tr><td>Port</td><td>the COM port that appears when you plug in the board</td></tr>
     <tr><td>USB CDC On Boot</td><td><b>Disabled</b> if you use the USB-serial COM port &middot; <b>Enabled</b> if you use the native USB COM port (5.5)</td></tr>
-    <tr><td>Flash Size</td><td><b>8MB (64Mb)</b>. The Waveshare board has 16&nbsp;MB; the 8&nbsp;MB setting works on it and keeps the history in the same place.</td></tr>
-    <tr><td>Partition Scheme</td><td><b>8M with spiffs (3MB APP/1.5MB SPIFFS)</b>. The history lives in its 1.5&nbsp;MB data area (section 7).</td></tr>
+    <tr><td>Flash Size</td><td><b>16MB (128Mb)</b>, the Waveshare board's flash.</td></tr>
+    <tr><td>Partition Scheme</td><td><b>16M Flash (3MB APP/9.9MB FATFS)</b>. The history lives in its 9.9&nbsp;MB data area (section 7). The menu calls it FATFS, but the firmware formats it with LittleFS itself.</td></tr>
     <tr><td>CPU Frequency</td><td>160MHz (WiFi)</td></tr>
     <tr><td>Upload Speed</td><td>921600 (use 115200 if uploads fail)</td></tr>
     <tr><td>Erase All Flash Before Sketch Upload</td><td><b>Disabled</b> (the default). Enabled deletes the stored history.</td></tr>
@@ -442,11 +550,11 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
         <li><b>SCD-41</b>: periodic measurement, a new CO<sub>2</sub> value every 5&nbsp;s. Altitude compensation is set at every start.</li>
         <li><b>Warm-up</b>: for the first 30&nbsp;s after start-up the sensors measure, but no value is shown, printed or saved. The values from this time are thrown away. The display counts down ("warming up", 30&nbsp;s &hellip; 1&nbsp;s).</li>
         <li><b>Display</b>: on during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press. Pressing while it's on restarts the 30&nbsp;s. When off, the panel is fully dark and the content is kept. Brightness is set by <code>OLED_BRIGHTNESS</code>.</li>
-        <li><b>RGB LED</b> (on the board, GPIO8): dimmed, on all the time except in sleep mode, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value after the warm-up.</li>
-        <li><b>Sleep mode</b>: RGB LED off, a small moon on the display. Hold the button for 2&nbsp;s or use the switch on the web page (see <i>Sleep mode</i> below).</li>
+        <li><b>8&nbsp;mm LED</b> (GPIO18, Figure 3): dimmed, on all the time except in sleep mode, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value after the warm-up.</li>
+        <li><b>Sleep mode</b>: LED off, a small moon on the display. Hold the button for 2&nbsp;s or use the switch on the web page (see <i>Sleep mode</i> below).</li>
         <li><b>Serial</b>: one line per CO<sub>2</sub> reading after the warm-up, usable in the Serial Monitor and the Serial Plotter.</li>
         <li><b>Wi-Fi and clock</b>: connects with the details in <code>secrets.h</code> and reconnects by itself. Gets the time (UTC) from the internet and updates it every 3&nbsp;hours.</li>
-        <li><b>History</b>: stores 1-minute, 5-minute and hourly values in the flash (section 7). You can view them with commands in the Serial Monitor (7.6).</li>
+        <li><b>History</b>: stores 1-minute and 5-minute values in the flash (section 7). You can view them with commands in the Serial Monitor (7.6).</li>
         <li><b>Web page</b>: live values, graphs and CSV downloads in a browser on the home network (section 8).</li>
         <li>A missing module is reported on Serial and on the display (<code>--.-</code> / "SCD-41 missing"). The rest keeps working.</li>
       </ul>
@@ -496,11 +604,11 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
         <text x="76" y="104" font-size="10" text-anchor="middle" fill="#57606a">Sleep mode on: moon at the top</text>
         <text x="224" y="104" font-size="10" text-anchor="middle" fill="#57606a">After a long press, for 2.5 s</text>
       </svg>
-      <figcaption>Figure 3: Display layout: CO<sub>2</sub> and rating on top, temperature and humidity (from the SHT45) at the bottom. In sleep mode a small moon sits between "CO2 ppm" and the rating. A long press on the button confirms the new mode on the full screen (a sun with "off - LED on" when it is switched off).</figcaption>
+      <figcaption>Figure 4: Display layout: CO<sub>2</sub> and rating on top, temperature and humidity (from the SHT45) at the bottom. In sleep mode a small moon sits between "CO2 ppm" and the rating. A long press on the button confirms the new mode on the full screen (a sun with "off - LED on" when it is switched off).</figcaption>
     </figure>
   </div>
 
-  <div class="box note"><span class="label">Firmware as it is today:</span> this section describes the firmware tested on the prototype (section 4), with its 0.96" display and the board's own RGB LED. The case uses the 1.5" 128&times;128 OLED (Adafruit 4741, SSD1327), turned 90&deg;, and the 8&nbsp;mm LED on GPIO18. The new display driver, a 128&times;128 layout for Figure 3's values, the new LED, the speaker and the new sensors come when the parts are here (section 3, <i>Pins used in the case</i>); this section is updated with them.</div>
+  <div class="box note"><span class="label">Firmware as it is today:</span> this section describes the firmware tested on the prototype (section 4), with its 0.96" display. The CO<sub>2</sub> colour already goes to the case's 8&nbsp;mm LED on GPIO18. The case uses the 1.5" 128&times;128 OLED (Adafruit 4741, SSD1327), turned 90&deg;. The new display driver, a 128&times;128 layout for Figure 4's values, the speaker and the new sensors come when the parts are here (section 3, <i>Pins used in the case</i>); this section is updated with them.</div>
 
   <h3>Settings at the top of the sketch</h3>
   <table>
@@ -514,9 +622,11 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td><code>LONG_PRESS_MS</code></td><td>2000</td><td>How long the button must be held to switch sleep mode on or off (ms).</td></tr>
     <tr><td><code>SLEEP_MESSAGE_MS</code></td><td>2500</td><td>How long the display confirms the new mode after a long press (ms).</td></tr>
     <tr><td><code>BUTTON_PIN</code></td><td>2</td><td>Button GPIO (other leg to GND).</td></tr>
+    <tr><td><code>LED_PIN</code></td><td>18</td><td>DIN of the 8&nbsp;mm LED (Figure 3).</td></tr>
     <tr><td><code>I2C_SDA_PIN</code> / <code>I2C_SCL_PIN</code></td><td>23 / 22</td><td>I&sup2;C pins.</td></tr>
     <tr><td><code>CO2_GOOD_BELOW</code>, <code>CO2_OK_BELOW</code>, <code>CO2_VENTILATE_BELOW</code></td><td>800 / 1000 / 2000</td><td>Limits for the rating shown at the top right, and the points where the LED is green, yellow and red.</td></tr>
-    <tr><td><code>LED_BRIGHTNESS</code></td><td>5</td><td>Brightness of the RGB LED, 1-255 (0 = off). 255 is glaring; the BlinkRGB example uses 64. Try 3-5 for a bedroom, 20-30 for a bright room.</td></tr>
+    <tr><td><code>LED_BRIGHTNESS</code></td><td>5</td><td>Brightness of the LED, 1-255 (0 = off). 255 is glaring; the BlinkRGB example uses 64. Try 3-5 for a bedroom, 20-30 for a bright room.</td></tr>
+    <tr><td><code>BOARD_LED_TOO</code></td><td>false</td><td><code>true</code> = the board's own RGB LED (GPIO8) shows the colour as well, handy while the 8&nbsp;mm LED is not wired yet. In the case it faces the floor, so leave it <code>false</code> there.</td></tr>
     <tr><td><code>LED_GREEN</code>, <code>LED_YELLOW</code>, <code>LED_RED</code></td><td>{0,255,0} / {255,160,0} / {255,0,0}</td><td>The three colours at full brightness, as {red, green, blue}. Yellow has less green because the green LED looks brighter than the red one. If yellow looks too green, lower its middle value.</td></tr>
     <tr><td><code>WIFI_HOSTNAME</code></td><td>co2-monitor</td><td>The name shown in your router's device list.</td></tr>
     <tr><td><code>NTP_SERVER_1</code>, <code>NTP_SERVER_2</code></td><td>pool.ntp.org / time.google.com</td><td>Internet time servers. Your router's address also works if it offers time itself.</td></tr>
@@ -535,7 +645,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
 
   <div style="break-inside: avoid">
   <h3 id="sleepmode">Sleep mode</h3>
-  <p>For the night. Sleep mode switches the <b>RGB LED off</b> and puts a <b>small moon</b> in the top line of the display (Figure 3). Everything else carries on: the sensors measure, the history records, and the web page works. Sleep mode is <b>not</b> the ESP32's deep sleep, which would stop all of that.</p>
+  <p>For the night. Sleep mode switches the <b>LED off</b> and puts a <b>small moon</b> in the top line of the display (Figure 4). Everything else carries on: the sensors measure, the history records, and the web page works. Sleep mode is <b>not</b> the ESP32's deep sleep, which would stop all of that.</p>
   <table>
     <tr><th style="width:24%">Switch it with</th><th>How</th></tr>
     <tr><td>The button</td><td><b>Hold it for 2&nbsp;s.</b> The display wakes as soon as you press, and after 2&nbsp;s it shows a big moon with "Sleep mode on - LED off" (or a sun with "off - LED on") for 2.5&nbsp;s. When switching on, the display then goes dark at once; when switching off, it shows the values for the rest of the 30&nbsp;s. A short press still just wakes the display, in sleep mode with the moon at the top.</td></tr>
@@ -555,29 +665,28 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   <h2><span class="n">7</span>History storage</h2>
   <p>The monitor keeps a long-term record of its values in the ESP32's own flash memory, with no extra hardware. The web page (section 8) draws its graphs from it and offers it as a CSV download. You can also read it in the Serial Monitor (7.6). The code is in <code>history.h</code> and <code>history.cpp</code>.</p>
 
-  <h3>7.1 Three levels of detail</h3>
+  <h3>7.1 Two levels of detail</h3>
   <table>
     <tr><th>Level</th><th>Each record holds</th><th>Record</th><th>Files</th><th>Kept</th></tr>
-    <tr><td><b>1-minute</b> (<code>m1</code>)</td><td>average CO<sub>2</sub>, temperature, humidity and air pressure</td><td class="nowrap">12 bytes</td><td><code>/m1/20261028.bin</code>, one per day, up to 17&nbsp;KB</td><td>7 days</td></tr>
-    <tr><td><b>5-minute</b> (<code>m5</code>)</td><td>the same</td><td class="nowrap">12 bytes</td><td><code>/m5/20261028.bin</code>, one per day, up to 3.5&nbsp;KB</td><td>90 days</td></tr>
-    <tr><td><b>Hourly</b> (<code>h1</code>)</td><td>average, minimum and maximum of CO<sub>2</sub>, temperature and humidity; average pressure; number of minutes measured</td><td class="nowrap">26 bytes</td><td><code>/h1/202610.bin</code>, one per month, up to 19&nbsp;KB</td><td>until the flash is full, about 3&frac12; years; then the oldest month is deleted</td></tr>
+    <tr><td><b>1-minute</b> (<code>m1</code>)</td><td>average CO<sub>2</sub>, temperature, humidity and air pressure</td><td class="nowrap">12 bytes</td><td><code>/m1/20261028.bin</code>, one per day, up to 17&nbsp;KB</td><td>14 days</td></tr>
+    <tr><td><b>5-minute</b> (<code>m5</code>)</td><td>the same</td><td class="nowrap">12 bytes</td><td><code>/m5/20261028.bin</code>, one per day, up to 3.5&nbsp;KB</td><td>3 years; nothing older is kept</td></tr>
   </table>
   <ul>
     <li>Air pressure stays empty until the BMP580 is in the firmware. The light level isn't stored; the VEML7700 is meant for the display brightness.</li>
-    <li>The hourly minimum and maximum come from the 1-minute averages, not from single 5-second readings.</li>
+    <li>For the last 14 days both levels exist. The 5-minute values are worked out at every save, not only when the 1-minute values are deleted. That costs about 56&nbsp;KB, and a power cut or a long time switched off can never lose them.</li>
     <li>Each file starts with a format version, so a later firmware can add values without losing the older data.</li>
   </ul>
 
   <h3>7.2 How a reading gets saved</h3>
   <figure>
-    <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flow of a reading into the history files">
+    <svg viewBox="0 40 760 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flow of a reading into the history files">
       <defs>
         <marker id="hist-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
         </marker>
       </defs>
       <text x="160" y="58" text-anchor="middle" font-size="11" font-weight="600" fill="#0969da">In RAM: lost on a power cut</text>
-      <text x="571" y="14" text-anchor="middle" font-size="11" font-weight="600" fill="#1a7f37">In the flash (LittleFS, 1.5&nbsp;MB): kept</text>
+      <text x="571" y="58" text-anchor="middle" font-size="11" font-weight="600" fill="#1a7f37">In the flash (LittleFS, 9.9&nbsp;MB): kept</text>
       <rect x="20" y="70" width="120" height="60" rx="6" fill="#eef1f5" stroke="#57606a"/>
       <text x="80" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">SCD-41 + SHT45</text>
       <text x="80" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">a reading every 5 s</text>
@@ -586,32 +695,27 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
       <text x="235" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">collected in RAM</text>
       <rect x="400" y="70" width="140" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
       <text x="470" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/m1 day files</text>
-      <text x="470" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">1-minute, kept 7 days</text>
-      <rect x="590" y="24" width="152" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
-      <text x="666" y="50" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/m5 day files</text>
-      <text x="666" y="67" text-anchor="middle" font-size="10.5" fill="#57606a">5-minute, kept 90 days</text>
-      <rect x="590" y="124" width="152" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
-      <text x="666" y="146" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/h1 month files</text>
-      <text x="666" y="162" text-anchor="middle" font-size="10.5" fill="#57606a">hourly avg / min / max</text>
-      <text x="666" y="176" text-anchor="middle" font-size="10.5" fill="#57606a">kept about 3&frac12; years</text>
+      <text x="470" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">1-minute, kept 14 days</text>
+      <rect x="590" y="70" width="152" height="60" rx="6" fill="#e7f5ee" stroke="#1a7f37"/>
+      <text x="666" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">/m5 day files</text>
+      <text x="666" y="113" text-anchor="middle" font-size="10.5" fill="#57606a">5-minute, kept 3 years</text>
       <g stroke="#57606a" stroke-width="1.6" fill="none" marker-end="url(#hist-arrow)">
         <line x1="140" y1="100" x2="168" y2="100"/>
         <line x1="300" y1="100" x2="398" y2="100"/>
-        <line x1="540" y1="92" x2="588" y2="58"/>
-        <line x1="540" y1="108" x2="588" y2="150"/>
+        <line x1="540" y1="100" x2="588" y2="100"/>
       </g>
       <text x="350" y="92" text-anchor="middle" font-size="10.5" fill="#1f2328">every 10 min</text>
       <text x="350" y="116" text-anchor="middle" font-size="10" fill="#57606a">append</text>
-      <text x="470" y="152" text-anchor="middle" font-size="10" fill="#57606a">in the same save, worked</text>
-      <text x="470" y="166" text-anchor="middle" font-size="10" fill="#57606a">out from the saved minutes</text>
+      <text x="564" y="152" text-anchor="middle" font-size="10" fill="#57606a">in the same save, worked</text>
+      <text x="564" y="166" text-anchor="middle" font-size="10" fill="#57606a">out from the saved minutes</text>
     </svg>
-    <figcaption>Figure 4: How a reading becomes history. Only the part in RAM, at most 10 minutes, is lost on a power cut.</figcaption>
+    <figcaption>Figure 5: How a reading becomes history. Only the part in RAM, at most 10 minutes, is lost on a power cut.</figcaption>
   </figure>
   <ol>
     <li>Every 5&nbsp;s the SCD-41 delivers a CO<sub>2</sub> value. Together with the latest SHT45 values it is added to the average of the current minute, in RAM. Nothing is stored during the 30&nbsp;s warm-up after a start.</li>
     <li>Every 10 minutes (at :00, :10, :20&nbsp;&hellip; plus 5&nbsp;s) the finished minutes are appended to today's file in <code>/m1</code>.</li>
-    <li>In the same save, every finished 5-minute period and every finished hour is worked out from the saved 1-minute values and appended to <code>/m5</code> and <code>/h1</code>. Because they always come from saved data, a power cut doesn't leave a hole in them: the hour that was running is completed after the restart from what was saved before.</li>
-    <li>Files older than their retention are deleted. If less than 64&nbsp;KB is free, the oldest hourly month is deleted.</li>
+    <li>In the same save, every finished 5-minute period is worked out from the saved 1-minute values and appended to <code>/m5</code>. Because it always comes from saved data, a power cut doesn't leave a hole in it: the 5 minutes that were running are completed after the restart from what was saved before.</li>
+    <li>Files older than their retention are deleted: 1-minute files after 14 days, 5-minute files after 3 years. If less than 64&nbsp;KB is ever free, the oldest 5-minute day is deleted too. That is only a safety net: 3 years fill about half of the flash.</li>
   </ol>
   <p>Records are only ever added to the end of a file, never changed later. Flash memory can't change data in place, so editing old records would wear it out much faster.</p>
 
@@ -626,7 +730,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   <ul>
     <li><b>Power cut:</b> the saved history is safe. LittleFS finishes a save completely or not at all, so files are never damaged. You lose at most the last 10 minutes. A firmware upload or the <kbd>RESET</kbd> button counts as a power cut too. Before you unplug or upload on purpose, type <code>save</code> in the Serial Monitor.</li>
     <li><b>Moving the monitor:</b> the same as a power cut. The history stays on the device. In another home, only <code>secrets.h</code> needs the new Wi-Fi.</li>
-    <li><b>Flash wear:</b> flash wears when a 4&nbsp;KB block is erased, and each block is rated for at least 100,000 erases. A save erases about 2-3 blocks, and LittleFS spreads the erases over the roughly 150 blocks that are reused again and again. That's about 2 erases per block per day, or around 100 years until the rating is reached.</li>
+    <li><b>Flash wear:</b> flash wears when a 4&nbsp;KB block is erased, and each block is rated for at least 100,000 erases. A save erases about 2-3 blocks, and LittleFS spreads the erases over all free blocks: about 2,500 at the start, and still about 1,300 once 3 years are stored. That's well under 1 erase per block per day, so the rating is never reached in the monitor's lifetime.</li>
   </ul>
 
   <h3>7.5 What erases the history</h3>
@@ -644,19 +748,19 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><th style="width:22%">Command</th><th>What it shows or does</th></tr>
     <tr><td><code>status</code></td><td>Wi-Fi, clock, flash use, minutes not saved yet, and the files of each level with their newest value.</td></tr>
     <tr><td><code>files</code></td><td>Every history file with its size and number of values.</td></tr>
-    <tr><td><code>csv m1 1</code></td><td>The 1-minute values of the last day as CSV. <code>m5</code> = 5-minute, <code>h1</code> = hourly; the number is how many days back (<code>csv h1 400</code> = more than a year of hourly values).</td></tr>
+    <tr><td><code>csv m1 1</code></td><td>The 1-minute values of the last day as CSV. <code>m5</code> = 5-minute; the number is how many days back (<code>csv m5 7</code> = the last week of 5-minute values).</td></tr>
     <tr><td><code>save</code></td><td>Saves the minutes waiting in RAM now, for example before you unplug the monitor.</td></tr>
     <tr><td><code>sleep on</code>, <code>sleep off</code></td><td>Switches sleep mode on or off (section 6). The answer is <code>Sleep mode on: LED off</code> or <code>Sleep mode off: LED on</code>.</td></tr>
+    <tr><td><code>led</code></td><td>LED test: red, green and blue for 1&nbsp;s each on the 8&nbsp;mm LED, then the CO<sub>2</sub> colour again. If it stays dark or the colours come out wrong, see section 12.</td></tr>
   </table>
   <p>Example answer to <code>status</code>:</p>
 <pre>Wi-Fi: connected to "MyNetwork", signal -58 dBm, web page at http://192.168.1.50/
 Sleep mode: off
 Clock: 2026-10-28 17:21:40 UTC
-Flash: 32 KB of 1536 KB used (2%)
+Flash: 32 KB of 10112 KB used (0%)
 Not saved yet (in RAM): 2 minutes, next save in 505 s
 1-minute values (m1): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:19 UTC
-5-minute values (m5): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:15 UTC
-Hourly values (h1): 0 files</pre>
+5-minute values (m5): 1 file, 20261028.bin ... 20261028.bin, newest value 2026-10-28 17:15 UTC</pre>
   <p>And the start of <code>csv m1 1</code>:</p>
 <pre>time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa
 2026-10-28 17:05,612,22.41,45.30,
@@ -668,35 +772,35 @@ Hourly values (h1): 0 files</pre>
   <p>Each file is a 16-byte header followed by fixed-size records in time order. Numbers are little-endian, and values are stored as whole numbers:</p>
   <table>
     <tr><th>Field</th><th>Bytes</th><th>Unit</th><th>Means "missing"</th></tr>
-    <tr><td colspan="4"><b>Header</b> (16 bytes): the letters <code>CO2H</code>, format version (1), minutes per record (1, 5 or 60), record size, creation time, 4 reserved bytes.</td></tr>
+    <tr><td colspan="4"><b>Header</b> (16 bytes): the letters <code>CO2H</code>, format version (1), minutes per record (1 or 5), record size, creation time, 4 reserved bytes.</td></tr>
     <tr><td colspan="4"><b>1-minute and 5-minute record</b> (12 bytes):</td></tr>
     <tr><td>time</td><td>4</td><td>UTC seconds since 1970, start of the minute or 5 minutes</td><td>-</td></tr>
     <tr><td>CO<sub>2</sub></td><td>2</td><td>ppm</td><td>0</td></tr>
     <tr><td>temperature</td><td>2 (signed)</td><td>0.01&nbsp;&deg;C</td><td>&minus;32768</td></tr>
     <tr><td>humidity</td><td>2</td><td>0.01&nbsp;%RH</td><td>65535</td></tr>
     <tr><td>air pressure</td><td>2</td><td>0.1&nbsp;hPa</td><td>0</td></tr>
-    <tr><td colspan="4"><b>Hourly record</b> (26 bytes): time (4), CO<sub>2</sub> average, minimum and maximum (3&nbsp;&times;&nbsp;2), the same for temperature and for humidity, average air pressure (2), number of minutes measured (1; 60 = complete hour), 1 reserved byte. Same units and "missing" values as above.</td></tr>
   </table>
   </div>
 
   <h3>7.8 How much fits</h3>
   <table>
-    <tr><th>Part of the 1.5&nbsp;MB</th><th style="width:28%">Space</th></tr>
-    <tr><td>1-minute files: 8 days of 17&nbsp;KB (5 blocks of 4&nbsp;KB each)</td><td>160&nbsp;KB</td></tr>
-    <tr><td>5-minute files: 91 days of 3.5&nbsp;KB (1 block each)</td><td>364&nbsp;KB</td></tr>
-    <tr><td>LittleFS's own data, plus 64&nbsp;KB that is always kept free</td><td>about 110&nbsp;KB</td></tr>
-    <tr><td><b>Left for hourly values</b>, at 5 blocks (20&nbsp;KB) per month or 240&nbsp;KB per year</td><td><b>about 900&nbsp;KB, roughly 3&frac12; years</b></td></tr>
+    <tr><th>Part of the 9.9&nbsp;MB (10,112&nbsp;KB)</th><th style="width:28%">Space</th></tr>
+    <tr><td>1-minute files: 15 days of 17&nbsp;KB (5 blocks of 4&nbsp;KB each)</td><td>300&nbsp;KB</td></tr>
+    <tr><td>5-minute files: 1,097 days of 3.5&nbsp;KB (1 block each)</td><td>about 4,390&nbsp;KB</td></tr>
+    <tr><td>LittleFS's own data (its folder lists grow with the number of files)</td><td>about 200&nbsp;KB</td></tr>
+    <tr><td><b>Used once 3 years are stored</b></td><td><b>about 4,900&nbsp;KB, half</b></td></tr>
+    <tr><td>Free</td><td>about 5,200&nbsp;KB</td></tr>
   </table>
-  <p class="muted">LittleFS stores each file in whole 4&nbsp;KB blocks, so space is counted in blocks. Keeping 5-minute values for 30 instead of 90 days (7.9) leaves room for about 4&frac12; years of hourly values. A microSD card would allow much more.</p>
+  <p class="muted">LittleFS stores each file in whole 4&nbsp;KB blocks, so space is counted in blocks. After 3 years, every new day's 5-minute file replaces the oldest one, so the use stays the same. The free half would hold about 3&frac12; more years of 5-minute values (<code>FIVE_MINUTE_KEEP_DAYS</code>, 7.9).</p>
 
   <h3>7.9 Settings in <code>history.cpp</code></h3>
   <table>
     <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
-    <tr><td><code>MINUTE_KEEP_DAYS</code></td><td>7</td><td>Days of 1-minute values.</td></tr>
-    <tr><td><code>FIVE_MINUTE_KEEP_DAYS</code></td><td>90</td><td>Days of 5-minute values.</td></tr>
+    <tr><td><code>MINUTE_KEEP_DAYS</code></td><td>14</td><td>Days of 1-minute values.</td></tr>
+    <tr><td><code>FIVE_MINUTE_KEEP_DAYS</code></td><td>1096</td><td>Days of 5-minute values (3 years); nothing older is kept. The web page's download list shows both values.</td></tr>
     <tr><td><code>SAVE_INTERVAL_S</code></td><td>600</td><td>Seconds between saves, and the most a power cut can lose. Shorter means more flash wear.</td></tr>
     <tr><td><code>PENDING_MAX</code></td><td>1440</td><td>Minutes kept in RAM while the clock isn't set (24&nbsp;h, 17&nbsp;KB of RAM).</td></tr>
-    <tr><td><code>MIN_FREE_BYTES</code></td><td>64&nbsp;KB</td><td>When less is free, the oldest hourly month is deleted.</td></tr>
+    <tr><td><code>MIN_FREE_BYTES</code></td><td>64&nbsp;KB</td><td>When less is free, the oldest 5-minute day is deleted (a safety net).</td></tr>
   </table>
 </section>
 
@@ -707,7 +811,7 @@ Hourly values (h1): 0 files</pre>
 
   <figure>
     <img src="web_page.png" alt="The web page: live values, calendar, time range, graphs of CO2, temperature and humidity, and the download box" style="display:block; width:100%; max-width:118mm; margin:0 auto; border:1px solid var(--line); border-radius:6px">
-    <figcaption>Figure 5: The web page in light mode on 31 Oct 2026, with the <i>Sleep mode</i> switch (off) at the top right. The gap in the evening is a time with no values stored.</figcaption>
+    <figcaption>Figure 6: The web page in light mode on 31 Oct 2026, with the <i>Sleep mode</i> switch (off) at the top right. The gap in the evening is a time with no values stored.</figcaption>
   </figure>
 
   <h3>8.1 Opening the page</h3>
@@ -727,11 +831,11 @@ Hourly values (h1): 0 files</pre>
     <tr><td>Live values</td><td>CO<sub>2</sub> with the same rating as the display (Good, OK, Ventilate, Bad air; limits in section 6), temperature and humidity. During the 30&nbsp;s warm-up: "Warming up" with the seconds left.</td></tr>
     <tr><td>Graphs</td><td>Right below the live values. One graph per value, all on the same time axis in local time; the heading above them names the time shown. Move the mouse over them, or drag a finger along them, to see the values at that moment. Dashed lines mark the CO<sub>2</sub> limits that fall inside the scale. A gap means nothing was measured (power off, restart, warm-up). While the range includes the current time, new values are added every minute.</td></tr>
     <tr><td>Last 1-24 h</td><td>The buttons <i>1 h</i>, <i>3 h</i>, <i>6 h</i>, <i>12 h</i> and <i>24 h</i> above the graphs show the last hours up to now. The range then moves along with the time. Picking a day or changing a time ends it; a day picked after it is shown whole.</td></tr>
-    <tr><td>Detail</td><td>The last 7 days use the 1-minute values, up to 90 days the 5-minute values, older days the hourly averages with a shaded band from the hourly minimum to the maximum. The line above the graphs says which.</td></tr>
-    <tr><td>Day and calendar</td><td>Below the graphs: the chosen day and time range on the right, the calendar on the left (on a phone the day box comes first). In the calendar, a dot under a day means values are stored for it, a ring that only hourly values are left (days older than 90 days). Future days can't be chosen. The arrows change the month.</td></tr>
+    <tr><td>Detail</td><td>The last 14 days use the 1-minute values, older days the 5-minute values. The line above the graphs says which.</td></tr>
+    <tr><td>Day and calendar</td><td>Below the graphs: the chosen day and time range on the right, the calendar on the left (on a phone the day box comes first). In the calendar, a dot under a day means values are stored for it. Future days can't be chosen. The arrows change the month.</td></tr>
     <tr><td>Time range</td><td>From and to, up to 24 hours. If "to" is earlier than "from", the range ends the next day. <i>Whole day</i> and <i>Night 22-08</i> set it with one click.</td></tr>
     <tr><td>Show</td><td>Switches the CO<sub>2</sub>, temperature and humidity graphs on and off. The browser remembers the choice.</td></tr>
-    <tr><td>Sleep mode</td><td>The switch at the top right, next to the theme buttons. Blue with the knob on the right = on: the monitor's RGB LED is off and its display shows a moon (section 6). It follows the monitor, so a long press on the button shows up here within 5&nbsp;s. Greyed out while there is no connection.</td></tr>
+    <tr><td>Sleep mode</td><td>The switch at the top right, next to the theme buttons. Blue with the knob on the right = on: the monitor's LED is off and its display shows a moon (section 6). It follows the monitor, so a long press on the button shows up here within 5&nbsp;s. Greyed out while there is no connection.</td></tr>
     <tr><td>Auto / Light / Dark</td><td>Auto follows the light or dark setting of the phone or PC. Light and Dark override it. The browser remembers the choice.</td></tr>
     <tr><td>Bottom line</td><td>Wi-Fi signal, flash used by the history, and the time since the monitor started.</td></tr>
   </table>
@@ -739,8 +843,8 @@ Hourly values (h1): 0 files</pre>
   <h3>8.4 CSV download</h3>
   <p>Choose a start and an end date (both included) and the detail, then press <i>Download CSV</i>. The browser fetches the values from the monitor in parts and saves them as a file, for example <code>co2_2026-10-23_2026-10-29_1min.csv</code>.</p>
   <ul>
-    <li><b>Best available detail:</b> 1-minute values if the start date is within the last 7 days, 5-minute values within the last 90 days, otherwise hourly values. One file always has one level of detail.</li>
-    <li><b>Columns:</b> <code>time_local</code> (your time, summer time included), <code>time_utc</code>, then CO<sub>2</sub> in ppm, temperature in &deg;C and humidity in %. Hourly files have the average, minimum and maximum of each, plus <code>minutes</code> (1-minute values in that hour; 60 = complete). Each time is the start of its minute, 5 minutes or hour. A pressure column appears once the BMP580 is in the firmware. An empty field means the value wasn't measured.</li>
+    <li><b>Best available detail:</b> 1-minute values if the start date is within the last 14 days, otherwise 5-minute values. One file always has one level of detail.</li>
+    <li><b>Columns:</b> <code>time_local</code> (your time, summer time included), <code>time_utc</code>, then CO<sub>2</sub> in ppm, temperature in &deg;C and humidity in %. Each time is the start of its minute or 5 minutes. A pressure column appears once the BMP580 is in the firmware. An empty field means the value wasn't measured.</li>
     <li><b>Excel:</b> the file uses the browser's number format. With German settings that's <code>22,5</code> with <code>;</code> between the columns, so Excel opens it straight into columns.</li>
   </ul>
 
@@ -750,7 +854,7 @@ Hourly values (h1): 0 files</pre>
     <tr><th style="width:21%">Resource</th><th>Use</th></tr>
     <tr><td>Program flash</td><td>About 60&nbsp;KB more: 1,166,586 of 3,342,336 bytes (34%), up from 1,106,244. About 41&nbsp;KB is the web server library and 12&nbsp;KB the page (35&nbsp;KB before compression). Plenty is left for Matter.</td></tr>
     <tr><td>RAM</td><td>0.4&nbsp;KB more fixed RAM, plus a few KB while a request is answered.</td></tr>
-    <tr><td>History storage</td><td><b>Unchanged.</b> The page is part of the firmware, not of the 1.5&nbsp;MB data partition, and reading the history doesn't wear the flash. The keeping times in 7.1 stay the same.</td></tr>
+    <tr><td>History storage</td><td><b>Unchanged.</b> The page is part of the firmware, not of the 9.9&nbsp;MB data partition, and reading the history doesn't wear the flash. The keeping times in 7.1 stay the same.</td></tr>
     <tr><td>Measuring</td><td>Every answer is below 60&nbsp;KB and takes well under a second. The main program waits meanwhile, but no reading is lost: the SCD-41 keeps its newest value until it is read.</td></tr>
   </table>
   </div>
@@ -766,7 +870,7 @@ Hourly values (h1): 0 files</pre>
     <tr><td><code>/api/now</code></td><td>Live values, warm-up seconds, sleep mode, CO<sub>2</sub> limits, Wi-Fi signal and clock state (JSON).</td></tr>
     <tr><td><code>/api/info</code></td><td>History on or off, flash use, minutes not saved yet, and the oldest file and days kept for each level (JSON).</td></tr>
     <tr><td><code>/api/days?from=&hellip;&amp;to=&hellip;</code></td><td>The UTC days with values and their finest detail, for the calendar marks (JSON, at most 45 days).</td></tr>
-    <tr><td><code>/api/data?res=1|5|60&amp;from=&hellip;&amp;to=&hellip;</code></td><td>The stored values as binary records, exactly as in the files (7.7). At most 2 days of 1-minute, 14 days of 5-minute or 92 days of hourly values per request.</td></tr>
+    <tr><td><code>/api/data?res=1|5&amp;from=&hellip;&amp;to=&hellip;</code></td><td>The stored values as binary records, exactly as in the files (7.7). At most 2 days of 1-minute or 14 days of 5-minute values per request.</td></tr>
     <tr><td><code>/api/sleep?on=1|0</code> (POST only)</td><td>Switches sleep mode on (1) or off (0) and answers <code>{"sleep":true}</code> or <code>{"sleep":false}</code>. Example from PowerShell: <code>Invoke-RestMethod -Method Post "http://192.168.178.40/api/sleep?on=1"</code>.</td></tr>
   </table>
 </section>
@@ -804,7 +908,7 @@ Warm-up: the first values follow in 30 s
 Warm-up done, values are shown and saved from now on
 CO2_ppm:612 Temperature_C:22.41 Humidity_pct:45.3
 CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
-  <p>The display shows "starting&hellip;", then "warming up" with a countdown from 30&nbsp;s and <code>--.-</code> / <code>--%</code> at the bottom. After the countdown the temperature and humidity appear at once, and CO<sub>2</sub> within 5&nbsp;s ("measuring&hellip;" until then). The RGB LED on the board goes off at the start and lights up dimly in the CO<sub>2</sub> colour with the first value. In normal room air it is green or yellowish. If the text is upside down, change <code>OLED_ROTATION</code> (2 &harr; 0) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick Temperature and Humidity to see the CO<sub>2</sub> curve at a useful scale.</p>
+  <p>The display shows "starting&hellip;", then "warming up" with a countdown from 30&nbsp;s and <code>--.-</code> / <code>--%</code> at the bottom. After the countdown the temperature and humidity appear at once, and CO<sub>2</sub> within 5&nbsp;s ("measuring&hellip;" until then). The 8&nbsp;mm LED goes off at the start and lights up dimly in the CO<sub>2</sub> colour with the first value. <code>led</code> tests it on its own (7.6). In normal room air it is green or yellowish. If the text is upside down, change <code>OLED_ROTATION</code> (2 &harr; 0) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick Temperature and Humidity to see the CO<sub>2</sub> curve at a useful scale.</p>
 
   <h3>Step 4: Button and display timeout</h3>
   <ol>
@@ -836,7 +940,7 @@ CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2</pre>
   <p>Enter your Wi-Fi in <code>secrets.h</code> (5.8), upload, and open the Serial Monitor. At the start you should see:</p>
 <pre>CO2 monitor starting
 History: formatting the data partition (first start)
-History: 8 KB of 1536 KB used
+History: 8 KB of 10112 KB used
 Wi-Fi: connecting to "MyNetwork"
 SHT45 found
 ...
@@ -846,7 +950,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <ol>
     <li>Wait until the next full 10 minutes have passed (for example 17:10:05) and type <code>status</code>. <code>m1</code> and <code>m5</code> each show one file and a newest value.</li>
     <li>Type <code>csv m1 1</code>. There is one line per minute since the start, and the CO<sub>2</sub> values match the live readings.</li>
-    <li>After the next full hour (plus 5&nbsp;s), type <code>csv h1 1</code>. The first hour shows fewer than 60 in the <code>minutes</code> column, because the monitor started during that hour.</li>
+    <li>Type <code>csv m5 1</code>. There is one line per finished 5 minutes, each the average of the 1-minute values in it.</li>
     <li><b>Power cut test:</b> unplug the monitor for about 20 minutes, then plug it back in. In <code>csv m1 1</code> the gap starts at the last save before unplugging (at most 10 minutes earlier) and ends at the restart. Nothing else is missing.</li>
     <li><b>Optional, no internet at start:</b> switch off the router, restart the monitor, wait a few minutes, then switch the router back on. <code>status</code> shows "Clock: not set yet" until the router is back. Once the clock is set, the minutes measured without it appear in <code>csv m1 1</code> with the correct times.</li>
   </ol>
@@ -862,7 +966,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
 
   <h3>Step 10: Sleep mode</h3>
   <ol>
-    <li>Hold the button. The display wakes at once; after 2&nbsp;s it shows the big moon with "Sleep mode on - LED off", and the RGB LED goes out. Let go. After 2.5&nbsp;s the display goes dark.</li>
+    <li>Hold the button. The display wakes at once; after 2&nbsp;s it shows the big moon with "Sleep mode on - LED off", and the LED goes out. Let go. After 2.5&nbsp;s the display goes dark.</li>
     <li>Press the button briefly. The values appear with a small moon at the top, and the display goes dark again after 30&nbsp;s. The LED stays off.</li>
     <li>Open the web page: the <i>Sleep mode</i> switch is on. Switch it off. The LED lights up in the CO<sub>2</sub> colour within a moment, and the Serial Monitor shows <code>Sleep mode off: LED on</code>.</li>
     <li>Switch it on again on the page, then press RESET on the board. After the restart the Serial Monitor shows <code>Sleep mode on: LED off</code>, and the LED stays off after the warm-up. <code>csv m1 1</code> still gets a line every minute: sleep mode doesn't stop the recording.</li>
@@ -936,7 +1040,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>3.3&nbsp;V logic, GPIOs not 5&nbsp;V tolerant.</b> The 5V pin carries USB voltage. Never connect it to a GPIO or to the I&sup2;C chain.</li>
     <li><b>Same pins as Espressif's DevKitC-1</b> on the prototype: two rows of 16, the same pins in the same order (J1/J3), the same SGM2212 3.3&nbsp;V regulator (800&nbsp;mA) and the RGB LED (WS2812B) on GPIO8. The firmware's pins don't change.</li>
     <li><b>One USB-C port:</b> a USB hub chip (CH334F) passes both the native USB and a USB-to-serial chip (CH343P) through the one port, so the PC shows two COM ports (5.5).</li>
-    <li><b>16&nbsp;MB flash.</b> The present board settings (8&nbsp;MB, <code>default_8MB</code>) work on it unchanged. The stored history stays on the prototype's board: download the CSV first (8.4).</li>
+    <li><b>16&nbsp;MB flash</b> (esptool reads 16&nbsp;MB). With the 16&nbsp;MB board settings (5.4) the history gets 9.9&nbsp;MB instead of the prototype's 1.5&nbsp;MB. The stored history stays on the prototype's board: download the CSV first (8.4).</li>
     <li><b>On board:</b> BOOT button (GPIO9), RESET button, the RGB LED and a red power LED (2&nbsp;k&Omega;, no jumper), brighter than the DevKitC-1's. In the case the board lies upside down, so both LEDs face the floor, next to the floor vents: tape over the red one for the night.</li>
     <li><b>Strapping pins</b> GPIO4, 5, 8, 9, 15: don't connect buttons or pull-downs to them.</li>
     <li><b>Size and holes:</b> 55 &times; 25.36&nbsp;mm, first pin 12.0&nbsp;mm from the USB end, 4 corner holes &#8960;2 at 1.77&nbsp;mm from both edges. The USB-C port sits in the middle of the short end and sticks out about 0.5&nbsp;mm past it; RESET and BOOT sit right at the long edges, 3.9-9.1&nbsp;mm from the USB end. In the case it lies upside down on 4 posts (section 13).</li>
@@ -1008,8 +1112,8 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <table>
     <tr><th style="width:24%">LED</th><th style="width:30%">Wiring</th><th>How to get it dark</th></tr>
     <tr><td>Waveshare ESP32-C6, red</td><td>Power LED with a 2&nbsp;k&Omega; resistor on the 3.3&nbsp;V rail; no jumper.</td><td>Tape over it; no sensor is near it, so any tape is fine there. In the case it faces the floor. For good: unsolder its resistor (check on the board which one it is).</td></tr>
-    <tr><td>SCD-41, green "on"</td><td>D1 with R1 (10&nbsp;k&Omega;) through jumper SJ3, front side.</td><td><b>Best:</b> cut the thin trace between the two pads of SJ3 (2 in Figure 6) with a craft knife. A blob of solder across the pads undoes it. Or tape, within the green area.</td></tr>
-    <tr><td>SHT45, green "on"</td><td>D1 with R1 (10&nbsp;k&Omega;); no jumper on this board.</td><td>Tape, as small as possible (Figure 6). For good: unsolder R1 (0603 size, next to the LED).</td></tr>
+    <tr><td>SCD-41, green "on"</td><td>D1 with R1 (10&nbsp;k&Omega;) through jumper SJ3, front side.</td><td><b>Best:</b> cut the thin trace between the two pads of SJ3 (2 in Figure 7) with a craft knife. A blob of solder across the pads undoes it. Or tape, within the green area.</td></tr>
+    <tr><td>SHT45, green "on"</td><td>D1 with R1 (10&nbsp;k&Omega;); no jumper on this board.</td><td>Tape, as small as possible (Figure 7). For good: unsolder R1 (0603 size, next to the LED).</td></tr>
   </table>
 
   <figure>
@@ -1102,7 +1206,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       <rect x="470" y="298" width="20" height="13" fill="#57606a" stroke="#1f2328" stroke-dasharray="3 2"/>
       <text x="496" y="309" font-size="12" fill="#1f2328">Enough tape for the LED</text>
     </svg>
-    <figcaption>Figure 6: Where electrical tape may go, to scale from Adafruit's board files (top view, pin header at the bottom, "on" LED top left). (1) Green power LED. (2) SCD-41: jumper SJ3, cut it to switch the LED off for good; SHT45: resistor R1, the only way to switch its LED off for good. (3) The sensor: on the SCD-41 the top of the metal cap with its white membrane, on the SHT45 the tiny chip with its 0.6&nbsp;mm opening and the U-shaped slot cut around it. (4) Plug openings: don't fold tape over the board edge here. The dashed line ends the green area 1.5&nbsp;mm before the sensor: 6&nbsp;mm from the left edge on the SCD-41, 8.5&nbsp;mm on the SHT45. Check against your own boards; the LEDs sit at 1-3&nbsp;mm (SCD-41) and 2.5-4.5&nbsp;mm (SHT45) from the left edge.</figcaption>
+    <figcaption>Figure 7: Where electrical tape may go, to scale from Adafruit's board files (top view, pin header at the bottom, "on" LED top left). (1) Green power LED. (2) SCD-41: jumper SJ3, cut it to switch the LED off for good; SHT45: resistor R1, the only way to switch its LED off for good. (3) The sensor: on the SCD-41 the top of the metal cap with its white membrane, on the SHT45 the tiny chip with its 0.6&nbsp;mm opening and the U-shaped slot cut around it. (4) Plug openings: don't fold tape over the board edge here. The dashed line ends the green area 1.5&nbsp;mm before the sensor: 6&nbsp;mm from the left edge on the SCD-41, 8.5&nbsp;mm on the SHT45. Check against your own boards; the LEDs sit at 1-3&nbsp;mm (SCD-41) and 2.5-4.5&nbsp;mm (SHT45) from the left edge.</figcaption>
   </figure>
 
   <ul>
@@ -1141,7 +1245,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h3>Panel button, LED and speaker</h3>
   <ul>
     <li><b>Panel button (Berrybase 10130, ordered):</b> one pole, normally open, two solder lugs, M7 &times; 0.75 thread with a nut and washer. One lug goes to GPIO2, the other to GND. No resistor is needed: the code enables the ESP32's internal pull-up (<code>INPUT_PULLUP</code>). Released = HIGH, pressed = LOW. The code debounces it (30&nbsp;ms).</li>
-    <li><b>8&nbsp;mm LED (Berrybase PL9823-F8, ordered):</b> diffused, addressable like the board's WS2812B: one data wire, no resistors. Rated 4.5-6&nbsp;V, so it runs from the 5V pin through a 1N4148 diode; with about 4.3&nbsp;V left, the ESP32's 3.3&nbsp;V data counts as high. Its colour order is red-green-blue, so the firmware swaps red and green. There is no data sheet: test it before it goes into the case.</li>
+    <li><b>8&nbsp;mm LED (Berrybase PL9823-F8, ordered):</b> diffused, addressable like the board's WS2812B: one data wire, no resistors. Rated 4.5-6&nbsp;V, so VDD goes straight to the 5V pin (Figure 3). Its colour order is red-green-blue (the WS2812B's is green-red-blue) and its timing is slower: a 1 is 1.36&nbsp;&micro;s high, a 0 only 0.35&nbsp;&micro;s. So the firmware doesn't use <code>rgbLedWrite()</code> for it but sends the 24 bits itself with the ESP32's RMT peripheral. Berrybase gives only a drawing (leg order and lengths, no sizes): test it before it goes into the case.</li>
     <li><b>STEMMA Speaker (Adafruit 3885, here):</b> a small class-D amplifier (PAM8302) with a 1&nbsp;W 8&nbsp;&Omega; speaker and a volume trim pot. It is always on (a few mA when silent) and has no LED. Its input is a <b>3-pin JST PH</b> socket, not STEMMA QT, so it needs the JST PH cable (to buy). The ESP32-C6 has no DAC, so tones go out as PWM on GPIO3.</li>
   </ul>
 
@@ -1165,11 +1269,12 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Serial Monitor shows garbage</td><td>Wrong baud rate.</td></tr>
     <tr><td>Scanner finds no devices</td><td>The cable on the ESP32 is on the wrong pins: blue = SDA on GPIO23, yellow = SCL on GPIO22, red on 3V3, black on GND (section 3). Or its plug isn't pushed in all the way.</td></tr>
     <tr><td>Display found but stays dark</td><td>It timed out &rarr; press the button. Check <code>OLED_ADDRESS</code> (0x3C vs 0x3D, see scanner output).</td></tr>
-    <tr><td>RGB LED stays off although CO<sub>2</sub> values come in</td><td>Sleep mode is on: the display shows a moon at the top, <code>status</code> says "Sleep mode: on". Hold the button for 2&nbsp;s, or use the switch on the web page.</td></tr>
+    <tr><td>LED stays off although CO<sub>2</sub> values come in</td><td>Sleep mode is on: the display shows a moon at the top, <code>status</code> says "Sleep mode: on". Hold the button for 2&nbsp;s, or use the switch on the web page. If <code>led</code> leaves it dark too, check the wiring (Figure 3): DIN on GPIO18, VDD on 5V, the longest leg on GND.</td></tr>
+    <tr><td>LED flickers or shows wrong colours</td><td>The LED doesn't read the 3.3&nbsp;V data reliably at 5&nbsp;V. Put a 1N4148 diode in its 5V wire, band toward the LED (section 3, <i>Wiring the 8&nbsp;mm LED</i>).</td></tr>
     <tr><td>Holding the button doesn't switch sleep mode</td><td>Hold it for a full 2&nbsp;s, until the big moon or sun appears. A shorter press only wakes the display.</td></tr>
-    <tr><td>Red LED on the ESP32 and green LEDs on the sensors stay on in sleep mode</td><td>They are power LEDs on the supply, not under software control. Cover them or disconnect them (section 11, Figure 6).</td></tr>
+    <tr><td>Red LED on the ESP32 and green LEDs on the sensors stay on in sleep mode</td><td>They are power LEDs on the supply, not under software control. Cover them or disconnect them (section 11, Figure 7).</td></tr>
     <tr><td>Display text is upside down</td><td>Change <code>OLED_ROTATION</code> in the sketch (2 &harr; 0).</td></tr>
-    <tr><td>Button does nothing</td><td>Check its two wires: one lug to GPIO2 (J1-12), the other to GND. A cold solder joint on a lug.</td></tr>
+    <tr><td>Button does nothing</td><td>Check its two wires: one lug to GPIO2 (J1-5), the other to GND. A cold solder joint on a lug.</td></tr>
     <tr><td>"measuring&hellip;" never goes away after the warm-up</td><td>SCD-41 is not delivering values; check Serial for "SCD-41 not found" and the STEMMA cable.</td></tr>
     <tr><td>CO<sub>2</sub> fluctuates by 10-30&nbsp;ppm</td><td>Normal. People nearby, drafts and doors cause real changes too.</td></tr>
     <tr><td>Temperature reads 1-3&nbsp;&deg;C too high</td><td>The monitor stands in sunlight or next to something warm. Move it (section 11, <i>Sensor placement</i>).</td></tr>
@@ -1180,7 +1285,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Serial: <code>Wi-Fi: enter your network in secrets.h</code></td><td><code>secrets.h</code> still has the example name. Enter your network and upload again. Without Wi-Fi there's no clock, so nothing is recorded.</td></tr>
     <tr><td>"Wi-Fi: connecting&hellip;" but never "connected"</td><td>Wrong name or password (both are case-sensitive), a 5&nbsp;GHz-only network, or the router is too far away.</td></tr>
     <tr><td><code>status</code>: "Clock: not set yet" although Wi-Fi is connected</td><td>The router has no internet or blocks time requests (UDP port 123). The values wait in RAM for up to 24&nbsp;h. If your router offers time itself, enter its address as <code>NTP_SERVER_1</code>.</td></tr>
-    <tr><td>Serial: <code>History OFF: wrong partition scheme</code></td><td>Tools menu: Flash Size <b>8MB</b>, Partition Scheme <b>8M with spiffs (3MB APP/1.5MB SPIFFS)</b> (5.4), then upload again. The history is normally still there.</td></tr>
+    <tr><td>Serial: <code>History OFF: wrong partition scheme</code></td><td>Tools menu: Flash Size <b>16MB</b>, Partition Scheme <b>16M Flash (3MB APP/9.9MB FATFS)</b> (5.4), then upload again. The history is normally still there.</td></tr>
     <tr><td>Commands in the Serial Monitor do nothing</td><td>The line-ending box next to the input line is set to "No Line Ending". Choose "New Line".</td></tr>
     <tr><td>Web page doesn't open</td><td>The phone or PC is in another network (guest Wi-Fi, mobile data). Or the address has changed: <code>status</code> shows the current one, and a fixed address in the router (8.2) stops it changing.</td></tr>
     <tr><td>Web page: "No connection to the monitor"</td><td>The monitor is unplugged, restarting or out of Wi-Fi range. The page keeps trying every 5&nbsp;s and continues by itself.</td></tr>
@@ -1210,17 +1315,17 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       <img src="case_v5_iso.png" alt="The closed v5 case from the front and the sensor-chamber side" style="display:block; width:100%">
       <img src="case_v5_front.png" alt="The front of the v5 case" style="display:block; width:100%">
     </div>
-    <figcaption>Figure 7: The closed case (pictures of the 3D model). Left: from the front and the sensor-chamber side. Behind the side slots are the SCD-41 (blue) and the SHT45 (green); the lid has the speaker grille and 4 screws. Right: the front, with the display window, the light sensor's narrow window beside it, the panel button with its nut and the LED below it.</figcaption>
+    <figcaption>Figure 8: The closed case (pictures of the 3D model). Left: from the front and the sensor-chamber side. Behind the side slots are the SCD-41 (blue) and the SHT45 (green); the lid has the speaker grille and 4 screws. Right: the front, with the display window, the light sensor's narrow window beside it, the panel button with its nut and the LED below it.</figcaption>
   </figure>
 
   <figure>
     <img src="case_v5_top.png" alt="Top view of the v5 case with the lid and speaker removed" style="display:block; width:100%; max-width:130mm; margin:0 auto">
-    <figcaption>Figure 8: Top view with the lid and speaker removed: back (USB) on the left, front on the right, sensor chamber at the bottom. Middle: the ESP32 upside down on its 4 posts, with jumper plugs on the pins it uses (grey). Top: the SGP40 (pink) and the BMP580 (purple) behind their double wall. Right: the display (dark blue) behind the front wall, the light sensor (yellow) on its wall beside it, and the button (red). Bottom: SCD-41 (blue) and SHT45 (green). Red: the STEMMA QT cables.</figcaption>
+    <figcaption>Figure 9: Top view with the lid and speaker removed: back (USB) on the left, front on the right, sensor chamber at the bottom. Middle: the ESP32 upside down on its 4 posts, with jumper plugs on the pins it uses (grey). Top: the SGP40 (pink) and the BMP580 (purple) behind their double wall. Right: the display (dark blue) behind the front wall, the light sensor (yellow) on its wall beside it, and the button (red). Bottom: SCD-41 (blue) and SHT45 (green). Red: the STEMMA QT cables.</figcaption>
   </figure>
 
   <figure>
     <img src="case_v5_back_open.png" alt="The v5 case from the back and the compartment side with the lid removed" style="display:block; width:100%; max-width:120mm; margin:0 auto">
-    <figcaption>Figure 9: From the back and the SGP40/BMP580 side, lid and speaker removed. Through the side slots: the BMP580 (purple) and the SGP40 (pink). Inside: the double wall between the ESP32 and the compartment, the light sensor (yellow), and the display's back with the plug and cable in its top socket. In the back wall: the USB opening, the ESP32's 4 vents above it and each sensor bay's 4 vents.</figcaption>
+    <figcaption>Figure 10: From the back and the SGP40/BMP580 side, lid and speaker removed. Through the side slots: the BMP580 (purple) and the SGP40 (pink). Inside: the double wall between the ESP32 and the compartment, the light sensor (yellow), and the display's back with the plug and cable in its top socket. In the back wall: the USB opening, the ESP32's 4 vents above it and each sensor bay's 4 vents.</figcaption>
   </figure>
 
   <figure>
@@ -1228,7 +1333,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       <img src="case_v5_back.png" alt="The back of the v5 case" style="display:block; width:100%">
       <img src="case_v5_cut.png" alt="Cut across the v5 case" style="display:block; width:100%">
     </div>
-    <figcaption>Figure 10: Left: the back, seen from outside (compartment side on the left): the USB-C opening, the ESP32's 4 vent slots above it and each sensor bay's 2 &times; 2 slots. Right: cut across the case 30&nbsp;mm from the back wall, seen from the front: the sensor chamber with the SCD-41, its double wall, the ESP32 upside down with its jumper plugs, the second double wall and the SGP40; the speaker under the lid.</figcaption>
+    <figcaption>Figure 11: Left: the back, seen from outside (compartment side on the left): the USB-C opening, the ESP32's 4 vent slots above it and each sensor bay's 2 &times; 2 slots. Right: cut across the case 30&nbsp;mm from the back wall, seen from the front: the sensor chamber with the SCD-41, its double wall, the ESP32 upside down with its jumper plugs, the second double wall and the SGP40; the speaker under the lid.</figcaption>
   </figure>
 
   <figure>
@@ -1236,7 +1341,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       <img src="case_v5_display.png" alt="The display's mount, cut lengthways" style="display:block; width:100%">
       <img src="case_v5_veml.png" alt="The light sensor on its wall" style="display:block; width:100%">
     </div>
-    <figcaption>Figure 11: Left: the display's mount, cut lengthways through its two screws and seen from the compartment side (front wall on the left). The board stands in the floor groove with its glass in the recess. Two M2.5 &times; 4 screws from behind go through its holes into small spacers on the front wall, and the lip behind the board runs between the screw heads. In the middle are the light sensor's two screw heads on the bay side of its wall. Red: the cable up to the display's top socket and the light sensor's cable along the floor. Right: the light sensor from the button side (that side cut away). It is screwed to its wall with the nuts on the board, and its sensor sits at the front edge, behind its window. Both sockets have a plug: the top one from the BMP580, the bottom one on to the SHT45 through a hole at the foot of the wall.</figcaption>
+    <figcaption>Figure 12: Left: the display's mount, cut lengthways through its two screws and seen from the compartment side (front wall on the left). The board stands in the floor groove with its glass in the recess. Two M2.5 &times; 4 screws from behind go through its holes into small spacers on the front wall, and the lip behind the board runs between the screw heads. In the middle are the light sensor's two screw heads on the bay side of its wall. Red: the cable up to the display's top socket and the light sensor's cable along the floor. Right: the light sensor from the button side (that side cut away). It is screwed to its wall with the nuts on the board, and its sensor sits at the front edge, behind its window. Both sockets have a plug: the top one from the BMP580, the bottom one on to the SHT45 through a hole at the foot of the wall.</figcaption>
   </figure>
 
   <h3>Printed parts</h3>
@@ -1259,7 +1364,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Adafruit <b>SGP40</b> (4829)</td><td>air quality (VOC index 0-500)</td><td>STEMMA QT, I&sup2;C 0x59. Uses the humidity and temperature of the SHT45.</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td>Adafruit <b>STEMMA Speaker</b> (3885)</td><td>alarm beeps</td><td>class-D amplifier, 3-5&nbsp;V, 3-pin JST PH input</td><td><span class="st have">have</span></td></tr>
     <tr><td><b>Panel button</b>, Berrybase 10130 (red)</td><td>wake and sleep</td><td>M7 &times; 0.75, 27.5&nbsp;mm long, nut and washer included, solder lugs</td><td><span class="st ord">ordered</span></td></tr>
-    <tr><td><b>8&nbsp;mm addressable LED</b>, Berrybase PL9823-F8 (diffused), and a <b>1N4148</b> diode</td><td>CO<sub>2</sub> colour on the front</td><td>WS2812-style: one data wire, no resistors. Rated 4.5-6&nbsp;V, so it runs from 5&nbsp;V; the diode in its supply (about 4.2&nbsp;V left) makes the ESP32's 3.3&nbsp;V data count as high. Colour order red-green-blue.</td><td><span class="st ord">ordered</span></td></tr>
+    <tr><td><b>8&nbsp;mm addressable LED</b>, Berrybase PL9823-F8 (diffused)</td><td>CO<sub>2</sub> colour on the front</td><td>WS2812-style: one data wire, no resistors. Rated 4.5-6&nbsp;V, VDD straight to 5&nbsp;V (section 3). Colour order red-green-blue.</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td>STEMMA QT cables, plug to plug: 3 &times; 50&nbsp;mm, 1 &times; 100&nbsp;mm, 1 &times; 200&nbsp;mm</td><td>50: SGP40-BMP580, BMP580-light sensor, SHT45-SCD-41; 100: light sensor-SHT45; 200: SCD-41-display</td><td>A 150&nbsp;mm cable would just reach the display too.</td><td><span class="st have">have</span> 2 &times; 50<br><span class="st ord">ordered</span> 100, 200<br><span class="st buy">to buy</span> third 50</td></tr>
     <tr><td>STEMMA QT cable with female sockets, 150&nbsp;mm (Adafruit 4397)</td><td>ESP32 pins to the first sensor</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td>Female-female jumper wires, about 6, 10-20&nbsp;cm</td><td>button (2) and LED (3) wires</td><td>cut in half and solder the cut end to the part; heat-shrink over each joint</td><td><span class="st buy">to buy</span></td></tr>
@@ -1269,7 +1374,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>8 &times; M2.5 &times; 6 hex socket (ISO 4762)</td><td>SCD-41, SHT45, BMP580, SGP40, 2 each</td><td>cut their own thread in the posts; turned from outside through the slots</td><td><span class="st buy">to buy</span></td></tr>
     <tr><td>2 &times; M2.5 &times; 6 hex socket and 2 M2.5 nuts (5&nbsp;mm across flats)</td><td>light sensor</td><td>heads on the bay side of its wall, nuts on the board</td><td><span class="st buy">to buy</span></td></tr>
     <tr><td>2 &times; M2.5 &times; 4 hex socket</td><td>display</td><td>from behind into the spacers on the front wall</td><td><span class="st buy">to buy</span></td></tr>
-    <tr><td>4 &times; M2 &times; 6 button head (ISO 7380, head &#8960;3.5)</td><td>ESP32</td><td>at the two corners next to pin 1 of each row (3V3 and GND) a socket head (&#8960;3.8) would touch that pin's plug</td><td><span class="st buy">to buy</span></td></tr>
+    <tr><td>4 &times; M2 &times; 6 button head (ISO 7380, head &#8960;3.5)</td><td>ESP32</td><td>at the two corners next to pin 16 of each row (3V3 and GND) a socket head (&#8960;3.8) would touch that pin's plug</td><td><span class="st buy">to buy</span></td></tr>
     <tr><td>4 &times; M2 &times; 6</td><td>speaker, under the lid</td><td>-</td><td><span class="st buy">to buy</span></td></tr>
     <tr><td>Drills &#8960;1.6, 2.1, 2.5, 3.2, 7 and 8&nbsp;mm, a pin vise</td><td>opening the printed pilot holes</td><td>see <i>Printing at school</i>; the school workshop may have them</td><td><span class="st buy">to get</span></td></tr>
     <tr><td>Precision screwdriver, 2&nbsp;mm hex</td><td>side-slot screws</td><td>the blade must be thin (about &#8960;2.3&nbsp;mm) to reach through the 4&nbsp;mm slots; a Phillips PH1 is too thick</td><td><span class="st buy">to get</span></td></tr>
@@ -1334,7 +1439,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <p><b>Dust mesh:</b> the slots let in a little dust, so a mesh sits behind the sensor bays' slots in a groove on the inside of the outer wall. It slides in from above, so with the lid off it can be pulled out whenever the screwdriver is needed.</p>
   <figure>
     <svg id="case-mount" viewBox="0 52 450 236" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sensor board screwed to a standoff, screwdriver through a side slot" style="max-width:120mm"></svg>
-    <figcaption>Figure 12: Cut across the sensor chamber through the SCD-41's back screw, seen from the front, to scale. Dashed: the path of the screwdriver during assembly, with the lid off and the dust mesh pulled out. The SGP40/BMP580 compartment is built the same way, mirrored.</figcaption>
+    <figcaption>Figure 13: Cut across the sensor chamber through the SCD-41's back screw, seen from the front, to scale. Dashed: the path of the screwdriver during assembly, with the lid off and the dust mesh pulled out. The SGP40/BMP580 compartment is built the same way, mirrored.</figcaption>
   </figure>
 
   <h3>Display and light-sensor mounts</h3>
@@ -1346,10 +1451,10 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <ul>
       <li><b>USB-C opening:</b> 13.0 &times; 7.5&nbsp;mm, sized to your four cables (E5). Try all four in the ESP32 floor test piece before the full print: each must go fully into the socket without touching the edge.</li>
       <li><b>Waveshare board, underneath:</b> the module's position and the height of the parts under the board are read from Waveshare's drawing and photo. The model draws the module 18.0&nbsp;mm wide (its data sheet) and centred across the board. Waveshare's dimension drawing, measured again on 7 Nov 2026, shows it centred to within 0.1&nbsp;mm; an earlier product photo put its edge about 0.9&nbsp;mm nearer the 4th post. Check them when the board is here (E6, E7): centred, the module clears the two posts at the antenna end by 0.2&nbsp;mm on each side, and nothing under the board may be taller than the USB-C port (3.3&nbsp;mm). If the module does reach a post's neck, file that neck flat on the module's side.</li>
-      <li><b>ESP32 screws at the antenna end:</b> each button head leaves about 0.1&nbsp;mm to the plug on pin 1 of its row (3V3 and GND). If one touches, leave that screw out; the other three hold the board.</li>
+      <li><b>ESP32 screws at the antenna end:</b> each button head leaves about 0.1&nbsp;mm to the plug on pin 16 of its row (3V3 and GND). If one touches, leave that screw out; the other three hold the board.</li>
       <li><b>1.5" OLED:</b> the glass and tape thickness and the hole size are assumed (O8-O10). Check them on the board, or in Adafruit's 3D model of it, before printing.</li>
       <li><b>Display window:</b> its top edge is a 29.9&nbsp;mm bridge in the 1&nbsp;mm skin in front of the glass. No test piece has it: check it in the slicer's preview before the full print.</li>
-      <li><b>LED size:</b> there is no data sheet for the PL9823-F8, so the model uses Adafruit's 8&nbsp;mm LED (11&nbsp;mm tall, rim &#8960;8.9). Measure it (P2) before printing: the sleeve's length sets how far the dome stands out.</li>
+      <li><b>LED size:</b> the PL9823-F8's drawing gives no sizes, so the model uses Adafruit's 8&nbsp;mm LED (11&nbsp;mm tall, rim &#8960;8.9). Measure it (P2) before printing: the sleeve's length sets how far the dome stands out.</li>
       <li><b>Light sensor and LED:</b> the LED's and the display's light can't reach the sensor directly, but in a dark room some of it comes back from the room into the window. Handle it in the firmware (read with the LED off), and print in black if you can: ivory lets a little light through the walls.</li>
       <li><b>Dust mesh:</b> type and thickness (P5), which set its groove. The groove isn't modelled yet.</li>
       <li><b>Cable holes</b> at the foot of both double walls: seal them after wiring, for example with a bit of foam or putty.</li>
@@ -1450,7 +1555,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li><b>Setup, once</b> (PowerShell in the project folder): <code>&amp; "C:\Program Files\Python313\python.exe" -m venv cad\.venv</code>, then <code>cad\.venv\Scripts\python.exe -m pip install -r cad\requirements.txt</code>. This puts about 60 packages into <code>cad\.venv</code>. build123d runs on Python 3.11-3.14. Use the installed 3.13, because the <code>py</code> launcher's 3.14 entry is broken on this PC.</li>
     <li><b>Build:</b> <code>cad\.venv\Scripts\python.exe cad\case_v5.py</code> (about 80&nbsp;s). It writes <code>cad/out/v5/</code>: <code>base.step</code> and <code>lid.step</code> for the school, an STL of every part for Cura, and <code>viewer.html</code>.</li>
     <li><b>Test pieces:</b> <code>cad\.venv\Scripts\python.exe cad\test_pieces_v5.py</code> builds the base and cuts the test pieces out of it (<i>Printing at school</i>) into <code>cad/out/v5/test_pieces/</code>. Run it again after every change to <code>case_v5.py</code>. It prints each piece's size and volume and warns if a cut leaves a loose bit; the cuts only cross plain walls and floor.</li>
-    <li><b>Viewer:</b> double-click <code>cad/out/v5/viewer.html</code>. It shows the case with Adafruit's models of the sensor boards, the light sensor and the speaker, the plugs and cables, the 1.5" OLED drawn from its board file, and simple models of the ESP32 with its plugs, the button with its nut, the LED, the screw heads and nuts, and the rubber feet. Parts fixed to the lid lift with it. You can turn the model, switch parts on and off, lift the lid or make it see-through, and cut the case open along x, y or z. A view can also be set in the address, for example <code>viewer.html#iso&amp;lift=30&amp;hide=lid,cables</code> (also <code>isoBack</code>, <code>sideA</code>, <code>sideJ</code>, <code>zoom</code>, <code>at=x,y,z</code>, <code>cut=y,-12</code>, <code>ghost</code>, and <code>clean</code> for pictures without the panel; Figures 7-11 were made that way). It needs an internet connection, because it loads the three.js library.</li>
+    <li><b>Viewer:</b> double-click <code>cad/out/v5/viewer.html</code>. It shows the case with Adafruit's models of the sensor boards, the light sensor and the speaker, the plugs and cables, the 1.5" OLED drawn from its board file, and simple models of the ESP32 with its plugs, the button with its nut, the LED, the screw heads and nuts, and the rubber feet. Parts fixed to the lid lift with it. You can turn the model, switch parts on and off, lift the lid or make it see-through, and cut the case open along x, y or z. A view can also be set in the address, for example <code>viewer.html#iso&amp;lift=30&amp;hide=lid,cables</code> (also <code>isoBack</code>, <code>sideA</code>, <code>sideJ</code>, <code>zoom</code>, <code>at=x,y,z</code>, <code>cut=y,-12</code>, <code>ghost</code>, and <code>clean</code> for pictures without the panel; Figures 8-12 were made that way). It needs an internet connection, because it loads the three.js library.</li>
     <li><b>Checks:</b> the script prints each part's size and volume and whether it is a valid solid. It also runs these fit checks:
       <ul>
         <li>No board, plug, cable or bought part overlaps the case.</li>
@@ -1495,6 +1600,10 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.30</td><td>13 Nov 2026</td><td>The firmware drives the <b>8&nbsp;mm LED on GPIO18</b> (PL9823-F8): the CO<sub>2</sub> colour moved there from the board's own RGB LED, which now stays off (new setting <code>BOARD_LED_TOO</code> shows the colour on it as well). The PL9823 takes red first and is slower than the WS2812B, so the firmware sends its bits itself with the RMT peripheral. New Serial Monitor command <code>led</code> (7.6): red, green and blue for 1&nbsp;s each. New Figure 3 in section 3: how the LED is wired, with its leg order, leg lengths and flat side; the figures after it are renumbered. No 1N4148 diode any more: VDD goes straight to 5V, and the diode is only the fix if the LED flickers. Uploaded to the Waveshare board, where <code>led</code> answers; the LED itself is not wired yet. Sections 1, 2, 3, 6, 7, 8, 9, 11, 12 and 13 updated.</td></tr>
+    <tr><td>0.29</td><td>13 Nov 2026</td><td>Pin diagram (Figure 2, section 3): each pin in use now has the colour of the part it leads to (I&sup2;C chain blue, panel button orange, speaker purple, 8&nbsp;mm LED green, on-board RGB LED pink); the 5V pin, which feeds the speaker and the LED, is half purple, half green. A coloured wire joins each of these pins to its name and a label in the same colour. All other pins are white: a solid outline for a free GPIO, a dashed one for a pin to use with care (strapping, USB, Serial). The on-board RGB LED on GPIO8 and the BOOT button on GPIO9 are drawn on the board, joined to their pins. The pins are now numbered from the USB end (pin 1) to the antenna end (pin 16); the table <i>Pins used in the case</i>, the troubleshooting row for the button, the ESP32 screw notes in section 13 and the comments in the sketches follow. The table has the same colours. The figure is a little larger.</td></tr>
+    <tr><td>0.28</td><td>13 Nov 2026</td><td>The history keeps only two levels: 1-minute values for <b>14 days</b> and 5-minute values for <b>3 years</b>. Nothing older is kept. The hourly values (average, minimum, maximum) are gone from the firmware, the web page (graph band, calendar ring, download choice) and the serial command <code>csv</code>. 3 years fill about half of the 9.9&nbsp;MB. The 5-minute values are still worked out at every save, so for the last 14 days both levels exist. Tested on the Waveshare board with made-up readings. Sections 1, 6, 7, 8 and 9 updated; Figure 4 redrawn. Figure 5 (the web page screenshot) still shows the old calendar legend.</td></tr>
+    <tr><td>0.27</td><td>13 Nov 2026</td><td>The history now uses the Waveshare board's 16&nbsp;MB flash. New board settings (5.4): Flash Size <b>16MB</b>, Partition Scheme <b>16M Flash (3MB APP/9.9MB FATFS)</b>, which gives the history 9.9&nbsp;MB instead of 1.5&nbsp;MB. Kept now: 1-minute values 31 days (was 7), 5-minute values 3 years (was 90 days), hourly values about 20 years (was about 3&frac12;). The web page's download list shows how far back each level goes, as set in the firmware. Uploaded and tested on the Waveshare board (sensors not connected yet). Sections 1, 5, 7, 8, 9, 11 and 12 updated.</td></tr>
     <tr><td>0.26</td><td>7 Nov 2026</td><td>USB-C opening now 13.0 &times; 7.5&nbsp;mm (was 12.5 &times; 7.5), sized to the four cables' plug grips (E5 measured): at least 0.5&nbsp;mm on each side of each grip. The Waveshare board was measured again on Waveshare's dimension drawing. Board, holes and pin rows match the model to about 0.1&nbsp;mm, and the module and USB-C port are centred. The USB-C port sticks out about 0.5&nbsp;mm (Berrybase's top-view photo; the model had 0.8), so its face is now flush with the inside of the back wall, 2.0&nbsp;mm inside the outside face; new note on putting the board in. RESET and BOOT moved to the long edges (3.9-9.1&nbsp;mm from the USB end). Model, viewer, print files and the ESP32 floor test pieces made again; sections 11 and 13 updated.</td></tr>
     <tr><td>0.25</td><td>6 Nov 2026</td><td>Test pieces: the new script <code>cad/test_pieces_v5.py</code> cuts small pieces out of the v5 base (the ESP32 floor with the USB-C opening, and the SHT45's two posts) and writes ready-to-print STL files into <code>cad/out/v5/test_pieces/</code>, each also as a no-drill version with the screw holes at their drilled size. <i>Printing at school</i> now lists what each piece checks and which parts it needs; they are printed on the P1S. Sections 1 and 13 updated.</td></tr>
     <tr><td>0.24</td><td>6 Nov 2026</td><td>The 4th ESP32 post is now like the other three: round, with a pilot hole and an M2 screw (it was cut flat on the module's side and only carried the board). The model now draws the module at its data-sheet width (18.0&nbsp;mm), centred across the board, which clears both posts at the antenna end by 0.2&nbsp;mm; E6 checks it. 4 instead of 3 M2 button-head screws; Figure 8 redrawn; sections 2, 13 and the measurement table updated.</td></tr>
@@ -1584,87 +1693,124 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     const svg = document.getElementById('pinout-svg');
     const rows = document.getElementById('pin-rows');
     const legend = document.getElementById('pin-legend');
-    const STYLE = {
-      used:     { fill: '#1a7f37', text: '#fff',    label: 'Used in the case' },
-      power:    { fill: '#c62828', text: '#fff',    label: 'Power (3V3 / 5V)' },
-      gnd:      { fill: '#24292f', text: '#fff',    label: 'Ground' },
-      strap:    { fill: '#e9b730', text: '#1f2328', label: 'Strapping pin, avoid' },
-      reserved: { fill: '#6f42c1', text: '#fff',    label: 'Reserved: USB / Serial' },
-      free:     { fill: '#fff',    text: '#1f2328', label: 'Free GPIO', stroke: '#8c959f' },
-      ctrl:     { fill: '#8c959f', text: '#fff' },
-      nc:       { fill: '#eaeef2', text: '#8c959f' }
+    // One colour per part wired to the board. Every pin that is not in use is white.
+    const COMP = {
+      i2c:     { fill: '#0969da', label: 'I²C chain: sensors and OLED' },
+      button:  { fill: '#bc4c00', label: 'Panel button' },
+      speaker: { fill: '#8250df', label: 'Speaker' },
+      led:     { fill: '#1a7f37', label: '8 mm LED' },
+      rgb:     { fill: '#bf3989', label: 'On-board RGB LED' }
     };
-    // [name, type, note, usedHere]
+    const INK = '#1f2328', GREY = '#8c959f';
+    // From the antenna end to the USB end: [name, kind, note, part(s)]
+    // kind: free GPIO | care = free, but use with care (strapping, USB, Serial) | other = not a GPIO
     const J1 = [
-      ['3V3', 'power', '→ I²C chain (3.3 V out)', true],
-      ['RST', 'ctrl', 'reset (EN)'],
-      ['GPIO4', 'strap', 'strapping · ADC1_CH4 · LP'],
-      ['GPIO5', 'strap', 'strapping · ADC1_CH5 · LP'],
+      ['3V3', 'other', 'I²C chain: 3.3 V', 'i2c'],
+      ['RST', 'other', 'RESET button (EN)'],
+      ['GPIO4', 'care', 'strapping · ADC1_CH4 · LP'],
+      ['GPIO5', 'care', 'strapping · ADC1_CH5 · LP'],
       ['GPIO6', 'free', 'ADC1_CH6 · LP I²C SDA'],
       ['GPIO7', 'free', 'LP I²C SCL · LP'],
       ['GPIO0', 'free', 'ADC1_CH0 · 32k XTAL · LP'],
       ['GPIO1', 'free', 'ADC1_CH1 · 32k XTAL · LP'],
-      ['GPIO8', 'strap', 'strapping · on-board RGB LED'],
+      ['GPIO8', 'care', 'on-board RGB LED · strapping', 'rgb'],
       ['GPIO10', 'free', ''],
       ['GPIO11', 'free', ''],
-      ['GPIO2', 'used', '→ panel button', true],
-      ['GPIO3', 'used', '→ speaker SIG (PWM)', true],
-      ['5V', 'power', '→ speaker +, LED (via diode)', true],
-      ['GND', 'gnd', '→ speaker −', true],
-      ['NC', 'nc', 'not connected']
+      ['GPIO2', 'free', 'panel button', 'button'],
+      ['GPIO3', 'free', 'speaker: SIG (PWM)', 'speaker'],
+      ['5V', 'other', [['speaker +', 'speaker'], [' and ', null], ['8 mm LED', 'led']], ['speaker', 'led']],
+      ['GND', 'other', 'speaker: −', 'speaker'],
+      ['NC', 'other', 'not connected']
     ];
     const J3 = [
-      ['GND', 'gnd', '→ I²C chain (ground)', true],
-      ['GPIO16', 'reserved', 'TX · Serial (UART0)'],
-      ['GPIO17', 'reserved', 'RX · Serial (UART0)'],
-      ['GPIO15', 'strap', 'strapping'],
-      ['GPIO23', 'used', '→ I²C SDA', true],
-      ['GPIO22', 'used', '→ I²C SCL', true],
+      ['GND', 'other', 'I²C chain: ground', 'i2c'],
+      ['GPIO16', 'care', 'TX · Serial (UART0)'],
+      ['GPIO17', 'care', 'RX · Serial (UART0)'],
+      ['GPIO15', 'care', 'strapping'],
+      ['GPIO23', 'free', 'I²C chain: SDA', 'i2c'],
+      ['GPIO22', 'free', 'I²C chain: SCL', 'i2c'],
       ['GPIO21', 'free', 'SPI SCK (default)'],
       ['GPIO20', 'free', 'SPI MISO (default)'],
       ['GPIO19', 'free', 'SPI MOSI (default)'],
-      ['GPIO18', 'used', '→ 8 mm LED DIN', true],
-      ['GPIO9', 'strap', 'strapping · BOOT button'],
-      ['GND', 'gnd', '→ 8 mm LED GND', true],
-      ['GPIO13', 'reserved', 'USB D+'],
-      ['GPIO12', 'reserved', 'USB D−'],
-      ['GND', 'gnd', '→ panel button', true],
-      ['NC', 'nc', 'not connected']
+      ['GPIO18', 'free', '8 mm LED: DIN', 'led'],
+      ['GPIO9', 'care', 'strapping · BOOT button'],
+      ['GND', 'other', '8 mm LED: GND', 'led'],
+      ['GPIO13', 'care', 'USB D+'],
+      ['GPIO12', 'care', 'USB D−'],
+      ['GND', 'other', 'panel button', 'button'],
+      ['NC', 'other', 'not connected']
     ];
-    const Y = n => 112 + (n - 1) * 32;
+    const Y = i => 140 + i * 32;     // i = 0 at the antenna end
 
-    function side(pins, headerX, dir) {
-      pins.forEach(([name, type, note, used], i) => {
-        const n = i + 1, y = Y(n), s = STYLE[type];
-        el('rect', { x: headerX - 5, y: y - 5, width: 10, height: 10, fill: '#d4a72c', stroke: '#7d5a00' }, rows);
-        el('text', { x: headerX + dir * 21, y: y + 3.5, 'font-size': 9.5, fill: '#8c959f', 'text-anchor': dir < 0 ? 'end' : 'start' }, rows, n);
-        const pillX = dir < 0 ? 196 : 492;
-        const pill = el('rect', { x: pillX, y: y - 9, width: 72, height: 18, rx: 9, fill: s.fill }, rows);
-        if (s.stroke) pill.setAttribute('stroke', s.stroke);
-        if (used && type !== 'used') { pill.setAttribute('stroke', '#1a7f37'); pill.setAttribute('stroke-width', 3); }
-        el('text', { x: pillX + 36, y: y + 4, 'font-size': 11, 'font-weight': 700, fill: s.text, 'text-anchor': 'middle' }, rows, name);
-        if (note) {
-          el('text', {
-            x: dir < 0 ? 188 : 572, y: y + 4, 'font-size': 10.5, 'text-anchor': dir < 0 ? 'end' : 'start',
-            fill: used ? '#1a7f37' : '#57606a', 'font-weight': used ? 700 : 400
-          }, rows, note);
+    function side(pins, padX, dir) {
+      pins.forEach(([name, kind, note, part], i) => {
+        const n = 16 - i, y = Y(i);   // pin 1 is at the USB end
+        const parts = part ? [].concat(part) : [];
+        const used = parts.length > 0;
+        const fill = parts.length > 1 ? 'url(#pin-split)' : used ? COMP[parts[0]].fill : '#fff';
+        const pillW = 72, pillX = dir < 0 ? 196 : 492;
+        const wireX0 = dir < 0 ? pillX + pillW : padX + 8, wireX1 = dir < 0 ? padX - 8 : pillX;
+        // wire from the pin to its label: one per part, white pins get a thin grey line
+        if (!used) el('rect', { x: wireX0, y: y - 0.5, width: wireX1 - wireX0, height: 1, fill: '#afb8c1' }, rows);
+        parts.forEach((p, k) => el('rect', {
+          x: wireX0, y: parts.length > 1 ? y - 3.5 + k * 4 : y - 2, width: wireX1 - wireX0,
+          height: parts.length > 1 ? 3 : 4, fill: COMP[p].fill
+        }, rows));
+        // the header pin itself, with its number
+        el('rect', { x: padX - 8, y: y - 8, width: 16, height: 16, rx: 2, fill, stroke: used ? 'none' : INK }, rows);
+        el('text', { x: padX, y: y + 3.2, 'font-size': 9, 'font-weight': 700, fill: used ? '#fff' : INK, 'text-anchor': 'middle' }, rows, n);
+        // the name pill
+        const pill = el('rect', { x: pillX, y: y - 9, width: pillW, height: 18, rx: 9, fill }, rows);
+        if (!used) {
+          pill.setAttribute('stroke', kind === 'other' ? '#afb8c1' : INK);
+          pill.setAttribute('stroke-width', 1.2);
+          if (kind === 'care') pill.setAttribute('stroke-dasharray', '3 2');
+        }
+        el('text', {
+          x: pillX + pillW / 2, y: y + 4, 'font-size': 11.5, 'font-weight': 700, 'text-anchor': 'middle',
+          fill: used ? '#fff' : kind === 'other' ? GREY : INK
+        }, rows, name);
+        if (!note) return;
+        // the note; for a pin in use it sits in a tag in the part's colour
+        const t = el('text', {
+          x: dir < 0 ? 186 : 574, y: y + 4, 'font-size': used ? 11 : 10.5, 'text-anchor': dir < 0 ? 'end' : 'start',
+          fill: used ? COMP[parts[0]].fill : '#57606a', 'font-weight': used ? 700 : 400
+        }, rows, Array.isArray(note) ? null : note);
+        if (Array.isArray(note)) note.forEach(([s, p]) => el('tspan', { fill: p ? COMP[p].fill : '#57606a' }, t, s));
+        if (used) {
+          const b = t.getBBox(), c = parts.length > 1 ? GREY : COMP[parts[0]].fill;
+          const tag = el('rect', {
+            x: b.x - 5, y: y - 8.5, width: b.width + 10, height: 17, rx: 4,
+            fill: parts.length > 1 ? '#f6f8fa' : c, 'fill-opacity': parts.length > 1 ? 1 : 0.1, stroke: c, 'stroke-opacity': 0.6
+          }, rows);
+          rows.insertBefore(tag, t);
         }
       });
     }
-    side(J1, 305, -1);
-    side(J3, 455, 1);
+    side(J1, 304, -1);
+    side(J3, 456, 1);
 
-    ['used', 'power', 'gnd', 'strap', 'reserved', 'free'].forEach((key, i) => {
-      const s = STYLE[key], x = i < 3 ? 20 : 560, y = 14 + (i % 3) * 22;
-      const r = el('rect', { x, y, width: 16, height: 14, rx: 4, fill: s.fill }, legend);
-      if (s.stroke) r.setAttribute('stroke', s.stroke);
-      el('text', { x: x + 22, y: y + 11, 'font-size': 10.5, fill: '#1f2328' }, legend, s.label);
+    // legend: the parts on the left, the white pins on the right
+    Object.values(COMP).forEach((c, i) => {
+      const y = 10 + i * 18;
+      el('rect', { x: 20, y, width: 16, height: 12, rx: 3, fill: c.fill }, legend);
+      el('text', { x: 42, y: y + 10, 'font-size': 10.5, fill: INK }, legend, c.label);
+    });
+    [
+      { stroke: INK, label: 'Free GPIO' },
+      { stroke: INK, dash: '3 2', label: 'Use with care: strapping, USB, Serial' },
+      { stroke: '#afb8c1', label: 'Not a GPIO (RST, NC)', text: GREY }
+    ].forEach((s, i) => {
+      const y = 10 + i * 18;
+      const r = el('rect', { x: 520, y, width: 16, height: 12, rx: 3, fill: '#fff', stroke: s.stroke, 'stroke-width': 1.2 }, legend);
+      if (s.dash) r.setAttribute('stroke-dasharray', s.dash);
+      el('text', { x: 542, y: y + 10, 'font-size': 10.5, fill: s.text || INK }, legend, s.label);
     });
   })();
 </script>
 
 <script>
-  // Figure 12 (section 13): cut across the sensor chamber. The case views (Figures 7-11) are pictures of the 3D model.
+  // Figure 13 (section 13): cut across the sensor chamber. The case views (Figures 8-12) are pictures of the 3D model.
   // y across the case (+ = towards the compartment side, - = the sensor chamber), z up (0 = underside of the floor).
   (() => {
     const SVGNS = 'http://www.w3.org/2000/svg';
@@ -1682,7 +1828,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
       mk('text', { x: (xa + xb) / 2, y: y - 4, 'text-anchor': 'middle', 'font-size': 9, fill: C.line }, svg, t);
     };
 
-    // ---- Figure 12: cut across the sensor chamber through the SCD-41's back screw (x 9.5), seen from the front.
+    // ---- Figure 13: cut across the sensor chamber through the SCD-41's back screw (x 9.5), seen from the front.
     // v5 numbers (cad/case_v5.py): outer wall y -24..-22, standoff -10..-4, double wall -4..-2.8 and -1.2..0.
     {
       const svg = document.getElementById('case-mount');

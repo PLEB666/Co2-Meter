@@ -199,7 +199,8 @@ ESP_BUTTONS = ((3.9, 9.1, 0.3, 3.3), (3.9, 9.1, ESP_W - 3.3, ESP_W - 0.3))
 
 
 def pin_x(k):
-    """x of pin k (1..16): pin 16 (NC) is 12.0 from the USB end, pin 1 (3V3 / GND) at the antenna end."""
+    """x of pin k (1..16), counted here from the antenna end: pin 16 (NC) is 12.0 from the USB end, pin 1
+    (3V3 / GND) at the antenna end. The docs number the other way, from the USB end (docs pin = 17 - k)."""
     return ESP_X0 + 12.0 + (16 - k) * 2.54
 
 

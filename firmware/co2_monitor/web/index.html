@@ -72,11 +72,9 @@ h1{font-size:22px;font-weight:600;margin:0}
 .cal button{height:36px;padding:0;border-color:transparent;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-variant-numeric:tabular-nums}
 .cal button i,.legend i{display:block;width:5px;height:5px;border-radius:50%}
 .cal .has i,.legend .m{background:var(--acc)}
-.cal .hourly i,.legend .h{background:none;box-shadow:inset 0 0 0 1.5px var(--acc);width:6px;height:6px}
 .cal .today{border-color:var(--line)}
 .cal .sel{background:var(--acc);color:var(--on-acc)}
 .cal .sel.has i{background:var(--on-acc)}
-.cal .sel.hourly i{background:none;box-shadow:inset 0 0 0 1.5px var(--on-acc)}
 .legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:8px 0 0}
 .legend i{display:inline-block;margin-left:6px}
 .legend i:first-child{margin-left:0}
@@ -103,7 +101,6 @@ h1{font-size:22px;font-weight:600;margin:0}
 #chart .lim{stroke:var(--sub);stroke-dasharray:3 4;opacity:.7}
 #chart .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 #chart .s-co2{stroke:var(--co2)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}
-#chart .f-co2{fill:var(--co2);opacity:.16}#chart .f-tmp{fill:var(--tmp);opacity:.16}#chart .f-hum{fill:var(--hum);opacity:.16}
 #cross{stroke:var(--sub);display:none}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
 #msg:empty{display:none}
@@ -159,7 +156,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
     <div class="calhead"><button id="prev" aria-label="Previous month">‹</button><span id="month"></span><button id="next" aria-label="Next month">›</button></div>
     <div class="cal wd" id="wd"></div>
     <div class="cal" id="cal"></div>
-    <p class="legend"><i class="m"></i>Values stored <i class="h"></i>Hourly values only</p>
+    <p class="legend"><i class="m"></i>Values stored</p>
   </div>
   <div class="card controls">
     <div><p class="lbl">Day</p><div id="daylabel" class="day"></div></div>
@@ -186,9 +183,8 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
     <input type="date" id="dlfrom" aria-label="Start date"><span class="sub">to</span><input type="date" id="dlto" aria-label="End date">
     <select id="dlres" aria-label="Detail">
       <option value="best">Best available detail</option>
-      <option value="1">1-minute values (last 7 days)</option>
-      <option value="5">5-minute values (last 90 days)</option>
-      <option value="60">Hourly average, minimum, maximum</option>
+      <option value="1" id="dlres1">1-minute values</option>
+      <option value="5" id="dlres5">5-minute values</option>
     </select>
     <button id="dl" class="primary">Download CSV</button>
   </div>
@@ -208,11 +204,11 @@ const SERIES = [
   {key: 'hum', name: 'Humidity', unit: '%', dec: 1, minRange: 5},
 ];
 const RATINGS = [['Good', 'good'], ['OK', 'ok'], ['Ventilate', 'vent'], ['Bad air', 'bad']];
-const LEVEL_NAMES = {1: '1-minute values', 5: '5-minute values', 60: 'hourly values'};
+const LEVEL_NAMES = {1: '1-minute values', 5: '5-minute values'};
 
 let info = null;              // /api/info: state of the history
 let live = null, liveAt = 0;  // /api/now and when it arrived
-let marks = {};               // day of the shown month -> 'has' or 'has hourly'
+let marks = {};               // day of the shown month -> 'has'
 let points = [];              // values in the graph
 let win = {start: 0, end: 0}; // time range of the graph, UTC seconds
 let geo = null;               // graph layout, for the tooltip
@@ -241,19 +237,14 @@ async function get(path, options) {
 
 // Turns the binary records of /api/data into objects (layout in history.cpp)
 function parse(buffer, res) {
-  const v = new DataView(buffer), size = res === 60 ? 26 : 12, out = [];
+  const v = new DataView(buffer), size = 12, out = [];
   const co2 = o => v.getUint16(o, true) || null;
   const tmp = o => { const x = v.getInt16(o, true); return x === -32768 ? null : x / 100; };
   const hum = o => { const x = v.getUint16(o, true); return x === 65535 ? null : x / 100; };
   const pres = o => { const x = v.getUint16(o, true); return x ? x / 10 : null; };
   for (let o = 0; o + size <= buffer.byteLength; o += size) {
     const t = v.getUint32(o, true), p = {t, r: res, m: t + res * 30};  // m = middle of the period
-    if (res === 60) {
-      Object.assign(p, {co2: co2(o + 4), co2Lo: co2(o + 6), co2Hi: co2(o + 8), tmp: tmp(o + 10), tmpLo: tmp(o + 12),
-        tmpHi: tmp(o + 14), hum: hum(o + 16), humLo: hum(o + 18), humHi: hum(o + 20), pres: pres(o + 22), minutes: v.getUint8(o + 24)});
-    } else {
-      Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10)});
-    }
+    Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10)});
     out.push(p);
   }
   return out;
@@ -345,7 +336,7 @@ async function loadMonth() {
     for (let d = 1; d <= n; d++) {
       const s = dayStart(y, m, d), e = dayStart(y, m, d + 1);
       for (const x of days) {
-        if (x.first < e && x.last + x.res * 60 > s) found[d] = found[d] === 'has' || x.res < 60 ? 'has' : 'has hourly';
+        if (x.first < e && x.last + x.res * 60 > s) found[d] = 'has';
       }
     }
     marks = found;
@@ -399,11 +390,11 @@ function windowTimes() {
   return {start, end};
 }
 
-// Values for a time range. The newest part comes from the 1-minute values, older
-// parts from the 5-minute and then the hourly values, as far as each level goes back.
+// Values for a time range. The newest part comes from the 1-minute values, the
+// older part from the 5-minute values, as far as each level goes back.
 async function fetchRange(start, end) {
   const o = info.oldest, parts = [];
-  for (const [res, from] of [[1, o.m1 || start], [5, o.m5], [60, o.h1]]) {
+  for (const [res, from] of [[1, o.m1 || start], [5, o.m5]]) {
     if (start >= end) break;
     if (!from || end <= from) continue;
     const s = Math.max(start, from);
@@ -477,7 +468,7 @@ function drawChart() {
   hideTip();
   geo = null;
   const kinds = [...new Set(points.map(p => p.r))].sort((a, b) => a - b);
-  const desc = kinds.map(r => r === 60 ? 'hourly averages, band from minimum to maximum' : LEVEL_NAMES[r]).join(' and ');
+  const desc = kinds.map(r => LEVEL_NAMES[r]).join(' and ');
   $('res').textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
   if (!act.length) return message('Choose at least one value to show.');
   if (!points.length) return message('No values stored for this time.');
@@ -489,7 +480,7 @@ function drawChart() {
   let o = '';
   act.forEach((s, i) => {
     const top = T0 + i * (PH + G), k = s.key, vals = [];
-    for (const p of points) for (const v of [p[k], p[k + 'Lo'], p[k + 'Hi']]) if (v != null) vals.push(v);
+    for (const p of points) if (p[k] != null) vals.push(p[k]);
     o += `<text class="pl" x="${L}" y="${top - 9}">${s.name} (${s.unit})</text>`;
     if (!vals.length) {
       o += `<text x="${L}" y="${top + PH / 2}">No values</text>`;
@@ -516,10 +507,6 @@ function drawChart() {
     }
     if (run.length) runs.push(run);
     for (const r of runs) {
-      const band = r.filter(p => p[k + 'Lo'] != null);
-      if (band.length > 1) {
-        o += `<path class="f-${k}" d="M${band.map(p => px(p) + ' ' + Y(p[k + 'Hi'])).join('L')}L${band.reverse().map(p => px(p) + ' ' + Y(p[k + 'Lo'])).join('L')}Z"/>`;
-      }
       o += `<path class="ln s-${k}" d="M${r.map(p => px(p) + ' ' + Y(p[k])).join('L')}${r.length === 1 ? 'l0 0' : ''}"/>`;
     }
   });
@@ -560,7 +547,6 @@ function showTip(e) {
   for (const s of geo.act) {
     const v = p[s.key];
     h += `<div><i class="sq b-${s.key}"></i>${s.name} <b>${fmt(v, s.dec)}</b> ${v == null ? '' : s.unit}`;
-    if (p[s.key + 'Lo'] != null) h += ` <span class="sub">(${fmt(p[s.key + 'Lo'], s.dec)} to ${fmt(p[s.key + 'Hi'], s.dec)})</span>`;
     h += '</div>';
   }
   const tip = $('tip');
@@ -578,32 +564,26 @@ function hideTip() {
 
 // ---------- Download ----------
 
-// Start of the time a level keeps (the monitor deletes older files), 0 = until the flash is full
+// Start of the time a level keeps (the monitor deletes older files)
 function keptFrom(res) {
-  const days = info.keepDays[{1: 'm1', 5: 'm5', 60: 'h1'}[res]];
+  const days = info.keepDays[{1: 'm1', 5: 'm5'}[res]];
   return days ? Math.floor(now() / DAY - days) * DAY : 0;
 }
 
 // Finest level that still keeps the start date. The monitor's days are UTC days,
 // so a local day may begin up to a day earlier.
 function bestLevel(start) {
-  for (const res of [1, 5]) if (start + DAY > keptFrom(res)) return res;
-  return 60;
+  return start + DAY > keptFrom(1) ? 1 : 5;
 }
 
-function toCsv(rows, res) {
+function toCsv(rows) {
   // The browser's number format, so Excel splits the columns (22,5 and ; in German, for example)
   const comma = (1.5).toLocaleString().includes(','), sep = comma ? ';' : ',';
   const num = (v, d) => v == null ? '' : comma ? v.toFixed(d).replace('.', ',') : v.toFixed(d);
   const local = t => { const d = new Date(t * 1000); return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const utc = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
-  const cols = res === 60
-    ? [['co2_avg_ppm', 'co2', 0], ['co2_min_ppm', 'co2Lo', 0], ['co2_max_ppm', 'co2Hi', 0], ['temperature_avg_c', 'tmp', 2],
-       ['temperature_min_c', 'tmpLo', 2], ['temperature_max_c', 'tmpHi', 2], ['humidity_avg_pct', 'hum', 2],
-       ['humidity_min_pct', 'humLo', 2], ['humidity_max_pct', 'humHi', 2]]
-    : [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2]];
-  if (rows.some(p => p.pres != null)) cols.push([res === 60 ? 'pressure_avg_hpa' : 'pressure_hpa', 'pres', 1]);
-  if (res === 60) cols.push(['minutes', 'minutes', 0]);
+  const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2]];
+  if (rows.some(p => p.pres != null)) cols.push(['pressure_hpa', 'pres', 1]);
   const lines = [['time_local', 'time_utc', ...cols.map(c => c[0])].join(sep)];
   for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2]))].join(sep));
   return lines.join('\r\n') + '\r\n';
@@ -620,6 +600,13 @@ function saveFile(name, text) {
 }
 
 function setDownloadDates() {
+  // How far back the two finer levels go, as set in the monitor's firmware
+  const back = d => d >= 730 ? `${Math.round(d / 365.25)} years` : `${d} days`;
+  for (const res of [1, 5]) {
+    const days = info.keepDays[{1: 'm1', 5: 'm5'}[res]];
+    const name = LEVEL_NAMES[res];
+    $('dlres' + res).textContent = name.charAt(0).toUpperCase() + name.slice(1) + (days ? ` (last ${back(days)})` : '');
+  }
   const t = new Date(), oldest = oldestData(), min = oldest ? isoDate(new Date(oldest * 1000)) : '';
   for (const id of ['dlfrom', 'dlto']) {
     $(id).max = isoDate(t);
@@ -644,7 +631,7 @@ async function download() {
   const choice = $('dlres').value, res = choice === 'best' ? bestLevel(start) : +choice;
   if (start + DAY <= keptFrom(res)) return fail(`The ${LEVEL_NAMES[res]} only go back to ${dateText(keptFrom(res))}. Choose a later start date or less detail.`);
 
-  const chunk = {1: DAY, 5: 14 * DAY, 60: 92 * DAY}[res], total = Math.ceil((end - start) / chunk), rows = [];
+  const chunk = {1: DAY, 5: 14 * DAY}[res], total = Math.ceil((end - start) / chunk), rows = [];
   $('dl').disabled = true;
   try {
     for (let t = start, i = 1; t < end; t += chunk, i++) {
@@ -657,8 +644,8 @@ async function download() {
     $('dl').disabled = false;
   }
   if (!rows.length) return fail('No values stored between these dates.');
-  const name = `co2_${a}_${b}_${res === 60 ? 'hourly' : res + 'min'}.csv`;
-  saveFile(name, toCsv(rows, res));
+  const name = `co2_${a}_${b}_${res}min.csv`;
+  saveFile(name, toCsv(rows));
   note.textContent = `Saved ${name}, ${fmt(rows.length, 0)} rows of ${LEVEL_NAMES[res]}.`;
 }
 

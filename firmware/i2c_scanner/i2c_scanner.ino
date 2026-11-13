@@ -10,8 +10,8 @@
 
 #include <Wire.h>
 
-constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 5
-constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 6
+constexpr uint8_t I2C_SDA_PIN = 23;  // J3 pin 12 (pin 1 = USB end)
+constexpr uint8_t I2C_SCL_PIN = 22;  // J3 pin 11
 
 const char* deviceName(uint8_t address) {
   switch (address) {

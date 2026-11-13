@@ -1,19 +1,18 @@
 /*
   History - long-term storage of the measured values in the ESP32's flash
 
-  Stored with LittleFS on the 1.5 MB data partition of the partition scheme
-  "8M with spiffs (3MB APP/1.5MB SPIFFS)". Firmware uploads don't touch it.
+  Stored with LittleFS on the 9.9 MB data partition of the partition scheme
+  "16M Flash (3MB APP/9.9MB FATFS)". Firmware uploads don't touch it.
 
-  Three levels of detail, each in its own folder:
-    /m1/YYYYMMDD.bin  1-minute averages, one file per day      kept 7 days
-    /m5/YYYYMMDD.bin  5-minute averages, one file per day      kept 90 days
-    /h1/YYYYMM.bin    hourly average, minimum and maximum,     kept until the flash is
-                      one file per month                       full (about 3.5 years)
+  Two levels of detail, each in its own folder:
+    /m1/YYYYMMDD.bin  1-minute averages, one file per day      kept 14 days
+    /m5/YYYYMMDD.bin  5-minute averages, one file per day      kept 3 years
+  Nothing older than 3 years is kept.
 
   - All times are UTC. The web page converts them to local time.
   - The 1-minute values wait in RAM and are saved every 10 minutes. The 5-minute
-    and hourly values are then calculated from the saved 1-minute values, so a
-    power cut never leaves a hole in them.
+    values are then calculated from the saved 1-minute values, so a power cut never
+    leaves a hole in them. For the last 14 days both levels exist.
   - Records are only ever appended to a file, never changed. Old files are deleted.
 */
 #pragma once
@@ -36,19 +35,19 @@ bool historySave();
 // Serial Monitor helpers
 void historyPrintStatus(Print &out);
 void historyPrintFiles(Print &out);
-// level: "m1", "m5" or "h1". Returns false for an unknown level.
+// level: "m1" or "m5". Returns false for an unknown level.
 bool historyPrintCsv(Print &out, const char *level, uint16_t days);
 
 // ---------- Web page helpers (web.cpp) ----------
-// All times are UTC seconds. minutes is 1, 5 or 60.
+// All times are UTC seconds. minutes is 1 or 5.
 
 // True once the internet time has arrived
 bool historyClockSet();
 
 // Writes the stored values from "from" (included) to "to" (not included) as binary
-// records, exactly as they are in the files: 12 bytes per 1- or 5-minute value,
-// 26 bytes per hourly value (layouts in history.cpp). The 1-minute values include
-// the ones not saved yet. Returns false for an unknown number of minutes.
+// records, exactly as they are in the files: 12 bytes per value (layout in
+// history.cpp). The 1-minute values include the ones not saved yet. Returns false
+// for an unknown number of minutes.
 bool historyWriteRecords(Print &out, uint8_t minutes, uint32_t from, uint32_t to);
 
 // Writes a JSON list of the UTC days between from and to that have values:

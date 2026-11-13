@@ -15,7 +15,6 @@
 constexpr uint32_t SECONDS_PER_DAY = 86400;
 constexpr uint32_t MAX_SPAN_MINUTE = 2 * SECONDS_PER_DAY;   // 1-minute values, 34 KB
 constexpr uint32_t MAX_SPAN_FIVE = 14 * SECONDS_PER_DAY;    // 5-minute values, 48 KB
-constexpr uint32_t MAX_SPAN_HOUR = 92 * SECONDS_PER_DAY;    // hourly values, 57 KB
 constexpr uint32_t MAX_SPAN_DAYS = 45 * SECONDS_PER_DAY;    // calendar markers
 
 static WebServer server(80);
@@ -126,9 +125,9 @@ static void handleDays() {
 
 static void handleData() {
   long minutes = server.arg("res").toInt();
-  uint32_t maxSpan = minutes == 1 ? MAX_SPAN_MINUTE : minutes == 5 ? MAX_SPAN_FIVE : minutes == 60 ? MAX_SPAN_HOUR : 0;
+  uint32_t maxSpan = minutes == 1 ? MAX_SPAN_MINUTE : minutes == 5 ? MAX_SPAN_FIVE : 0;
   if (maxSpan == 0) {
-    server.send(400, "text/plain", "res must be 1, 5 or 60");
+    server.send(400, "text/plain", "res must be 1 or 5");
     return;
   }
   uint32_t from, to;

@@ -11,7 +11,7 @@
     /api/now                              live values, warm-up, sleep mode, Wi-Fi signal (JSON)
     /api/info                             state of the history (JSON)
     /api/days?from=..&to=..               which days have values, for the calendar (JSON)
-    /api/data?res=1|5|60&from=..&to=..    stored values as binary records (history.h)
+    /api/data?res=1|5&from=..&to=..      stored values as binary records (history.h)
     /api/sleep?on=1|0                     POST: turns sleep mode on or off (JSON)
 */
 #pragma once
