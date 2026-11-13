@@ -19,6 +19,8 @@
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
+  - Like a smart bulb, the light never jumps: a new brightness, a new LED colour and the
+    LED or the display going on or off all fade over FADE_TIME_MS.
   - Sleep mode for the night: the LED is off and the display shows a small moon.
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
@@ -145,13 +147,20 @@ constexpr uint8_t BRIGHTNESS_START = 50;
 // the slider doesn't write the flash every few milliseconds
 constexpr uint32_t BRIGHTNESS_SAVE_DELAY_MS = 3000;
 
+// ---------- Fading ----------
+// Like a smart bulb, every change of the light fades instead of jumping: a new brightness
+// (Auto, the slider, Serial), the LED's colour, the LED going on or off (sleep mode, the
+// first CO2 value) and the display going on or off. Each fade takes this long (ms).
+// 0 = no fading, every change at once.
+constexpr uint32_t FADE_TIME_MS = 1000;
+
 // ---------- Sleep mode ----------
 // For the night: the RGB LED stays off and the display shows a small moon. The sensors,
 // the history and the web page keep running. The setting survives a restart.
 // Holding the button this long turns sleep mode on or off.
 constexpr uint32_t LONG_PRESS_MS = 2000;
 // After a long press the display confirms the new mode for this long. In sleep mode it
-// then goes dark at once.
+// then fades out at once.
 constexpr uint32_t SLEEP_MESSAGE_MS = 2500;
 
 // ---------- Wi-Fi and clock ----------
@@ -180,6 +189,44 @@ Preferences settings;             // keeps sleep mode and brightness through a r
 // 8 x 8 moon, shown in the top line of the display while sleep mode is on
 const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0x3C};
 
+// A value that glides to each new target in a straight line, in FADE_TIME_MS. A new
+// target in the middle of a fade starts from where the value is at that moment, so it
+// never jumps, and a slider that keeps moving is followed smoothly.
+struct Fade {
+  float from = 0;
+  float to = 0;
+  uint32_t start = 0;  // millis() when the fade began
+
+  float value() const {
+    uint32_t elapsed = millis() - start;
+    if (elapsed >= FADE_TIME_MS) return to;
+    return from + (to - from) * elapsed / FADE_TIME_MS;
+  }
+  bool done() const {
+    return millis() - start >= FADE_TIME_MS;
+  }
+  void fadeTo(float target) {
+    if (target == to) return;
+    from = value();
+    to = target;
+    start = millis();
+  }
+  void jumpTo(float target) {
+    from = to = target;
+    start = millis() - FADE_TIME_MS;
+  }
+};
+
+// While fading, the display and the LED get a new value this often (ms). Drawing the
+// display holds the program for about 0.2 s; a fade going on meanwhile waits and then
+// catches up.
+constexpr uint32_t FADE_STEP_MS = 20;
+// Going on or off, a light fades between its level and this one, below 0 %: the LED is
+// dark here and the display at its faintest. So switching on and off look like the
+// brightness steps further down, and are as even to the eye. At the end of the fade
+// the LED is set to black and the display is switched off.
+constexpr float FADE_OFF_LEVEL = -40;
+
 bool displayFound = false;
 bool shtFound = false;
 bool scdFound = false;
@@ -188,22 +235,29 @@ uint8_t bmpAddress = 0;
 bool vemlFound = false;
 bool sgpFound = false;
 
-bool displayOn = false;
+bool displayOn = false;       // shows the values; false = fading out or off
+bool displayPanelOn = false;  // the SSD1327 is switched on (still true while it fades out)
 uint32_t displayOnSince = 0;
 bool screenChanged = false;  // something on the display has changed
 uint32_t lastDraw = 0;
+Fade displayLevel;           // the display's brightness now, in % (FADE_OFF_LEVEL = off)
+uint8_t oledContrast = 0;    // what the display is set to
 
 bool sleepMode = false;
 bool sleepMessageShown = false;  // the display confirms a long press
 uint32_t sleepMessageSince = 0;
 
 bool autoBrightness = true;        // false = a fixed level, set on the web page or by Serial
-uint8_t brightness = BRIGHTNESS_START;  // 0-100 %, what the display and the LED use now
+uint8_t brightness = BRIGHTNESS_START;  // 0-100 %, the level the display and the LED fade to
 float autoLevel = NAN;             // 0-100 %, from the light sensor, smoothed; NAN = no reading yet
-float ledScale = 0;                // what a full LED colour (255) is dimmed to
-uint8_t oledContrast = 0;          // what the display is set to
 bool brightnessUnsaved = false;
 uint32_t brightnessChangedAt = 0;
+
+Fade ledLevel;                   // the LED's brightness now, in % (FADE_OFF_LEVEL = off)
+Fade ledRed, ledGreen, ledBlue;  // its colour now, at full brightness (0-255 each)
+LedColour ledSent = {0, 0, 0};   // what was last sent to the LED
+bool ledResend = true;           // send it even if it looks the same (at the start, after the LED test)
+uint32_t lastLightsUpdate = 0;
 
 bool warmingUp = true;
 uint32_t warmupStart = 0;  // when the sensors started measuring
@@ -283,8 +337,9 @@ LedColour co2Colour(uint16_t ppm) {
   return LED_RED;
 }
 
-uint8_t dimmed(uint8_t value) {
-  return (uint8_t)lroundf(value * ledScale / 255);
+// value: one colour at full brightness (0-255). scale: what 255 is dimmed to.
+uint8_t dimmed(float value, float scale) {
+  return (uint8_t)lroundf(value * scale / 255);
 }
 
 // Sends a colour to the 8 mm LED. The PL9823 takes 24 bits like the board's WS2812B, but
@@ -312,12 +367,39 @@ void pl9823Write(uint8_t r, uint8_t g, uint8_t b) {
   rmtWrite(LED_PIN, bits, RMT_SYMBOLS_OF(bits), RMT_WAIT_FOR_EVER);
 }
 
-// LED off until the first CO2 value arrives, and in sleep mode
+float brightnessBetween(uint8_t min, uint8_t max, float level);  // in "Brightness" below
+
+// Every FADE_STEP_MS (from loop()). The LED fades to the CO2 colour at the current
+// brightness, and down to off until the first CO2 value arrives and in sleep mode.
+// It is only sent a colour when that has changed.
 void updateLed() {
-  LedColour colour = co2Ppm > 0 && !sleepMode ? co2Colour(co2Ppm) : LedColour{0, 0, 0};
-  uint8_t r = dimmed(colour.r), g = dimmed(colour.g), b = dimmed(colour.b);
-  pl9823Write(r, g, b);
-  if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, r, g, b);
+  bool on = co2Ppm > 0 && !sleepMode;
+  if (on) {
+    LedColour target = co2Colour(co2Ppm);
+    if (ledLevel.value() <= FADE_OFF_LEVEL) {
+      // While it is dark the colour can jump, then the LED fades in with the new one
+      ledRed.jumpTo(target.r);
+      ledGreen.jumpTo(target.g);
+      ledBlue.jumpTo(target.b);
+    } else {
+      ledRed.fadeTo(target.r);
+      ledGreen.fadeTo(target.g);
+      ledBlue.fadeTo(target.b);
+    }
+  }
+  ledLevel.fadeTo(on ? brightness : FADE_OFF_LEVEL);
+
+  LedColour shown = {0, 0, 0};
+  float level = ledLevel.value();
+  if (level > FADE_OFF_LEVEL) {
+    float scale = brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level);
+    shown = {dimmed(ledRed.value(), scale), dimmed(ledGreen.value(), scale), dimmed(ledBlue.value(), scale)};
+  }
+  if (!ledResend && shown.r == ledSent.r && shown.g == ledSent.g && shown.b == ledSent.b) return;
+  pl9823Write(shown.r, shown.g, shown.b);
+  if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, shown.r, shown.g, shown.b);
+  ledSent = shown;
+  ledResend = false;
 }
 
 // Serial Monitor command "led": red, green and blue for 1 s each, then back to the CO2
@@ -331,6 +413,7 @@ void testLed() {
     if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, steps[i].r, steps[i].g, steps[i].b);
     delay(1000);
   }
+  ledResend = true;
   updateLed();
   Serial.println(F("LED test done"));
 }
@@ -453,29 +536,46 @@ void drawScreen() {
   display.display();
 }
 
+// Draws the screen and fades the display in (updateDisplayBrightness() does the fading)
 void displayWake() {
   if (!displayFound) return;
-  if (!displayOn) {
-    display.oled_command(SSD1327_DISPLAYON);
-    displayOn = true;
-  }
+  displayOn = true;
   displayOnSince = millis();
-  drawScreen();
+  drawScreen();  // while the display is still dark, so it fades in with the new picture
+  if (!displayPanelOn) {
+    display.oled_command(SSD1327_DISPLAYON);
+    displayPanelOn = true;
+  }
 }
 
+// Fades the display out; updateDisplayBrightness() switches it off once it is dark
 void displayOff() {
-  if (!displayFound) return;
-  display.oled_command(SSD1327_DISPLAYOFF);
   displayOn = false;
   sleepMessageShown = false;
 }
 
-// From the button, the web page or the Serial Monitor
+// Every FADE_STEP_MS (from loop()). The display fades to the brightness while it is on,
+// and down to dark when it goes off; then the panel is switched off.
+void updateDisplayBrightness() {
+  if (!displayFound) return;
+  displayLevel.fadeTo(displayOn ? brightness : FADE_OFF_LEVEL);
+  uint8_t contrast = lroundf(brightnessBetween(OLED_BRIGHTNESS_MIN, OLED_BRIGHTNESS_MAX, displayLevel.value()));
+  if (contrast != oledContrast) {
+    display.setContrast(contrast);
+    oledContrast = contrast;
+  }
+  if (displayPanelOn && !displayOn && displayLevel.done()) {
+    display.oled_command(SSD1327_DISPLAYOFF);
+    displayPanelOn = false;
+  }
+}
+
+// From the button, the web page or the Serial Monitor. The LED fades out or in
+// (updateLed()).
 void setSleepMode(bool on) {
   if (on != sleepMode) {
     sleepMode = on;
     settings.putBool("sleep", on);
-    updateLed();
     screenChanged = true;  // adds or removes the moon if the display is on
   }
   Serial.println(on ? F("Sleep mode on: LED off") : F("Sleep mode off: LED on"));
@@ -491,18 +591,18 @@ void toggleSleepMode() {
 
 // ---------- Brightness ----------
 
-// min at 0 %, max at 100 %, the same factor for every % in between
-float brightnessBetween(uint8_t min, uint8_t max, uint8_t level) {
+// min at 0 %, max at 100 %, the same factor for every % in between. Below 0 % (fading
+// on or off) it goes on getting dimmer the same way.
+float brightnessBetween(uint8_t min, uint8_t max, float level) {
   return min * powf((float)max / min, level / 100.0f);
 }
 
-// Sets the display and the LED to a level, 0-100 %
-void applyBrightness(uint8_t level) {
-  brightness = level;
-  ledScale = brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level);
-  uint8_t contrast = lroundf(brightnessBetween(OLED_BRIGHTNESS_MIN, OLED_BRIGHTNESS_MAX, level));
-  if (displayFound && contrast != oledContrast) display.setContrast(contrast);  // also while it is off
-  oledContrast = contrast;
+// Every FADE_STEP_MS (from loop()): the display and the LED take the next step of
+// their fades. A new brightness only sets "brightness"; this fades both to it.
+void updateLights() {
+  if (millis() - lastLightsUpdate < FADE_STEP_MS) return;
+  lastLightsUpdate = millis();
+  updateDisplayBrightness();
   updateLed();
 }
 
@@ -513,7 +613,7 @@ void updateAutoBrightness() {
   float lux = constrain(lightLux, LUX_DARK, LUX_BRIGHT);
   float target = 100 * logf(lux / LUX_DARK) / logf(LUX_BRIGHT / LUX_DARK);
   autoLevel = isnan(autoLevel) ? target : autoLevel + (target - autoLevel) * AUTO_BRIGHTNESS_SPEED;
-  if (autoBrightness && fabsf(autoLevel - brightness) >= 1) applyBrightness(lroundf(autoLevel));
+  if (autoBrightness && fabsf(autoLevel - brightness) >= 1) brightness = lroundf(autoLevel);
 }
 
 // The level is saved BRIGHTNESS_SAVE_DELAY_MS after the last change (in loop())
@@ -530,22 +630,24 @@ void saveBrightnessWhenDue() {
 }
 
 // From the web page or the Serial Monitor: BRIGHTNESS_AUTO, or a fixed level 0-100 %.
-// Returns the level now in use.
+// Returns the level the display and the LED now fade to.
 uint8_t setBrightness(int level) {
   autoBrightness = level == BRIGHTNESS_AUTO;
   if (!autoBrightness) {
-    applyBrightness(constrain(level, 0, 100));
+    brightness = constrain(level, 0, 100);
   } else if (!isnan(autoLevel)) {
-    applyBrightness(lroundf(autoLevel));
+    brightness = lroundf(autoLevel);
   }  // Auto without a light reading keeps the level it has
   saveBrightnessSoon();
   return brightness;
 }
 
+// The level and what the display and the LED are set to at that level (at the end of a fade)
 void printBrightness() {
-  Serial.printf("Brightness: %u %% (%s), display %u of 255, LED %.1f of 255\n", brightness,
+  Serial.printf("Brightness: %u %% (%s), display %ld of 255, LED %.1f of 255\n", brightness,
                 autoBrightness ? (vemlFound ? "auto, from the light sensor" : "auto, but no light sensor") : "fixed",
-                oledContrast, ledScale);
+                lroundf(brightnessBetween(OLED_BRIGHTNESS_MIN, OLED_BRIGHTNESS_MAX, brightness)),
+                brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, brightness));
 }
 
 // ---------- Sensors ----------
@@ -638,8 +740,7 @@ void readScd41() {
   if (warmingUp) return;  // read anyway, so the next value is a new one
 
   co2Ppm = co2;
-  screenChanged = true;
-  updateLed();
+  screenChanged = true;  // the LED follows by itself (updateLed())
   historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);  // pressure is not stored
 
   // "name:value" pairs can be read by people and by the Serial Plotter
@@ -893,20 +994,26 @@ void setup() {
   if (sleepMode) Serial.println(F("Sleep mode on: LED off"));
   autoBrightness = settings.getBool("autobright", true);
 
+  // The saved level is used until the light sensor's first reading (on Auto, about 1 s
+  // later; the display and the LED then fade to the new level).
+  brightness = min(settings.getUChar("brightness", BRIGHTNESS_START), (uint8_t)100);
+
   // Both LEDs keep their last colour through a reset (for example from BlinkRGB), so clear them.
-  // The saved level is used until the light sensor's first reading (on Auto, about 1 s).
+  // The 8 mm LED stays off until the first CO2 value, then fades in.
   rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
-  applyBrightness(min(settings.getUChar("brightness", BRIGHTNESS_START), (uint8_t)100));
+  ledLevel.jumpTo(FADE_OFF_LEVEL);
+  updateLed();  // sends black, as ledResend is still true
 
   displayFound = display.begin(OLED_ADDRESS);
   if (displayFound) {
     display.setRotation(OLED_ROTATION);
-    display.setContrast(oledContrast);
+    displayOn = displayPanelOn = true;  // begin() switches the display on
+    displayLevel.jumpTo(brightness);    // no fade here: "starting..." shows at once
+    updateDisplayBrightness();
     display.clearDisplay();
     printCentred("CO2", 3, 40);
     printCentred("starting...", 1, 76);
     display.display();
-    displayOn = true;
     Serial.println(F("Display found"));
   } else {
     Serial.println(F("Display not found - check wiring and OLED_ADDRESS"));
@@ -956,6 +1063,7 @@ void loop() {
   updateWarmup();
   readSensors();
   saveBrightnessWhenDue();
+  updateLights();
   webLoop({co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, warmupSecondsLeft(), sleepMode,
            brightness, autoBrightness});
 
@@ -963,7 +1071,7 @@ void loop() {
     if (sleepMessageShown && millis() - sleepMessageSince >= SLEEP_MESSAGE_MS) {
       sleepMessageShown = false;
       if (sleepMode) {
-        displayOff();  // dark at once for the night
+        displayOff();  // fades out at once for the night
       } else {
         drawScreen();  // the values, until the display times out
       }

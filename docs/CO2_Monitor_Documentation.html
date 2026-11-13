@@ -105,7 +105,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.35: the light sensor sets the brightness of the display and LED, with Auto and a slider on the web page</span>
+    <span><b>Version</b> 0.36: the display and the LED fade to every new brightness, colour and on/off, like a smart bulb</span>
     <span><b>Updated</b> 13 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
@@ -559,10 +559,11 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
         <li><b>SGP40</b>: one raw reading per second, compensated with the SHT45's temperature and humidity. Sensirion's algorithm turns it into the <b>VOC index</b>: 100 = the room's usual air, higher = more VOCs (smells, solvents, cooking), lower = fewer. The index starts 45&nbsp;s after start-up, settles near 100 within minutes, and learns the room over the first hours. It keeps learning during the warm-up and in sleep mode.</li>
         <li>Pressure and the VOC index are <b>only printed</b> for now (Serial, <code>status</code>, <code>/api/now</code>). They are not on the display, nothing depends on them yet, and they are not stored. Neither is the light, which is also shown at the bottom of the web page.</li>
         <li><b>Warm-up</b>: for the first 30&nbsp;s after start-up the sensors measure, but no value is shown, printed or saved. The values from this time are thrown away. The display counts down ("warming up", 30&nbsp;s &hellip; 1&nbsp;s).</li>
-        <li><b>Display</b>: the 1.5" OLED, turned for the case, with the prototype's screen: CO<sub>2</sub> large, temperature and humidity at the bottom (Figure 4). On during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press. Pressing while it's on restarts the 30&nbsp;s. When off, the panel is fully dark and the content is kept. A whole picture takes about 0.2&nbsp;s on the I&sup2;C bus, so it is redrawn at most once a second. Its brightness follows the room light (<i>Brightness</i> below).</li>
-        <li><b>8&nbsp;mm LED</b> (GPIO18, Figure 3): dimmed to suit the room light, on all the time except in sleep mode, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value after the warm-up.</li>
+        <li><b>Display</b>: the 1.5" OLED, turned for the case, with the prototype's screen: CO<sub>2</sub> large, temperature and humidity at the bottom (Figure 4). On during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press. Pressing while it's on restarts the 30&nbsp;s. It fades in and out in 1&nbsp;s; when off, the panel is fully dark and the content is kept. A whole picture takes about 0.2&nbsp;s on the I&sup2;C bus, so it is redrawn at most once a second. Its brightness follows the room light (<i>Brightness</i> below).</li>
+        <li><b>8&nbsp;mm LED</b> (GPIO18, Figure 3): dimmed to suit the room light, on all the time except in sleep mode, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. It stays off until the first CO<sub>2</sub> value after the warm-up, then fades in.</li>
         <li><b>Sleep mode</b>: LED off, a small moon on the display. Hold the button for 2&nbsp;s or use the switch on the web page (see <i>Sleep mode</i> below).</li>
         <li><b>Brightness</b>: one level, 0-100&nbsp;%, for the display and the LED together. On <i>Auto</i> the light sensor sets it; the web page and the Serial Monitor can set a fixed level instead (see <i>Brightness</i> below).</li>
+        <li><b>Fading</b>: like a smart bulb, the light never jumps. A new brightness, a new LED colour, and the LED or the display going on or off all fade over 1&nbsp;s (see <i>Fading</i> below).</li>
         <li><b>Serial</b>: one line per CO<sub>2</sub> reading after the warm-up, with all six values and the brightness, usable in the Serial Monitor and the Serial Plotter.</li>
         <li><b>Wi-Fi and clock</b>: connects with the details in <code>secrets.h</code> at the fixed address 192.168.178.40 (8.2) and reconnects by itself. Gets the time (UTC) from the internet and updates it every 3&nbsp;hours.</li>
         <li><b>History</b>: stores 1-minute and 5-minute values of CO<sub>2</sub>, temperature and humidity in the flash (section 7). You can view them with commands in the Serial Monitor (7.6).</li>
@@ -643,6 +644,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td><code>AUTO_BRIGHTNESS_SPEED</code></td><td>0.3</td><td>How fast <i>Auto</i> follows the light: the share of the way taken with each reading (one a second). Higher = faster, 1 = at once.</td></tr>
     <tr><td><code>BRIGHTNESS_START</code></td><td>50</td><td>Level (%) of a new monitor until the light sensor's first reading, and the level <i>Auto</i> keeps if the light sensor is missing.</td></tr>
     <tr><td><code>BRIGHTNESS_SAVE_DELAY_MS</code></td><td>3000</td><td>A brightness set on the web page is saved this long after the last change (ms), so moving the slider doesn't write the flash again and again.</td></tr>
+    <tr><td><code>FADE_TIME_MS</code></td><td>1000</td><td>How long every change of the light takes (ms): a new brightness, a new LED colour, the LED or the display going on or off. Longer = softer, 0 = no fading.</td></tr>
     <tr><td><code>BOARD_LED_TOO</code></td><td>false</td><td><code>true</code> = the board's own RGB LED (GPIO8) shows the colour as well. In the case it faces the floor, so leave it <code>false</code> there.</td></tr>
     <tr><td><code>LED_GREEN</code>, <code>LED_YELLOW</code>, <code>LED_RED</code></td><td>{0,255,0} / {255,160,0} / {255,0,0}</td><td>The three colours at full brightness, as {red, green, blue}. Yellow has less green because the green LED looks brighter than the red one. If yellow looks too green, lower its middle value.</td></tr>
     <tr><td><code>WIFI_HOSTNAME</code></td><td>co2-monitor</td><td>The name shown in your router's device list.</td></tr>
@@ -660,7 +662,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td>1000 to 1999</td><td><b>VENTILATE</b> (inverted)</td><td><span class="wire" style="background:linear-gradient(90deg,#f2c200,#f07800,#e02020)"></span>yellow &rarr; orange &rarr; red</td><td>Air is getting stale. Open a window. 1000&nbsp;ppm is the classic guideline (Pettenkofer value).</td></tr>
     <tr><td>2000 and above</td><td><b>BAD AIR</b> (inverted)</td><td><span class="wire" style="background:#e02020"></span>red</td><td>Ventilate now. Tiredness and poor concentration are common at these levels.</td></tr>
   </table>
-  <p class="muted">The LED colour changes smoothly with the CO<sub>2</sub> value; for example, 1500&nbsp;ppm is orange. It is updated with every new reading (every 5&nbsp;s) and stays on while the display is off. In sleep mode it is off.</p>
+  <p class="muted">The LED colour changes smoothly with the CO<sub>2</sub> value; for example, 1500&nbsp;ppm is orange. It fades to the new colour with every new reading (every 5&nbsp;s) and stays on while the display is off. In sleep mode it is off.</p>
 
   <div style="break-inside: avoid">
   <h3 id="brightness">Brightness</h3>
@@ -669,7 +671,8 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <li><b>Auto</b> (the default): the light sensor sets the level. At or below 1&nbsp;lux it is 0&nbsp;%, at or above 400&nbsp;lux 100&nbsp;%, and in between every tenfold of light adds the same step. The level glides to a new light within about 5&nbsp;s, so a passing shadow doesn't make the LED flicker.</li>
     <li><b>Fixed level</b>: moving the slider on the web page (8.3), or <code>brightness 0-100</code> in the Serial Monitor (7.6), switches Auto off and keeps that level whatever the light. The <i>Auto</i> switch on the page, or <code>brightness auto</code>, hands it back to the light sensor.</li>
     <li><b>Remembered:</b> Auto on or off and the level are stored in the settings memory (NVS), like sleep mode, 3&nbsp;s after the last change. After a restart the saved level is used until the light sensor's first reading, about 1&nbsp;s later.</li>
-    <li><b>Sleep mode</b> still switches the LED off, whatever the brightness. Without the light sensor, Auto keeps the level it has.</li>
+    <li><b>Sleep mode</b> still switches the LED off (it fades out), whatever the brightness. Without the light sensor, Auto keeps the level it has.</li>
+    <li>Every new level is reached by a 1&nbsp;s <b>fade</b>, not a jump (<i>Fading</i> below).</li>
   </ul>
   <table>
     <tr><th>Room light</th><th>Level</th><th>Display (of 255)</th><th>LED (of 255)</th><th>For example</th></tr>
@@ -683,11 +686,23 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   </div>
 
   <div style="break-inside: avoid">
+  <h3 id="fading">Fading</h3>
+  <p>Like a smart bulb, the display and the LED never jump to a new setting: they <b>fade</b> to it over <code>FADE_TIME_MS</code> (1&nbsp;s).</p>
+  <ul>
+    <li><b>What fades:</b> a new brightness (Auto, the slider, <code>brightness</code>), the LED's colour with each CO<sub>2</sub> reading, the LED going off and on (sleep mode, the first CO<sub>2</sub> value after the warm-up), and the display going on (button press) and off (after 30&nbsp;s, or after the sleep mode message). Only "starting&hellip;" right after a restart appears at once.</li>
+    <li><b>Even to the eye:</b> the brightness fades through the same % steps as the level, so each part of a fade looks like the same change. Going off, a light fades on below 0&nbsp;% until it is dark; then the LED gets black and the display is switched off. Going on is the same backwards, with the new picture already drawn.</li>
+    <li><b>A new change during a fade</b> starts from where the light is at that moment, so it never jumps. When you move the slider on the web page, the display and the LED follow about a second behind.</li>
+    <li><b>Few steps when very dim:</b> at 0&nbsp;% the LED's colours are 1 of 255, so a fade down there has only a step or two. The display has more steps (6 of 255 at 0&nbsp;%).</li>
+    <li>Drawing the display holds the program for about 0.2&nbsp;s. A fade going on meanwhile waits and then catches up, which can show as a small hitch while the display is on.</li>
+  </ul>
+  </div>
+
+  <div style="break-inside: avoid">
   <h3 id="sleepmode">Sleep mode</h3>
   <p>For the night. Sleep mode switches the <b>LED off</b> and puts a <b>small moon</b> in the top line of the display (Figure 4). Everything else carries on: the sensors measure, the history records, and the web page works. Sleep mode is <b>not</b> the ESP32's deep sleep, which would stop all of that.</p>
   <table>
     <tr><th style="width:24%">Switch it with</th><th>How</th></tr>
-    <tr><td>The button</td><td><b>Hold it for 2&nbsp;s.</b> The display wakes as soon as you press, and after 2&nbsp;s it shows a big moon with "Sleep mode on - LED off" (or a sun with "off - LED on") for 2.5&nbsp;s. When switching on, the display then goes dark at once; when switching off, it shows the values for the rest of the 30&nbsp;s. A short press still just wakes the display, in sleep mode with the moon at the top.</td></tr>
+    <tr><td>The button</td><td><b>Hold it for 2&nbsp;s.</b> The display wakes as soon as you press, and after 2&nbsp;s it shows a big moon with "Sleep mode on - LED off" (or a sun with "off - LED on") for 2.5&nbsp;s. When switching on, the display then fades out at once; when switching off, it shows the values for the rest of the 30&nbsp;s. A short press still just wakes the display, in sleep mode with the moon at the top.</td></tr>
     <tr><td>The web page</td><td>The <i>Sleep mode</i> switch at the top right (8.3). The display stays dark, so the bedroom does too; if it happens to be on, the moon appears or disappears.</td></tr>
     <tr><td>The Serial Monitor</td><td><code>sleep on</code> or <code>sleep off</code> (7.6). <code>status</code> shows the current mode.</td></tr>
   </table>
@@ -790,7 +805,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td><code>csv m1 1</code></td><td>The 1-minute values of the last day as CSV. <code>m5</code> = 5-minute; the number is how many days back (<code>csv m5 7</code> = the last week of 5-minute values).</td></tr>
     <tr><td><code>save</code></td><td>Saves the minutes waiting in RAM now, for example before you unplug the monitor.</td></tr>
     <tr><td><code>sleep on</code>, <code>sleep off</code></td><td>Switches sleep mode on or off (section 6). The answer is <code>Sleep mode on: LED off</code> or <code>Sleep mode off: LED on</code>.</td></tr>
-    <tr><td><code>brightness</code></td><td>Shows the brightness: the level, Auto or fixed, and what the display and the LED are set to.</td></tr>
+    <tr><td><code>brightness</code></td><td>Shows the brightness: the level, Auto or fixed, and what the display and the LED are set to at that level (at the end of a fade).</td></tr>
     <tr><td><code>brightness auto</code>, <code>brightness 40</code></td><td>Lets the light sensor set the brightness, or sets a fixed level, 0-100&nbsp;% (section 6, <i>Brightness</i>). The answer is the <code>brightness</code> line.</td></tr>
     <tr><td><code>led</code></td><td>LED test: red, green and blue for 1&nbsp;s each on the 8&nbsp;mm LED, then the CO<sub>2</sub> colour again. If it stays dark or the colours come out wrong, see section 12.</td></tr>
   </table>
@@ -881,7 +896,7 @@ Not saved yet (in RAM): 2 minutes, next save in 505 s
     <tr><td>Time range</td><td>From and to, up to 24 hours. If "to" is earlier than "from", the range ends the next day. <i>Whole day</i> and <i>Night 22-08</i> set it with one click.</td></tr>
     <tr><td>Show</td><td>Switches the CO<sub>2</sub>, temperature and humidity graphs on and off. The browser remembers the choice.</td></tr>
     <tr><td>Sleep mode</td><td>The switch at the top right, next to the theme buttons. Blue with the knob on the right = on: the monitor's LED is off and its display shows a moon (section 6). It follows the monitor, so a long press on the button shows up here within 5&nbsp;s. Greyed out while there is no connection.</td></tr>
-    <tr><td>Brightness</td><td>The sun with the slider, to the left of the sleep mode switch: the brightness of the monitor's display and LED together, 0-100&nbsp;% (section 6, <i>Brightness</i>). With <i>Auto</i> on (blue), the slider is grey and follows the light sensor. <b>Moving the slider overrides Auto:</b> the switch goes off, the display and the LED change while you move it, and the level stays until you switch <i>Auto</i> back on. Both survive a restart of the monitor. Greyed out while there is no connection.</td></tr>
+    <tr><td>Brightness</td><td>The sun with the slider, to the left of the sleep mode switch: the brightness of the monitor's display and LED together, 0-100&nbsp;% (section 6, <i>Brightness</i>). With <i>Auto</i> on (blue), the slider is grey and follows the light sensor. <b>Moving the slider overrides Auto:</b> the switch goes off, the display and the LED glide after it while you move it (about 1&nbsp;s behind), and the level stays until you switch <i>Auto</i> back on. Both survive a restart of the monitor. Greyed out while there is no connection.</td></tr>
     <tr><td>Auto / Light / Dark</td><td>Auto follows the light or dark setting of the phone or PC. Light and Dark override it. The browser remembers the choice. (This is the page's own look, not the monitor's brightness.)</td></tr>
     <tr><td>Bottom line</td><td>Wi-Fi signal, room light from the light sensor, flash used by the history, and the time since the monitor started.</td></tr>
   </table>
@@ -973,8 +988,8 @@ CO2_ppm:614 Temperature_C:22.42 Humidity_pct:45.2 Pressure_hPa:1012.85 Light_lux
 
   <h3>Step 4: Button and display timeout</h3>
   <ol>
-    <li>About 30&nbsp;s after the warm-up ends (1&nbsp;minute after start-up) the display goes dark. Serial output continues, so the sensors are still running.</li>
-    <li>Press the button. The display turns on immediately with current values.</li>
+    <li>About 30&nbsp;s after the warm-up ends (1&nbsp;minute after start-up) the display fades out. Serial output continues, so the sensors are still running.</li>
+    <li>Press the button. The display fades in with current values, readable well within the 1&nbsp;s fade.</li>
     <li>Press again after ~20&nbsp;s. The 30&nbsp;s start over.</li>
   </ol>
 
@@ -1031,9 +1046,9 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
 
   <h3>Step 10: Sleep mode</h3>
   <ol>
-    <li>Hold the button. The display wakes at once; after 2&nbsp;s it shows the big moon with "Sleep mode on - LED off", and the LED goes out. Let go. After 2.5&nbsp;s the display goes dark.</li>
-    <li>Press the button briefly. The values appear with a small moon at the top, and the display goes dark again after 30&nbsp;s. The LED stays off.</li>
-    <li>Open the web page: the <i>Sleep mode</i> switch is on. Switch it off. The LED lights up in the CO<sub>2</sub> colour within a moment, and the Serial Monitor shows <code>Sleep mode off: LED on</code>.</li>
+    <li>Hold the button. The display fades in; after 2&nbsp;s it shows the big moon with "Sleep mode on - LED off", and the LED fades out within 1&nbsp;s. Let go. After 2.5&nbsp;s the display fades out.</li>
+    <li>Press the button briefly. The values fade in with a small moon at the top, and the display fades out again after 30&nbsp;s. The LED stays off.</li>
+    <li>Open the web page: the <i>Sleep mode</i> switch is on. Switch it off. The LED fades in to the CO<sub>2</sub> colour within about 1&nbsp;s, and the Serial Monitor shows <code>Sleep mode off: LED on</code>.</li>
     <li>Switch it on again on the page, then press RESET on the board. After the restart the Serial Monitor shows <code>Sleep mode on: LED off</code>, and the LED stays off after the warm-up. <code>csv m1 1</code> still gets a line every minute: sleep mode doesn't stop the recording.</li>
   </ol>
   <p class="muted">Tested on the board on 31 Oct 2026: web switch, <code>/api/sleep</code>, the Serial commands and the restart behaved as above.</p>
@@ -1042,8 +1057,9 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <ol>
     <li>Type <code>brightness</code>. It says "auto, from the light sensor" with a level that suits the room (section 6, <i>Brightness</i>).</li>
     <li>Wake the display and cover the light sensor's window with a finger. Within about 5&nbsp;s the display and the LED dim to their lowest; take the finger away and they come back. <code>brightness</code> shows 0&nbsp;% while it is covered (in a dark room it is 0&nbsp;% anyway).</li>
-    <li>On the web page, move the brightness slider. The <i>Auto</i> switch goes off, and the display and the LED follow the slider. Covering the sensor now changes nothing.</li>
-    <li>Wait 3&nbsp;s, then press RESET. After the restart the page still shows the slider's level with <i>Auto</i> off. Switch <i>Auto</i> on: the level jumps back to the one for the room light.</li>
+    <li>On the web page, move the brightness slider. The <i>Auto</i> switch goes off, and the display and the LED follow the slider, gliding about a second behind it. Covering the sensor now changes nothing.</li>
+    <li>Wake the display and type <code>brightness 0</code>, then <code>brightness 100</code>. Each time the display and the LED fade to the new level in about 1&nbsp;s, without a jump at the start or the end.</li>
+    <li>Wait 3&nbsp;s, then press RESET. After the restart the page still shows the slider's level with <i>Auto</i> off. Switch <i>Auto</i> on: the level jumps back to the one for the room light, and the display and the LED fade there.</li>
   </ol>
   <p class="muted">Tested on the board on 13 Nov 2026 over Wi-Fi: <code>/api/brightness</code> and <code>/api/now</code> (Auto gave 25&nbsp;% at 4.6&nbsp;lux, a fixed level survived a reset, wrong values gave error 400), and the page shows the new controls. The slider on the page, the display and the LED were not checked by eye.</p>
 </section>
@@ -1350,6 +1366,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Display and LED don't follow the room light</td><td>Auto is off: the web page's <i>Auto</i> switch is grey, <code>brightness</code> says "fixed". Switch Auto on, or type <code>brightness auto</code>. If it says "auto, but no light sensor", the VEML7700 wasn't found at the start: check its plugs and press RESET.</td></tr>
     <tr><td>Display or LED too dim or too bright on Auto</td><td>Change the ranges: <code>OLED_BRIGHTNESS_MIN</code>/<code>MAX</code> and <code>LED_BRIGHTNESS_MIN</code>/<code>MAX</code> for the dimmest and brightest, <code>LUX_DARK</code>/<code>LUX_BRIGHT</code> for the light at which they are reached (section 6, <i>Brightness</i>). For one evening, the slider on the web page is enough.</td></tr>
     <tr><td>LED colours look wrong when very dim</td><td>At the lowest levels each colour has only a step or two, so yellow and orange can look green or red. Raise <code>LED_BRIGHTNESS_MIN</code> to 2 or 3.</td></tr>
+    <tr><td>Fades too slow, too fast, or not wanted</td><td>Change <code>FADE_TIME_MS</code> (section 6, <i>Fading</i>): 2000 for softer fades, 300 for quicker ones, 0 for none. Very dim fades only have a step or two on the LED, which is normal.</td></tr>
     <tr><td>Holding the button doesn't switch sleep mode</td><td>Hold it for a full 2&nbsp;s, until the big moon or sun appears. A shorter press only wakes the display.</td></tr>
     <tr><td>Red LED on the ESP32 and green LEDs on the sensors stay on in sleep mode</td><td>They are power LEDs on the supply, not under software control. Cover them or disconnect them (section 11, Figure 7).</td></tr>
     <tr><td>Display text lies on its side or is upside down</td><td>Change <code>OLED_ROTATION</code> in the sketch (0-3, each step a quarter turn clockwise). 3 is for the case, 0 for the display held with its pin header at the top.</td></tr>
@@ -1681,6 +1698,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.36</td><td>13 Nov 2026</td><td>The light now <b>fades</b> like a smart bulb instead of jumping: a new brightness (Auto, the slider, <code>brightness</code>), the LED's colour with each CO<sub>2</sub> reading, the LED going off and on (sleep mode, first CO<sub>2</sub> value) and the display going on and off all take 1&nbsp;s. Fades run through the same % steps as the brightness, also below 0&nbsp;% when switching off, so they look even. A new change during a fade starts from the light as it is, so the slider is followed smoothly. New setting <code>FADE_TIME_MS</code> (1000, 0 = no fading). The display is now drawn before it is switched on, so the new picture fades in. The firmware updates the display and the LED every 20&nbsp;ms and only sends a value when it has changed. Uploaded to the Waveshare board; the fades were not watched by eye. New subsection <i>Fading</i> in section 6, a troubleshooting row; sections 6, 7.6, 8.3 and 9 (steps 4, 10 and 11) updated.</td></tr>
     <tr><td>0.35</td><td>13 Nov 2026</td><td>The <b>light sensor sets the brightness</b> of the display and the LED: one level, 0-100&nbsp;%, for both together. On <b>Auto</b> it goes from 0&nbsp;% at 1&nbsp;lux to 100&nbsp;% at 400&nbsp;lux, gliding to a new light within about 5&nbsp;s. New settings <code>LUX_DARK</code>, <code>LUX_BRIGHT</code>, <code>OLED_BRIGHTNESS_MIN</code>/<code>MAX</code> (6/255), <code>LED_BRIGHTNESS_MIN</code>/<code>MAX</code> (1/25), <code>AUTO_BRIGHTNESS_SPEED</code>, <code>BRIGHTNESS_START</code>, <code>BRIGHTNESS_SAVE_DELAY_MS</code>; <code>OLED_BRIGHTNESS</code> and <code>LED_BRIGHTNESS</code> are gone. The <b>web page</b> has a brightness slider with an <i>Auto</i> switch next to <i>Sleep mode</i>: moving the slider overrides Auto with a fixed level, the switch hands it back. New address <code>/api/brightness</code>; <code>/api/now</code> also gives <code>brightness</code> and <code>autoBrightness</code>, and the page's bottom line shows the room light. New Serial command <code>brightness [auto|0-100]</code>; <code>status</code> and the Serial lines show the brightness. Auto and the level survive a restart (NVS). The light sensor is now read during the warm-up too. Uploaded to the Waveshare board and checked over Wi-Fi: Auto gave 25&nbsp;% at 4.6&nbsp;lux, a fixed level of 40&nbsp;% survived a reset, wrong values gave error 400. The display, the LED and the slider on the page were not checked by eye; Figure 6 still shows the page without the slider. New subsection <i>Brightness</i> in section 6, test step 11, three troubleshooting rows. Sections 3, 6, 7, 8, 9, 11 and 12 updated.</td></tr>
     <tr><td>0.34</td><td>13 Nov 2026</td><td>The <b>display</b> shows the prototype's screen again, only larger: CO<sub>2</sub> and its rating at the top (digits 30&nbsp;&times;&nbsp;40 pixels), temperature and humidity at the bottom, all white. Pressure, light and the VOC index are off the display for now; they are still read and printed (Serial, <code>status</code>, <code>/api/now</code>). The picture is turned for the case: <code>OLED_ROTATION</code> is now 3, worked out from the case model (pin header on the right, seen from the front), assuming that at 0 the picture is upright with the pin header at the top. Figure 4 redrawn, the grey-level settings removed. Uploaded to the Waveshare board, which is back at 192.168.178.40 with believable values; the turned picture is not yet checked by eye. The parts table in section 13 now has the same status as section 2 (board, display, the three new sensors and the LED: <i>have</i>). Sections 3, 6, 9, 12 and 13 updated.</td></tr>
     <tr><td>0.33</td><td>13 Nov 2026</td><td>The <b>main program</b> now runs the case parts. Display: the <b>1.5" OLED</b> (SSD1327, 0x3D) with a new 128&nbsp;&times;&nbsp;128 layout in grey levels (Figure 4 redrawn); it is redrawn at most once a second. New sensors: <b>BMP580</b> air pressure (0x46 or 0x47), <b>VEML7700</b> light, <b>SGP40</b> with Sensirion's <b>VOC index</b> algorithm. The SGP40 is read without the library's 250&nbsp;ms wait, so the button and the web page don't have to wait. Their values are shown on the display, on Serial and in <code>/api/now</code>, but not stored and not yet used for anything. <b>Fixed address</b>: the monitor always uses 192.168.178.40 (new settings <code>USE_FIXED_IP</code>, <code>FIXED_IP</code>, <code>ROUTER_IP</code>, <code>SUBNET_MASK</code>); 8.2 rewritten. <code>status</code> also shows the MAC address, which parts were found and the current values. Uploaded to the Waveshare board (37&nbsp;% of the program space) with all six I&sup2;C parts and the LED connected: it took 192.168.178.40, and <code>/api/now</code> gave believable values (730&nbsp;ppm, 21.3&nbsp;&deg;C, 37&nbsp;%RH, 983.06&nbsp;hPa, 1.7&nbsp;lux; VOC index 7 at first, 129 a minute later, 107 after 3 minutes). The display and the LED were not checked by eye. The parts that arrived are marked <i>have</i> in section 2. Sections 1, 2, 3, 5, 6, 7, 8, 9, 11, 12 updated.</td></tr>
