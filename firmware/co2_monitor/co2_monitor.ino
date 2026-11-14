@@ -24,7 +24,9 @@
   - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 all the time, dimmed:
     green -> yellow -> red. The VOC index doesn't change its colour (LED_SHOWS_VOC), but
     from "VENTILATE" on (LED_BREATH_FROM_VOC) the LED slowly breathes: dims and brightens
-    again every 3 s, until the VOC index has been lower again for a minute.
+    again every 3 s, until the VOC index has been lower again for a minute. The LED has
+    its own task, and while it breathes or fades it flicks between neighbouring steps
+    (LED_DITHER), so it dims smoothly although it only uses its lowest 25 of 256 steps.
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
@@ -164,12 +166,27 @@ constexpr uint16_t LED_BREATH_FROM_VOC = VOC_OK_BELOW;
 constexpr uint32_t LED_BREATH_TIME_MS = 3000;
 // How far a breath dims the LED, in % steps of the brightness (as on the web page's
 // slider, so it looks even to the eye). 40 = to about a quarter. At a brightness below
-// 40 % the LED goes dark for a moment at the bottom of each breath.
+// 40 % the bottom of a breath is dimmer than the LED's dimmest step (LED_BRIGHTNESS_MIN);
+// it gets there by flicking between off and that step (LED_DITHER), and at 0 % it goes
+// dark for a moment.
 constexpr float LED_BREATH_DEPTH = 40;
 // The LED goes on breathing this long after the VOC index has dropped below
 // LED_BREATH_FROM_VOC, and then stops at the end of a breath, so a VOC index that wavers
 // around the limit doesn't start and stop it every few seconds
 constexpr uint32_t LED_BREATH_HOLD_MS = 60000;
+// The LED has 256 steps per colour, but it is so bright that it only uses the lowest
+// 1-25 of them (LED_BRIGHTNESS_MIN/MAX below), at 35 % brightness 1-3. A breath or a fade
+// down there would go in a few visible jumps (green 3 -> 2 -> 1). true = while the light
+// breathes or fades, the LED flicks between the two nearest steps so fast that the eye
+// sees the level in between (temporal dithering): 2.3 = 2, 3, 2, 2, 3, 2, ... A light
+// that stays the same gets the nearest step, as with false.
+constexpr bool LED_DITHER = true;
+// While the light moves, the LED gets a new value this often (ms). Its own task sends it,
+// so it keeps going while the display is drawn or the web page is served. Shorter = the
+// in-between levels flicker less, but each value should last at least one of the LED's
+// own PWM cycles (not published for the PL9823; such LEDs run at 400-1200 Hz).
+constexpr uint32_t LED_FRAME_MS = 3;
+static_assert(LED_FRAME_MS >= 1, "LED_FRAME_MS must be at least 1 ms");
 // true = the board's own RGB LED (GPIO8) shows the colour as well. In the case the
 // board's LED faces the floor, so it stays off there.
 constexpr bool BOARD_LED_TOO = false;
@@ -280,9 +297,9 @@ struct Fade {
   }
 };
 
-// While fading, the display and the LED get a new value this often (ms). Drawing the
-// display holds the program for about 0.2 s; a fade going on meanwhile waits and then
-// catches up.
+// While fading, the display gets a new brightness this often (ms). Drawing the display
+// holds the program for about 0.2 s; a fade going on meanwhile waits and then catches up.
+// The LED has its own task and pace (LED_FRAME_MS), so it doesn't wait.
 constexpr uint32_t FADE_STEP_MS = 20;
 // Going on or off, a light fades between its level and this one, below 0 %: the LED is
 // dark here and the display at its faintest. So switching on and off look like the
@@ -323,8 +340,12 @@ uint32_t brightnessChangedAt = 0;
 Fade ledLevel;                   // the LED's brightness now, in % (FADE_OFF_LEVEL = off)
 Fade ledRed, ledGreen, ledBlue;  // its colour now, at full brightness (0-255 each)
 LedColour ledSent = {0, 0, 0};   // what was last sent to the LED
-bool ledResend = true;           // send it even if it looks the same (at the start, after the LED test)
+bool ledResend = true;           // send it even if it looks the same (at the start)
 bool ledBreathing = false;       // it breathes because the VOC index is high (ledBreathDip())
+// While the Serial command "led" runs: the colour it shows (0xRRGGBB) instead of the air
+// quality colour. One 32-bit value, so the LED task never reads half of a new colour.
+constexpr uint32_t NO_LED_TEST = 0xFFFFFFFF;
+volatile uint32_t ledTestColour = NO_LED_TEST;
 uint32_t lastLightsUpdate = 0;
 
 bool warmingUp = true;
@@ -470,9 +491,19 @@ LedColour airColour() {
   return position <= 1 ? blendColour(LED_GREEN, LED_YELLOW, position) : blendColour(LED_YELLOW, LED_RED, position - 1);
 }
 
-// value: one colour at full brightness (0-255). scale: what 255 is dimmed to.
-uint8_t dimmed(float value, float scale) {
-  return (uint8_t)lroundf(value * scale / 255);
+// One colour of the LED as a whole step, 0-255. value: what it should be, with a fraction.
+// With dither, what is left over goes into "error" and is added in the next frame, so a
+// few frames together show the value exactly: 2.3 = 2, 3, 2, 2, 3, 2, ... Without, the
+// nearest step.
+uint8_t ledStep(float value, float &error, bool dither) {
+  if (!dither || value <= 0) {
+    error = 0;
+    return (uint8_t)lroundf(max(value, 0.0f));
+  }
+  float sum = value + error;
+  uint8_t step = (uint8_t)lroundf(constrain(sum, 0.0f, 255.0f));
+  error = sum - step;
+  return step;
 }
 
 // Sends a colour to the 8 mm LED. The PL9823 takes 24 bits like the board's WS2812B, but
@@ -528,10 +559,10 @@ float ledBreathDip() {
   return LED_BREATH_DEPTH * (1 - cosf(2 * PI * phase / LED_BREATH_TIME_MS)) / 2;
 }
 
-// Every FADE_STEP_MS (from loop()). The LED fades to the air quality colour at the
-// current brightness, and down to off until the first value arrives and in sleep mode.
-// While the VOC index is high it breathes (ledBreathDip()). It is only sent a colour
-// when that has changed.
+// Every LED_FRAME_MS, in the LED's own task (ledTask()). The LED fades to the air quality
+// colour at the current brightness, and down to off until the first value arrives and in
+// sleep mode. While the VOC index is high it breathes (ledBreathDip()). While it breathes
+// or fades it is dithered (LED_DITHER). It is only sent a colour when that has changed.
 void updateLed() {
   bool on = (co2Ppm > 0 || (LED_SHOWS_VOC && vocIndex > 0)) && !sleepMode;
   if (on) {
@@ -549,12 +580,16 @@ void updateLed() {
   }
   ledLevel.fadeTo(on ? brightness : FADE_OFF_LEVEL);
 
-  LedColour shown = {0, 0, 0};
   float level = ledLevel.value() - ledBreathDip();
-  if (level > FADE_OFF_LEVEL) {
-    float scale = brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level);
-    shown = {dimmed(ledRed.value(), scale), dimmed(ledGreen.value(), scale), dimmed(ledBlue.value(), scale)};
-  }
+  // What 255 is dimmed to, as a share (0 = dark)
+  float scale = level > FADE_OFF_LEVEL ? brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level) / 255 : 0;
+  bool moving = ledBreathing || !ledLevel.done() || !ledRed.done() || !ledGreen.done() || !ledBlue.done();
+  bool dither = LED_DITHER && moving;
+  static float error[3] = {0, 0, 0};  // what dithering carries over to the next frame
+  LedColour shown = {ledStep(ledRed.value() * scale, error[0], dither), ledStep(ledGreen.value() * scale, error[1], dither),
+                     ledStep(ledBlue.value() * scale, error[2], dither)};
+  uint32_t test = ledTestColour;
+  if (test != NO_LED_TEST) shown = {(uint8_t)(test >> 16), (uint8_t)(test >> 8), (uint8_t)test};
   if (!ledResend && shown.r == ledSent.r && shown.g == ledSent.g && shown.b == ledSent.b) return;
   pl9823Write(shown.r, shown.g, shown.b);
   if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, shown.r, shown.g, shown.b);
@@ -562,19 +597,32 @@ void updateLed() {
   ledResend = false;
 }
 
+// The LED's own task: every LED_FRAME_MS the next step of its fades, its breathing and its
+// dithering (updateLed()). It runs beside loop() at a higher priority (loop() has 1), so
+// the LED keeps going while loop() waits for the display (0.2 s per picture) or serves
+// the web page. It only works for a few hundredths of a millisecond each time.
+constexpr UBaseType_t LED_TASK_PRIORITY = 2;
+
+void ledTask(void *) {
+  TickType_t wake = xTaskGetTickCount();
+  for (;;) {
+    updateLed();
+    vTaskDelayUntil(&wake, pdMS_TO_TICKS(LED_FRAME_MS));
+  }
+}
+
 // Serial Monitor command "led": red, green and blue for 1 s each, then back to the CO2
 // colour. Shows that the LED is wired right and that its colours come in the right order.
+// The LED task shows them (ledTestColour).
 void testLed() {
-  const LedColour steps[] = {{40, 0, 0}, {0, 40, 0}, {0, 0, 40}};
+  const uint32_t steps[] = {0x280000, 0x002800, 0x000028};  // 40 of 255 each
   const char *names[] = {"red", "green", "blue"};
   for (uint8_t i = 0; i < 3; i++) {
     Serial.printf("LED test: %s\n", names[i]);
-    pl9823Write(steps[i].r, steps[i].g, steps[i].b);
-    if (BOARD_LED_TOO) rgbLedWrite(RGB_BUILTIN, steps[i].r, steps[i].g, steps[i].b);
+    ledTestColour = steps[i];
     delay(1000);
   }
-  ledResend = true;
-  updateLed();
+  ledTestColour = NO_LED_TEST;
   Serial.println(F("LED test done"));
 }
 
@@ -877,13 +925,13 @@ float brightnessBetween(uint8_t min, uint8_t max, float level) {
   return min * powf((float)max / min, level / 100.0f);
 }
 
-// Every FADE_STEP_MS (from loop()): the display and the LED take the next step of
-// their fades. A new brightness only sets "brightness"; this fades both to it.
+// Every FADE_STEP_MS (from loop()): the display takes the next step of its fade. A new
+// brightness only sets "brightness"; this fades the display to it, and the LED task the
+// LED (ledTask()).
 void updateLights() {
   if (millis() - lastLightsUpdate < FADE_STEP_MS) return;
   lastLightsUpdate = millis();
   updateDisplayBrightness();
-  updateLed();
 }
 
 // After every light reading. The level from the light is smoothed, and Auto only
@@ -1465,6 +1513,10 @@ void setup() {
   rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
   ledLevel.jumpTo(FADE_OFF_LEVEL);
   updateLed();  // sends black, as ledResend is still true
+  // From now on the LED's own task keeps it up to date
+  if (xTaskCreate(ledTask, "led", 4096, nullptr, LED_TASK_PRIORITY, nullptr) != pdPASS) {
+    Serial.println(F("LED: task start failed, the LED stays off"));
+  }
 
   displayFound = display.begin(OLED_ADDRESS);
   if (displayFound) {
