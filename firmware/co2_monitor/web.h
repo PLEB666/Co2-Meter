@@ -9,7 +9,7 @@
 
   The page gets its data from these addresses (all times are UTC seconds):
     /api/now                              live values, warm-up, sleep mode, brightness, Wi-Fi signal (JSON)
-                                          (pressure and voc are not on the page yet)
+                                          (voc is not on the page yet)
     /api/info                             state of the history (JSON)
     /api/days?from=..&to=..               which days have values, for the calendar (JSON)
     /api/data?res=1|5&from=..&to=..      stored values as binary records (history.h)

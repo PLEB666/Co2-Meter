@@ -13,7 +13,8 @@
   - Warm-up: for the first 30 s after start-up the sensors measure, but no value
     is shown, printed or saved. The display counts down meanwhile.
   - The display shows CO2, temperature and humidity, laid out as on the prototype.
-    Pressure, light and the VOC index are only printed (Serial, status, /api/now).
+    Pressure, light and the VOC index are not on the display. The pressure is on the
+    web page; light and the VOC index are only printed (Serial, status, /api/now).
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
   - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 level all the time, dimmed:
     green -> yellow -> red.
@@ -26,8 +27,8 @@
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
   - Wi-Fi gets the time from the internet and uses the fixed address FIXED_IP.
-    CO2, temperature and humidity are stored in the flash as 1-minute and 5-minute
-    averages (history.h explains how). Pressure, light and VOC are not stored.
+    CO2, temperature, humidity and air pressure are stored in the flash as 1-minute and
+    5-minute averages (history.h explains how). Light and VOC are not stored.
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
   - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off,
@@ -765,8 +766,9 @@ void readScd41() {
 
   co2Ppm = co2;
   screenChanged = true;  // the LED follows by itself (updateLed())
-  // Pressure is not stored. With a fixed test pressure nothing is (see pressureFixedHpa).
-  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, NAN);
+  // The BMP580's newest pressure is stored with it (NAN if there is none).
+  // With a fixed test pressure nothing is stored (see pressureFixedHpa).
+  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, pressureHpa);
 
   // "name:value" pairs can be read by people and by the Serial Plotter
   Serial.printf(

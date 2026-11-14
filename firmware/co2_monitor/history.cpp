@@ -61,7 +61,7 @@ struct __attribute__((packed)) SampleRecord {
   uint16_t co2;         // ppm
   int16_t temperature;  // 0.01 °C
   uint16_t humidity;    // 0.01 %RH
-  uint16_t pressure;    // 0.1 hPa (BMP390, planned)
+  uint16_t pressure;    // 0.1 hPa (BMP580)
 };
 
 static_assert(sizeof(FileHeader) == 16, "FileHeader must be 16 bytes");

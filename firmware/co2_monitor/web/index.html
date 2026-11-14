@@ -24,10 +24,10 @@ applyTheme();
 </script>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#15181c;--sub:#5d6573;--line:#e1e4e8;--grid:#edf0f2;--acc:#2a78d6;--on-acc:#fff;
---co2:#2a78d6;--tmp:#eb6834;--hum:#1baf7a;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
+--co2:#2a78d6;--tmp:#eb6834;--hum:#1baf7a;--prs:#8e5cc9;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
 --good:#e3f3e8;--good-tx:#1e6b34;--ok:#fbf0cf;--ok-tx:#7a5300;--vent:#fde4d4;--vent-tx:#93400f;--bad:#fbe0e0;--bad-tx:#a32d2d;color-scheme:light}
 :root[data-theme=dark]{--bg:#0f1216;--card:#171b21;--ink:#e6e8eb;--sub:#9aa2ad;--line:#2a3039;--grid:#20262e;--acc:#4b93ea;--on-acc:#fff;
---co2:#4b93ea;--tmp:#f07a45;--hum:#22b886;--err:#ff8a80;
+--co2:#4b93ea;--tmp:#f07a45;--hum:#22b886;--prs:#a986e8;--err:#ff8a80;
 --good:#17351f;--good-tx:#9fd9ae;--ok:#3a2f10;--ok-tx:#f0cf74;--vent:#42230f;--vent-tx:#f5ad80;--bad:#451a1a;--bad-tx:#f2a0a0;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -64,7 +64,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 .bright input:disabled,.bright input:disabled+.pct{opacity:.4;cursor:default}
 .pct{min-width:2.9em;text-align:right;font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
 .bright .switch{border:0;background:none;height:30px;padding:0 6px}
-.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px}
 .big{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
 .badge{font-size:12px;padding:2px 8px;border-radius:6px;margin-left:auto;background:var(--bg);color:var(--sub)}
@@ -96,7 +96,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 .chip[aria-pressed=false] .sq{background:none!important;box-shadow:inset 0 0 0 1.5px var(--sub)}
 .sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .chip .sq{margin:0}
-.b-co2{background:var(--co2)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}
+.b-co2{background:var(--co2)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}.b-pres{background:var(--prs)}
 .charttop{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-bottom:8px}
 .wintext{font-size:16px;font-weight:600}
 .charthead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin-bottom:4px}
@@ -107,7 +107,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 #chart .gl{stroke:var(--grid)}
 #chart .lim{stroke:var(--sub);stroke-dasharray:3 4;opacity:.7}
 #chart .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-#chart .s-co2{stroke:var(--co2)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}
+#chart .s-co2{stroke:var(--co2)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}#chart .s-pres{stroke:var(--prs)}
 #cross{stroke:var(--sub);display:none}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
 #msg:empty{display:none}
@@ -119,7 +119,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
   .row{grid-template-columns:minmax(0,1fr)}
   .row .controls{order:-1}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .tiles .card:first-child{grid-column:1/-1}
+  .tiles .card:first-child,.tiles .card:last-child{grid-column:1/-1}
   .big{font-size:26px}
 }
 </style>
@@ -149,6 +149,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
   <div class="card"><p class="lbl">CO<sub>2</sub></p><div class="val"><span id="co2" class="big">–</span><span class="sub">ppm</span><span id="badge" class="badge"></span></div></div>
   <div class="card"><p class="lbl">Temperature</p><div class="val"><span id="tmp" class="big">–</span><span class="sub">°C</span></div></div>
   <div class="card"><p class="lbl">Humidity</p><div class="val"><span id="hum" class="big">–</span><span class="sub">%</span></div></div>
+  <div class="card" title="Measured where the monitor stands. Weather reports convert the pressure to sea level, so they show a higher value."><p class="lbl">Air pressure</p><div class="val"><span id="prs" class="big">–</span><span class="sub">hPa</span></div></div>
 </section>
 
 <section class="card">
@@ -185,6 +186,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
         <button class="chip" data-s="co2" aria-pressed="true"><i class="sq b-co2"></i>CO₂</button>
         <button class="chip" data-s="tmp" aria-pressed="true"><i class="sq b-tmp"></i>Temperature</button>
         <button class="chip" data-s="hum" aria-pressed="true"><i class="sq b-hum"></i>Humidity</button>
+        <button class="chip" data-s="pres" aria-pressed="true"><i class="sq b-pres"></i>Air pressure</button>
       </div>
     </div>
   </div>
@@ -215,6 +217,7 @@ const SERIES = [
   {key: 'co2', name: 'CO₂', unit: 'ppm', dec: 0, minRange: 100},
   {key: 'tmp', name: 'Temperature', unit: '°C', dec: 1, minRange: 1},
   {key: 'hum', name: 'Humidity', unit: '%', dec: 1, minRange: 5},
+  {key: 'pres', name: 'Air pressure', unit: 'hPa', dec: 1, minRange: 3},
 ];
 const RATINGS = [['Good', 'good'], ['OK', 'ok'], ['Ventilate', 'vent'], ['Bad air', 'bad']];
 const LEVEL_NAMES = {1: '1-minute values', 5: '5-minute values'};
@@ -226,7 +229,7 @@ let points = [];              // values in the graph
 let win = {start: 0, end: 0}; // time range of the graph, UTC seconds
 let geo = null;               // graph layout, for the tooltip
 let lastHours = 0;            // > 0 while "Last … h" is chosen; the range then moves with the time
-let show = {co2: true, tmp: true, hum: true};
+let show = {co2: true, tmp: true, hum: true, pres: true};
 try { Object.assign(show, JSON.parse(localStorage.getItem('show'))); } catch (e) {}
 
 const now = () => Date.now() / 1000;
@@ -348,6 +351,7 @@ function showLive() {
   $('co2').textContent = fmt(warm ? null : live.co2, 0);
   $('tmp').textContent = fmt(warm ? null : live.temperature, 1);
   $('hum').textContent = fmt(warm ? null : live.humidity, 0);
+  $('prs').textContent = fmt(warm ? null : live.pressure, 0);
   const b = $('badge');
   if (warm || live.co2 == null) {
     b.textContent = warm ? 'Warming up, ' + live.warmup + ' s' : '';
@@ -628,8 +632,7 @@ function toCsv(rows) {
   const num = (v, d) => v == null ? '' : comma ? v.toFixed(d).replace('.', ',') : v.toFixed(d);
   const local = t => { const d = new Date(t * 1000); return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const utc = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
-  const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2]];
-  if (rows.some(p => p.pres != null)) cols.push(['pressure_hpa', 'pres', 1]);
+  const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2], ['pressure_hpa', 'pres', 1]];
   const lines = [['time_local', 'time_utc', ...cols.map(c => c[0])].join(sep)];
   for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2]))].join(sep));
   return lines.join('\r\n') + '\r\n';
