@@ -24,10 +24,10 @@ applyTheme();
 </script>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#15181c;--sub:#5d6573;--line:#e1e4e8;--grid:#edf0f2;--acc:#2a78d6;--on-acc:#fff;
---co2:#2a78d6;--tmp:#eb6834;--hum:#1baf7a;--prs:#8e5cc9;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
+--co2:#2a78d6;--voc:#c4458a;--tmp:#eb6834;--hum:#1baf7a;--prs:#8e5cc9;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
 --good:#e3f3e8;--good-tx:#1e6b34;--ok:#fbf0cf;--ok-tx:#7a5300;--vent:#fde4d4;--vent-tx:#93400f;--bad:#fbe0e0;--bad-tx:#a32d2d;color-scheme:light}
 :root[data-theme=dark]{--bg:#0f1216;--card:#171b21;--ink:#e6e8eb;--sub:#9aa2ad;--line:#2a3039;--grid:#20262e;--acc:#4b93ea;--on-acc:#fff;
---co2:#4b93ea;--tmp:#f07a45;--hum:#22b886;--prs:#a986e8;--err:#ff8a80;
+--co2:#4b93ea;--voc:#e276b4;--tmp:#f07a45;--hum:#22b886;--prs:#a986e8;--err:#ff8a80;
 --good:#17351f;--good-tx:#9fd9ae;--ok:#3a2f10;--ok-tx:#f0cf74;--vent:#42230f;--vent-tx:#f5ad80;--bad:#451a1a;--bad-tx:#f2a0a0;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -64,7 +64,11 @@ h1{font-size:22px;font-weight:600;margin:0}
 .bright input:disabled,.bright input:disabled+.pct{opacity:.4;cursor:default}
 .pct{min-width:2.9em;text-align:right;font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
 .bright .switch{border:0;background:none;height:30px;padding:0 6px}
-.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.tiles .card{grid-column:span 2}
+.tiles .air{grid-column:span 3}
+.note{font-size:12px;color:var(--sub);margin:4px 0 0}
+.note:empty{display:none}
 .val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px}
 .big{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
 .badge{font-size:12px;padding:2px 8px;border-radius:6px;margin-left:auto;background:var(--bg);color:var(--sub)}
@@ -96,7 +100,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 .chip[aria-pressed=false] .sq{background:none!important;box-shadow:inset 0 0 0 1.5px var(--sub)}
 .sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .chip .sq{margin:0}
-.b-co2{background:var(--co2)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}.b-pres{background:var(--prs)}
+.b-co2{background:var(--co2)}.b-voc{background:var(--voc)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}.b-pres{background:var(--prs)}
 .charttop{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-bottom:8px}
 .wintext{font-size:16px;font-weight:600}
 .charthead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin-bottom:4px}
@@ -107,7 +111,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 #chart .gl{stroke:var(--grid)}
 #chart .lim{stroke:var(--sub);stroke-dasharray:3 4;opacity:.7}
 #chart .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-#chart .s-co2{stroke:var(--co2)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}#chart .s-pres{stroke:var(--prs)}
+#chart .s-co2{stroke:var(--co2)}#chart .s-voc{stroke:var(--voc)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}#chart .s-pres{stroke:var(--prs)}
 #cross{stroke:var(--sub);display:none}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
 #msg:empty{display:none}
@@ -119,7 +123,8 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
   .row{grid-template-columns:minmax(0,1fr)}
   .row .controls{order:-1}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .tiles .card:first-child,.tiles .card:last-child{grid-column:1/-1}
+  .tiles .card{grid-column:span 1}
+  .tiles .air,.tiles .card:last-child{grid-column:1/-1}
   .big{font-size:26px}
 }
 </style>
@@ -146,7 +151,8 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
 </header>
 
 <section class="tiles">
-  <div class="card"><p class="lbl">CO<sub>2</sub></p><div class="val"><span id="co2" class="big">–</span><span class="sub">ppm</span><span id="badge" class="badge"></span></div></div>
+  <div class="card air"><p class="lbl">CO<sub>2</sub></p><div class="val"><span id="co2" class="big">–</span><span class="sub">ppm</span><span id="badge" class="badge"></span></div></div>
+  <div class="card air" title="Volatile organic compounds, from cooking, cleaning products, paint, perfume or many people. The index is relative: 100 is the room's usual air over the last day, higher means more than usual (up to 500), lower means cleaner."><p class="lbl">VOC index</p><div class="val"><span id="voc" class="big">–</span><span class="sub">100 = usual air</span><span id="vocbadge" class="badge"></span></div><p id="vocnote" class="note"></p></div>
   <div class="card"><p class="lbl">Temperature</p><div class="val"><span id="tmp" class="big">–</span><span class="sub">°C</span></div></div>
   <div class="card"><p class="lbl">Humidity</p><div class="val"><span id="hum" class="big">–</span><span class="sub">%</span></div></div>
   <div class="card" title="Measured where the monitor stands. Weather reports convert the pressure to sea level, so they show a higher value."><p class="lbl">Air pressure</p><div class="val"><span id="prs" class="big">–</span><span class="sub">hPa</span></div></div>
@@ -184,6 +190,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
       <p class="lbl">Show</p>
       <div class="line" id="toggles">
         <button class="chip" data-s="co2" aria-pressed="true"><i class="sq b-co2"></i>CO₂</button>
+        <button class="chip" data-s="voc" aria-pressed="true"><i class="sq b-voc"></i>VOC index</button>
         <button class="chip" data-s="tmp" aria-pressed="true"><i class="sq b-tmp"></i>Temperature</button>
         <button class="chip" data-s="hum" aria-pressed="true"><i class="sq b-hum"></i>Humidity</button>
         <button class="chip" data-s="pres" aria-pressed="true"><i class="sq b-pres"></i>Air pressure</button>
@@ -215,6 +222,7 @@ const DAY = 86400;
 const DEVICE = new URLSearchParams(location.search).get('device');
 const SERIES = [
   {key: 'co2', name: 'CO₂', unit: 'ppm', dec: 0, minRange: 100},
+  {key: 'voc', name: 'VOC index', unit: '', dec: 0, minRange: 50},
   {key: 'tmp', name: 'Temperature', unit: '°C', dec: 1, minRange: 1},
   {key: 'hum', name: 'Humidity', unit: '%', dec: 1, minRange: 5},
   {key: 'pres', name: 'Air pressure', unit: 'hPa', dec: 1, minRange: 3},
@@ -229,7 +237,7 @@ let points = [];              // values in the graph
 let win = {start: 0, end: 0}; // time range of the graph, UTC seconds
 let geo = null;               // graph layout, for the tooltip
 let lastHours = 0;            // > 0 while "Last … h" is chosen; the range then moves with the time
-let show = {co2: true, tmp: true, hum: true, pres: true};
+let show = {co2: true, voc: true, tmp: true, hum: true, pres: true};
 try { Object.assign(show, JSON.parse(localStorage.getItem('show'))); } catch (e) {}
 
 const now = () => Date.now() / 1000;
@@ -253,14 +261,15 @@ async function get(path, options) {
 
 // Turns the binary records of /api/data into objects (layout in history.cpp)
 function parse(buffer, res) {
-  const v = new DataView(buffer), size = 12, out = [];
+  const v = new DataView(buffer), size = 14, out = [];
   const co2 = o => v.getUint16(o, true) || null;
   const tmp = o => { const x = v.getInt16(o, true); return x === -32768 ? null : x / 100; };
   const hum = o => { const x = v.getUint16(o, true); return x === 65535 ? null : x / 100; };
   const pres = o => { const x = v.getUint16(o, true); return x ? x / 10 : null; };
+  const voc = o => v.getUint16(o, true) || null;
   for (let o = 0; o + size <= buffer.byteLength; o += size) {
     const t = v.getUint32(o, true), p = {t, r: res, m: t + res * 30};  // m = middle of the period
-    Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10)});
+    Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10), voc: voc(o + 12)});
     out.push(p);
   }
   return out;
@@ -328,6 +337,19 @@ function showBrightness(level, auto) {
   $('brightbox').classList.toggle('auto', auto);
 }
 
+// Rating badge for a value, with the limits good below, OK below, ventilate below
+function rate(b, value, limits) {
+  if (value == null || !limits) {
+    b.textContent = '';
+    b.className = 'badge';
+    return;
+  }
+  let i = 0;
+  while (i < 3 && value >= limits[i]) i++;
+  b.textContent = RATINGS[i][0];
+  b.className = 'badge ' + RATINGS[i][1];
+}
+
 function showLive() {
   const ok = live && Date.now() - liveAt < 15000;
   $('dot').className = 'dot ' + (ok ? 'on' : live ? 'off' : '');
@@ -352,16 +374,22 @@ function showLive() {
   $('tmp').textContent = fmt(warm ? null : live.temperature, 1);
   $('hum').textContent = fmt(warm ? null : live.humidity, 0);
   $('prs').textContent = fmt(warm ? null : live.pressure, 0);
+  $('voc').textContent = fmt(warm ? null : live.voc, 0);
   const b = $('badge');
-  if (warm || live.co2 == null) {
-    b.textContent = warm ? 'Warming up, ' + live.warmup + ' s' : '';
+  if (warm) {
+    b.textContent = 'Warming up, ' + live.warmup + ' s';
     b.className = 'badge';
   } else {
-    let i = 0;
-    while (i < 3 && live.co2 >= live.limits[i]) i++;
-    b.textContent = RATINGS[i][0];
-    b.className = 'badge ' + RATINGS[i][1];
+    rate(b, live.co2, live.limits);
   }
+  rate($('vocbadge'), warm ? null : live.voc, live.vocLimits);
+  // The VOC index needs a few hours to learn the room's usual air after a fresh start
+  let note = '';
+  if (!warm && live.voc != null && live.vocLearnLeft > 0) {
+    const min = Math.ceil(live.vocLearnLeft / 60), h = Math.floor(min / 60);
+    note = `Still learning the room’s usual air, ${h ? h + ' h ' : ''}${min % 60} min to go`;
+  }
+  $('vocnote').textContent = note;
 
   const up = live.uptime, d = Math.floor(up / DAY), h = Math.floor(up % DAY / 3600), m = Math.floor(up % 3600 / 60);
   const parts = ['Wi-Fi signal ' + live.rssi + ' dBm'];
@@ -531,7 +559,7 @@ function drawChart() {
   act.forEach((s, i) => {
     const top = T0 + i * (PH + G), k = s.key, vals = [];
     for (const p of points) if (p[k] != null) vals.push(p[k]);
-    o += `<text class="pl" x="${L}" y="${top - 9}">${s.name} (${s.unit})</text>`;
+    o += `<text class="pl" x="${L}" y="${top - 9}">${s.name}${s.unit ? ` (${s.unit})` : ''}</text>`;
     if (!vals.length) {
       o += `<text x="${L}" y="${top + PH / 2}">No values</text>`;
       return;
@@ -545,7 +573,8 @@ function drawChart() {
     for (let v = lo; v <= hi + step / 2; v += step) {
       o += `<line class="gl" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 6}" y="${+Y(v) + 4}" text-anchor="end">${fmt(v, dec)}</text>`;
     }
-    if (k === 'co2' && live) for (const lim of live.limits) if (lim > lo && lim < hi) o += `<line class="lim" x1="${L}" x2="${W - R}" y1="${Y(lim)}" y2="${Y(lim)}"/>`;
+    const lims = live && {co2: live.limits, voc: live.vocLimits}[k];
+    if (lims) for (const lim of lims) if (lim > lo && lim < hi) o += `<line class="lim" x1="${L}" x2="${W - R}" y1="${Y(lim)}" y2="${Y(lim)}"/>`;
 
     // Lines break where values are missing for more than 2.5 periods
     const runs = [];
@@ -632,7 +661,7 @@ function toCsv(rows) {
   const num = (v, d) => v == null ? '' : comma ? v.toFixed(d).replace('.', ',') : v.toFixed(d);
   const local = t => { const d = new Date(t * 1000); return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const utc = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
-  const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2], ['pressure_hpa', 'pres', 1]];
+  const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2], ['pressure_hpa', 'pres', 1], ['voc_index', 'voc', 0]];
   const lines = [['time_local', 'time_utc', ...cols.map(c => c[0])].join(sep)];
   for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2]))].join(sep));
   return lines.join('\r\n') + '\r\n';

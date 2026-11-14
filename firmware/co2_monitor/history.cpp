@@ -11,6 +11,8 @@
 #include <esp_timer.h>
 #include <time.h>
 
+#include <vector>
+
 // ---------- Settings ----------
 constexpr uint16_t MINUTE_KEEP_DAYS = 14;
 constexpr uint16_t FIVE_MINUTE_KEEP_DAYS = 1096;  // 3 years, nothing older is kept
@@ -36,8 +38,10 @@ constexpr uint32_t PARTITION_SIZE = 0x9E0000;
 constexpr time_t CLOCK_VALID_AFTER = 1767225600;
 constexpr uint32_t SECONDS_PER_DAY = 86400;
 
-// ---------- File format (version 1) ----------
-constexpr uint8_t FORMAT_VERSION = 1;
+// ---------- File format (version 2) ----------
+// Version 1 (up to docs v0.39) had no VOC index: 12-byte records. Such files are
+// converted at start-up (convertOldFiles()).
+constexpr uint8_t FORMAT_VERSION = 2;
 constexpr char FORMAT_MAGIC[4] = {'C', 'O', '2', 'H'};
 
 // Markers for a missing value
@@ -45,6 +49,7 @@ constexpr uint16_t NO_CO2 = 0;
 constexpr int16_t NO_TEMPERATURE = INT16_MIN;
 constexpr uint16_t NO_HUMIDITY = UINT16_MAX;
 constexpr uint16_t NO_PRESSURE = 0;
+constexpr uint16_t NO_VOC = 0;
 
 struct __attribute__((packed)) FileHeader {
   char magic[4];        // "CO2H"
@@ -62,10 +67,21 @@ struct __attribute__((packed)) SampleRecord {
   int16_t temperature;  // 0.01 °C
   uint16_t humidity;    // 0.01 %RH
   uint16_t pressure;    // 0.1 hPa (BMP580)
+  uint16_t voc;         // VOC index 1-500 (SGP40)
+};
+
+// The records of format version 1, only read to convert them
+struct __attribute__((packed)) SampleRecordV1 {
+  uint32_t time;
+  uint16_t co2;
+  int16_t temperature;
+  uint16_t humidity;
+  uint16_t pressure;
 };
 
 static_assert(sizeof(FileHeader) == 16, "FileHeader must be 16 bytes");
-static_assert(sizeof(SampleRecord) == 12, "SampleRecord must be 12 bytes");
+static_assert(sizeof(SampleRecord) == 14, "SampleRecord must be 14 bytes");
+static_assert(sizeof(SampleRecordV1) == 12, "SampleRecordV1 must be 12 bytes");
 
 struct Level {
   const char *name;         // folder name, also used by the csv command
@@ -100,7 +116,7 @@ struct Channel {
 // Collects the readings of one minute, or the 1-minute values of 5 minutes.
 // Each value has its own count, because one sensor can fail while the others work.
 struct Accumulator {
-  Channel co2, temperature, humidity, pressure;
+  Channel co2, temperature, humidity, pressure, voc;
   uint8_t records = 0;
 
   void add(const SampleRecord &r) {
@@ -108,23 +124,27 @@ struct Accumulator {
     if (r.temperature != NO_TEMPERATURE) temperature.add(r.temperature);
     if (r.humidity != NO_HUMIDITY) humidity.add(r.humidity);
     if (r.pressure != NO_PRESSURE) pressure.add(r.pressure);
+    if (r.voc != NO_VOC) voc.add(r.voc);
     if (records < UINT8_MAX) records++;
   }
 
   SampleRecord average(uint32_t start) const {
     return {start, (uint16_t)co2.average(NO_CO2), (int16_t)temperature.average(NO_TEMPERATURE),
-            (uint16_t)humidity.average(NO_HUMIDITY), (uint16_t)pressure.average(NO_PRESSURE)};
+            (uint16_t)humidity.average(NO_HUMIDITY), (uint16_t)pressure.average(NO_PRESSURE),
+            (uint16_t)voc.average(NO_VOC)};
   }
 };
 
 // Converts a reading to the whole-number units of SampleRecord
-static SampleRecord toRecord(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa) {
+static SampleRecord toRecord(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa,
+                             uint16_t vocIndex) {
   SampleRecord r;
   r.time = 0;
   r.co2 = co2Ppm;
   r.temperature = isnan(temperatureC) ? NO_TEMPERATURE : (int16_t)lroundf(constrain(temperatureC, -100.0f, 200.0f) * 100);
   r.humidity = isnan(humidityPct) ? NO_HUMIDITY : (uint16_t)lroundf(constrain(humidityPct, 0.0f, 100.0f) * 100);
   r.pressure = isnan(pressureHpa) ? NO_PRESSURE : (uint16_t)lroundf(constrain(pressureHpa, 300.0f, 1250.0f) * 10);
+  r.voc = min(vocIndex, (uint16_t)500);  // 0 = none
   return r;
 }
 
@@ -203,6 +223,12 @@ static uint32_t lastSavedOf(const Level &level) {
   return &level == &MINUTE_LEVEL ? lastMinuteSaved : lastFiveSaved;
 }
 
+// Data files are named after their day: "YYYYMMDD.bin". Anything else in the folders
+// (a ".new" file left by a power cut while converting) is not a data file.
+static bool isDataFile(const String &name) {
+  return name.length() == 12 && name.endsWith(".bin");
+}
+
 // Finds the oldest and newest file name of a level. The names are dates, so
 // they sort in time order. Returns the number of files.
 static uint16_t findFiles(const Level &level, char *oldest, char *newest, size_t size) {
@@ -216,7 +242,7 @@ static uint16_t findFiles(const Level &level, char *oldest, char *newest, size_t
   for (String path = dir.getNextFileName(&isDir); path.length() > 0; path = dir.getNextFileName(&isDir)) {
     if (isDir) continue;
     String name = path.substring(path.lastIndexOf('/') + 1);
-    if (name.length() >= size) continue;
+    if (!isDataFile(name) || name.length() >= size) continue;
     if (count == 0 || strcmp(name.c_str(), oldest) < 0) strcpy(oldest, name.c_str());
     if (count == 0 || strcmp(name.c_str(), newest) > 0) strcpy(newest, name.c_str());
     count++;
@@ -264,9 +290,19 @@ static void readRecords(const Level &level, const char *path, Callback onRecord)
 }
 
 // Opens the file for the given time for appending. A new file gets its header first.
+// A file in another format (one that could not be converted) is left alone.
 static File openForAppend(const Level &level, uint32_t seconds) {
   char path[24];
   filePathFor(path, sizeof path, level, seconds);
+  if (LittleFS.exists(path)) {
+    File existing = LittleFS.open(path, FILE_READ);
+    size_t size = existing ? existing.size() : 0;
+    existing.close();
+    if (size > 0 && !openForReading(level, path)) {
+      Serial.printf("History: %s is in another format, nothing added to it\n", path);
+      return File();
+    }
+  }
   File f = LittleFS.open(path, FILE_APPEND, true);
   if (f && f.size() == 0) {
     FileHeader header = {{FORMAT_MAGIC[0], FORMAT_MAGIC[1], FORMAT_MAGIC[2], FORMAT_MAGIC[3]},
@@ -450,6 +486,99 @@ static bool deriveFiveMinutes(uint32_t doneUntil) {
   return true;
 }
 
+// ---------- Converting files of format version 1 ----------
+
+enum class Conversion { NotNeeded, Done, Failed };
+
+// Rewrites one file of format version 1 in the current format, with "no value" for the
+// VOC index. The new file is written next to the old one ("....bin.new") and then
+// renamed onto it, which LittleFS does in one step. A power cut in the middle leaves
+// the old file as it was, and it is converted at the next start.
+static Conversion convertFile(const Level &level, const char *path) {
+  File in = LittleFS.open(path, FILE_READ);
+  if (!in) return Conversion::Failed;
+  FileHeader header;
+  if (in.read((uint8_t *)&header, sizeof header) != sizeof header || memcmp(header.magic, FORMAT_MAGIC, 4) != 0
+      || header.version != 1 || header.minutes != level.minutes || header.recordSize != sizeof(SampleRecordV1)) {
+    return Conversion::NotNeeded;  // already converted, or not a file of this level
+  }
+
+  char newPath[32];
+  snprintf(newPath, sizeof newPath, "%s.new", path);
+  File out = LittleFS.open(newPath, FILE_WRITE);
+  if (!out) return Conversion::Failed;
+  header.version = FORMAT_VERSION;
+  header.recordSize = sizeof(SampleRecord);
+  bool ok = out.write((const uint8_t *)&header, sizeof header) == sizeof header;
+
+  SampleRecordV1 buffer[16];
+  SampleRecord converted[16];
+  size_t bytes;
+  while (ok && (bytes = in.read((uint8_t *)buffer, sizeof buffer)) >= sizeof(SampleRecordV1)) {
+    size_t count = bytes / sizeof(SampleRecordV1);
+    for (size_t i = 0; i < count; i++) {
+      const SampleRecordV1 &o = buffer[i];
+      converted[i] = {o.time, o.co2, o.temperature, o.humidity, o.pressure, NO_VOC};
+    }
+    ok = out.write((const uint8_t *)converted, count * sizeof(SampleRecord)) == count * sizeof(SampleRecord);
+  }
+  in.close();
+  out.close();
+
+  if (!ok) {
+    LittleFS.remove(newPath);
+    return Conversion::Failed;
+  }
+  if (LittleFS.rename(newPath, path)) return Conversion::Done;
+  // Only if the rename can't replace the old file: remove it first. A power cut right
+  // here leaves just the new file, which convertOldFiles() then renames at the next start.
+  if (LittleFS.remove(path) && LittleFS.rename(newPath, path)) return Conversion::Done;
+  return Conversion::Failed;
+}
+
+// Converts every file of format version 1 (written before the VOC index was stored).
+// Runs at every start; once all files are converted it only reads their headers.
+static void convertOldFiles() {
+  uint16_t done = 0, failed = 0;
+  for (const Level *level : LEVELS) {
+    char folder[8];
+    snprintf(folder, sizeof folder, "/%s", level->name);
+    File dir = LittleFS.open(folder);
+    if (!dir || !dir.isDirectory()) continue;
+    // The names first: the folder must not change while it is being read
+    std::vector<String> paths;
+    bool isDir = false;
+    for (String path = dir.getNextFileName(&isDir); path.length() > 0; path = dir.getNextFileName(&isDir)) {
+      if (!isDir) paths.push_back(path);
+    }
+    dir.close();
+
+    // First the ".new" files left over from a power cut while converting. Next to its
+    // old file one may be unfinished: it goes, and the old file is converted again.
+    // Alone it is complete (the old file is only removed after it was written).
+    for (const String &path : paths) {
+      if (!path.endsWith(".new")) continue;
+      String dataPath = path.substring(0, path.length() - 4);
+      if (LittleFS.exists(dataPath)) {
+        LittleFS.remove(path);
+      } else {
+        LittleFS.rename(path, dataPath);
+      }
+    }
+    for (const String &path : paths) {
+      if (!isDataFile(path.substring(path.lastIndexOf('/') + 1))) continue;
+      Conversion result = convertFile(*level, path.c_str());
+      if (result == Conversion::Done) done++;
+      if (result == Conversion::Failed) {
+        failed++;
+        Serial.printf("History: could not convert %s to the new format\n", path.c_str());
+      }
+    }
+  }
+  if (done > 0) Serial.printf("History: %u file%s converted to the new format (with VOC index)\n", done, done == 1 ? "" : "s");
+  if (failed > 0) Serial.printf("History: %u file%s could not be converted, see above\n", failed, failed == 1 ? "" : "s");
+}
+
 // ---------- Public functions ----------
 
 void historyBegin() {
@@ -469,6 +598,7 @@ void historyBegin() {
     }
   }
 
+  convertOldFiles();
   lastMinuteSaved = newestRecordTime(MINUTE_LEVEL);
   lastFiveSaved = newestRecordTime(FIVE_LEVEL);
   enabled = true;
@@ -476,11 +606,11 @@ void historyBegin() {
   checkClock();  // the clock survives a software restart
 }
 
-void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa) {
+void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa, uint16_t vocIndex) {
   if (!enabled) return;
   checkClock();
   closeMinuteIfOver(clockNow());
-  minuteSum.add(toRecord(co2Ppm, temperatureC, humidityPct, pressureHpa));
+  minuteSum.add(toRecord(co2Ppm, temperatureC, humidityPct, pressureHpa, vocIndex));
 }
 
 void historyLoop() {
@@ -580,6 +710,7 @@ static void printSample(Print &out, const SampleRecord &r) {
   printValue(out, r.temperature, NO_TEMPERATURE, 100, 2);
   printValue(out, r.humidity, NO_HUMIDITY, 100, 2);
   printValue(out, r.pressure, NO_PRESSURE, 10, 1);
+  printValue(out, r.voc, NO_VOC, 1, 0);
   out.println();
 }
 
@@ -602,7 +733,7 @@ bool historyPrintCsv(Print &out, const char *levelName, uint16_t days) {
   if (from < oldestKept) from = oldestKept;
 
   char path[24];
-  out.println(F("time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa"));
+  out.println(F("time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa,voc_index"));
   for (uint32_t day = from - from % SECONDS_PER_DAY; day <= now; day += SECONDS_PER_DAY) {
     filePathFor(path, sizeof path, *level, day);
     readRecords<SampleRecord>(*level, path, [&](const SampleRecord &r) {

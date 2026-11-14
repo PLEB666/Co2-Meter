@@ -8,16 +8,19 @@
   - BMP580   -> air pressure (0x46 or 0x47, whichever answers), sent to the SCD-41 so it
                 can correct its CO2 value for the pressure (SCD_PRESSURE_STEP_HPA)
   - SGP40    -> VOC index (air quality, 100 = the room's usual air), worked out from
-                its raw signal once per second with Sensirion's algorithm
+                its raw signal once per second with Sensirion's algorithm. What the
+                algorithm has learned is saved every 5 min, so a restart (a break of up
+                to 10 min) carries on with it instead of learning for hours again.
   - VEML7700 -> light in lux, sets the brightness of the display and the LED
   - Warm-up: for the first 30 s after start-up the sensors measure, but no value
     is shown, printed or saved. The display counts down meanwhile.
-  - The display shows CO2, temperature and humidity, laid out as on the prototype.
-    Pressure, light and the VOC index are not on the display. The pressure is on the
-    web page; light and the VOC index are only printed (Serial, status, /api/now).
+  - The display shows CO2, temperature and humidity, laid out as on the prototype,
+    and the VOC index in a small line at the bottom. Pressure and light are not on the
+    display. The pressure is on the web page; light is only printed (Serial, status,
+    /api/now).
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
-  - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 level all the time, dimmed:
-    green -> yellow -> red.
+  - The 8 mm LED (PL9823-F8 on GPIO18) shows the air quality all the time, dimmed:
+    green -> yellow -> red, for whichever is worse, CO2 or the VOC index (LED_SHOWS_VOC).
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
@@ -27,19 +30,18 @@
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
   - Wi-Fi gets the time from the internet and uses the fixed address FIXED_IP.
-    CO2, temperature, humidity and air pressure are stored in the flash as 1-minute and
-    5-minute averages (history.h explains how). Light and VOC are not stored.
+    CO2, temperature, humidity, air pressure and the VOC index are stored in the flash as
+    1-minute and 5-minute averages (history.h explains how). Light is not stored.
   - A web page on the home network shows the live values, graphs of any stored
     day and CSV downloads (web.h explains how).
   - Serial Monitor commands: status, files, csv m1|m5 [days], save, sleep on|off,
-    brightness [auto|0-100], led, pressure [auto|700-1200]
+    brightness [auto|0-100], led, pressure [auto|700-1200], voc [reset]
 
   The sensors keep measuring while the display is off and in sleep mode. This matters for the
   SCD-41's automatic self-calibration, which needs uninterrupted operation, and for the SGP40's
   VOC index, which learns the room's usual air over hours.
 
-  Not used yet: the speaker. The VOC index is only printed; what it will control (VOC
-  warnings) comes later.
+  Not used yet: the speaker (warnings come later).
 
   Libraries (Arduino IDE -> Library Manager):
     Adafruit SSD1327, Adafruit SHT4x Library, Sensirion I2C SCD4x,
@@ -52,6 +54,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include <esp_timer.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1327.h>
 #include <Adafruit_SHT4x.h>
@@ -104,6 +107,17 @@ constexpr uint32_t VEML_INTERVAL_MS = 1000;
 // The VOC index algorithm expects exactly one SGP40 reading per second
 constexpr uint32_t SGP_INTERVAL_MS = 1000;
 constexpr uint32_t SGP_MEASURE_MS = 30;  // the SGP40 needs up to 30 ms per reading
+// What the VOC algorithm has learned about the room's usual air is saved this often, so
+// a restart or a firmware upload doesn't start the learning again. Sensirion: a saved
+// state is only good after VOC_LEARNING_S of measuring, and only after a break of at
+// most VOC_STATE_MAX_AGE_S (the sensor drifts while it is off). After a longer break
+// the algorithm learns again.
+constexpr uint32_t VOC_LEARNING_S = 3 * 3600;
+constexpr uint32_t VOC_STATE_SAVE_S = 300;
+constexpr uint32_t VOC_STATE_MAX_AGE_S = 600;
+// The age of the saved state needs the internet time. After start-up the algorithm
+// waits this long for it, then it starts learning without the saved state.
+constexpr uint32_t VOC_CLOCK_WAIT_MS = 60000;
 
 constexpr uint8_t BMP580_ADDRESS_A = 0x46;  // the two addresses its
 constexpr uint8_t BMP580_ADDRESS_B = 0x47;  // address jumper can choose
@@ -114,8 +128,23 @@ constexpr uint16_t CO2_GOOD_BELOW = 800;
 constexpr uint16_t CO2_OK_BELOW = 1000;
 constexpr uint16_t CO2_VENTILATE_BELOW = 2000;
 
+// VOC index rating limits (shown at the bottom of the display), with the same four
+// ratings. The index is relative: 100 = the room's usual air over the last day, more =
+// more VOCs than usual (cooking, cleaning products, paint, perfume, many people).
+// Sensirion gives 150 as an example for switching an air purifier on; there is no
+// official scale, so these are a choice.
+constexpr uint16_t VOC_GOOD_BELOW = 150;
+constexpr uint16_t VOC_OK_BELOW = 250;
+constexpr uint16_t VOC_VENTILATE_BELOW = 400;
+
+constexpr uint16_t CO2_LIMITS[3] = {CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW};
+constexpr uint16_t VOC_LIMITS[3] = {VOC_GOOD_BELOW, VOC_OK_BELOW, VOC_VENTILATE_BELOW};
+
 // ---------- LED ----------
-// The 8 mm LED on LED_PIN shows the CO2 colour. Its brightness: see "Brightness" below.
+// The 8 mm LED on LED_PIN shows the air quality colour. Its brightness: see "Brightness" below.
+// true = the colour is that of whichever is worse, CO2 or the VOC index (both mean: open
+// a window; the display and the web page say which). false = CO2 only.
+constexpr bool LED_SHOWS_VOC = true;
 // true = the board's own RGB LED (GPIO8) shows the colour as well. In the case the
 // board's LED faces the floor, so it stays off there.
 constexpr bool BOARD_LED_TOO = false;
@@ -124,7 +153,8 @@ struct LedColour {
   uint8_t r, g, b;
 };
 // The colour changes smoothly: green below CO2_GOOD_BELOW, yellow at CO2_OK_BELOW,
-// red from CO2_VENTILATE_BELOW. Yellow has less green because the green LED is brighter.
+// red from CO2_VENTILATE_BELOW (for the VOC index its own limits). Yellow has less
+// green because the green LED is brighter.
 constexpr LedColour LED_GREEN = {0, 255, 0};
 constexpr LedColour LED_YELLOW = {255, 160, 0};
 constexpr LedColour LED_RED = {255, 0, 0};
@@ -281,6 +311,19 @@ bool lightTooBright = false;  // the light sensor is at the top of its range
 uint16_t vocIndex = 0;        // 0 = no value yet (the algorithm gives none in its first 45 s)
 uint16_t vocRaw = 0;          // the SGP40's raw signal, for the Serial Monitor
 
+// The VOC algorithm's state as saved in the settings (VOC_STATE_SAVE_S)
+struct VocState {
+  int32_t mean;      // its two states (VocAlgorithm_get_states())
+  int32_t std;
+  uint32_t savedAt;  // UTC seconds
+};
+bool vocStarted = false;        // the algorithm runs (see startVocAlgorithm())
+bool vocRestored = false;       // it carries on from a saved state, so it has learned
+uint32_t vocStartedAtS = 0;     // seconds since start-up when it started
+uint32_t vocLastReading = 0;    // millis() of the last reading it got
+uint32_t vocLastSave = 0;       // millis() of the last saved state
+uint32_t vocSavedAt = 0;        // UTC seconds of the last saved state, 0 = none since start-up
+
 uint32_t lastShtRead = 0;
 uint32_t lastScdPoll = 0;
 uint32_t lastBmpRead = 0;
@@ -319,32 +362,46 @@ ButtonEvent readButton() {
   return ButtonEvent::None;
 }
 
-const char* co2Rating(uint16_t ppm) {
-  if (ppm == 0) return "";
-  if (ppm < CO2_GOOD_BELOW) return "GOOD";
-  if (ppm < CO2_OK_BELOW) return "OK";
-  if (ppm < CO2_VENTILATE_BELOW) return "VENTILATE";
-  return "BAD AIR";
+// The same four ratings for CO2 and the VOC index
+const char *const RATING_NAMES[] = {"GOOD", "OK", "VENTILATE", "BAD AIR"};
+
+// 0 = good, 1 = OK, 2 = ventilate, 3 = bad air. limits: good below, OK below, ventilate below.
+uint8_t ratingLevel(uint16_t value, const uint16_t limits[3]) {
+  uint8_t level = 0;
+  while (level < 3 && value >= limits[level]) level++;
+  return level;
+}
+
+const char *co2Rating(uint16_t ppm) {
+  return ppm == 0 ? "" : RATING_NAMES[ratingLevel(ppm, CO2_LIMITS)];
+}
+
+const char *vocRating(uint16_t index) {
+  return index == 0 ? "" : RATING_NAMES[ratingLevel(index, VOC_LIMITS)];
 }
 
 // ---------- LED ----------
 
-// step 0 = from, step == steps = to
-LedColour blendColour(LedColour from, LedColour to, uint16_t step, uint16_t steps) {
-  return {(uint8_t)(from.r + ((int32_t)to.r - from.r) * step / steps),
-          (uint8_t)(from.g + ((int32_t)to.g - from.g) * step / steps),
-          (uint8_t)(from.b + ((int32_t)to.b - from.b) * step / steps)};
+// share 0 = from, 1 = to
+LedColour blendColour(LedColour from, LedColour to, float share) {
+  return {(uint8_t)lroundf(from.r + (to.r - from.r) * share), (uint8_t)lroundf(from.g + (to.g - from.g) * share),
+          (uint8_t)lroundf(from.b + (to.b - from.b) * share)};
 }
 
-LedColour co2Colour(uint16_t ppm) {
-  if (ppm < CO2_GOOD_BELOW) return LED_GREEN;
-  if (ppm < CO2_OK_BELOW) {
-    return blendColour(LED_GREEN, LED_YELLOW, ppm - CO2_GOOD_BELOW, CO2_OK_BELOW - CO2_GOOD_BELOW);
-  }
-  if (ppm < CO2_VENTILATE_BELOW) {
-    return blendColour(LED_YELLOW, LED_RED, ppm - CO2_OK_BELOW, CO2_VENTILATE_BELOW - CO2_OK_BELOW);
-  }
-  return LED_RED;
+// Where a value sits on the LED's colour scale: 0 = green (below the "good" limit),
+// 1 = yellow (at the "OK" limit), 2 = red (from the "ventilate" limit), smoothly between
+float colourPosition(uint16_t value, const uint16_t limits[3]) {
+  if (value < limits[0]) return 0;
+  if (value < limits[1]) return (float)(value - limits[0]) / (limits[1] - limits[0]);
+  if (value < limits[2]) return 1 + (float)(value - limits[1]) / (limits[2] - limits[1]);
+  return 2;
+}
+
+// The colour for CO2, or for whichever is worse, CO2 or the VOC index (LED_SHOWS_VOC)
+LedColour airColour() {
+  float position = co2Ppm > 0 ? colourPosition(co2Ppm, CO2_LIMITS) : 0;
+  if (LED_SHOWS_VOC && vocIndex > 0) position = max(position, colourPosition(vocIndex, VOC_LIMITS));
+  return position <= 1 ? blendColour(LED_GREEN, LED_YELLOW, position) : blendColour(LED_YELLOW, LED_RED, position - 1);
 }
 
 // value: one colour at full brightness (0-255). scale: what 255 is dimmed to.
@@ -379,13 +436,13 @@ void pl9823Write(uint8_t r, uint8_t g, uint8_t b) {
 
 float brightnessBetween(uint8_t min, uint8_t max, float level);  // in "Brightness" below
 
-// Every FADE_STEP_MS (from loop()). The LED fades to the CO2 colour at the current
-// brightness, and down to off until the first CO2 value arrives and in sleep mode.
+// Every FADE_STEP_MS (from loop()). The LED fades to the air quality colour at the
+// current brightness, and down to off until the first value arrives and in sleep mode.
 // It is only sent a colour when that has changed.
 void updateLed() {
-  bool on = co2Ppm > 0 && !sleepMode;
+  bool on = (co2Ppm > 0 || (LED_SHOWS_VOC && vocIndex > 0)) && !sleepMode;
   if (on) {
-    LedColour target = co2Colour(co2Ppm);
+    LedColour target = airColour();
     if (ledLevel.value() <= FADE_OFF_LEVEL) {
       // While it is dark the colour can jump, then the LED fades in with the new one
       ledRed.jumpTo(target.r);
@@ -475,16 +532,31 @@ void drawSleepMessage() {
   display.display();
 }
 
+uint32_t vocLearnSecondsLeft();  // in "VOC index" below
+
+// A rating at the right edge, white on black, or black on white (inverted) when the
+// air is bad
+void printRating(const char *rating, bool inverted, int16_t y) {
+  if (!inverted) {
+    printRight(rating, 1, y);
+    return;
+  }
+  int16_t x = OLED_SIZE - textWidth(rating, 1);
+  display.fillRect(x - 2, y - 1, OLED_SIZE - x + 2, 10, SSD1327_WHITE);
+  printAt(rating, 1, x, y, SSD1327_BLACK);
+}
+
 /*
   Screen layout, 128 x 128 pixels, the same as on the prototype's 0.96" display,
   with more room:
     y   1  "CO2 ppm"   (moon in sleep mode)        rating
     y  28            CO2 value, large
     y  80  ------------------------------------------------
-    y  96  temperature                             humidity
+    y  88  temperature                             humidity
+    y 114  "VOC" index                  rating or "learning"
 */
 void drawScreen() {
-  char text[16];
+  char text[22];
   lastDraw = millis();
   screenChanged = false;
   if (sleepMessageShown) {
@@ -496,14 +568,7 @@ void drawScreen() {
   // Top line: label left, moon in sleep mode, rating right (inverted when the air is bad)
   printAt("CO2 ppm", 1, 0, 1);
   if (sleepMode) display.drawBitmap(53, 1, MOON_ICON, 8, 8, SSD1327_WHITE);
-  const char *rating = co2Rating(co2Ppm);
-  if (co2Ppm >= CO2_OK_BELOW) {
-    int16_t ratingX = OLED_SIZE - textWidth(rating, 1);
-    display.fillRect(ratingX - 2, 0, OLED_SIZE - ratingX + 2, 10, SSD1327_WHITE);
-    printAt(rating, 1, ratingX, 1, SSD1327_BLACK);
-  } else {
-    printRight(rating, 1, 1);
-  }
+  printRating(co2Rating(co2Ppm), co2Ppm >= CO2_OK_BELOW, 1);
 
   // CO2 value, large and centred
   if (!scdFound) {
@@ -525,23 +590,36 @@ void drawScreen() {
 
   display.drawFastHLine(0, 80, OLED_SIZE, SSD1327_WHITE);
 
-  // Bottom line: temperature left, humidity right
+  // Temperature left, humidity right
   if (isnan(temperatureC)) {
     strcpy(text, "--.-");
   } else {
     snprintf(text, sizeof text, "%.1f", temperatureC);
   }
-  printAt(text, 2, 0, 96);
+  printAt(text, 2, 0, 88);
   int16_t unitX = display.getCursorX() + 3;
-  display.drawCircle(unitX, 97, 1, SSD1327_WHITE);  // degree sign
-  printAt("C", 1, unitX + 3, 96);
+  display.drawCircle(unitX, 89, 1, SSD1327_WHITE);  // degree sign
+  printAt("C", 1, unitX + 3, 88);
 
   if (isnan(humidityPct)) {
     strcpy(text, "--%");
   } else {
     snprintf(text, sizeof text, "%d%%", (int)lroundf(humidityPct));
   }
-  printRight(text, 2, 96);
+  printRight(text, 2, 88);
+
+  // Bottom line: VOC index left, its rating right (inverted when the air is bad). While
+  // the index is still learning the room's usual air, "learning" instead of GOOD or OK.
+  if (!sgpFound) {
+    printAt("VOC: SGP40 missing", 1, 0, 114);
+  } else if (vocIndex == 0) {
+    printAt("VOC --", 1, 0, 114);  // the first index comes about 45 s after the start
+  } else {
+    snprintf(text, sizeof text, "VOC %u", vocIndex);
+    printAt(text, 1, 0, 114);
+    uint8_t level = ratingLevel(vocIndex, VOC_LIMITS);
+    printRating(level < 2 && vocLearnSecondsLeft() > 0 ? "learning" : RATING_NAMES[level], level >= 2, 114);
+  }
 
   display.display();
 }
@@ -709,11 +787,10 @@ bool initVeml7700() {
   return true;
 }
 
-// begin() ends with the sensor's self-test (about 0.5 s)
+// begin() ends with the sensor's self-test (about 0.5 s). The VOC algorithm starts
+// later (startVocAlgorithm()).
 bool initSgp40() {
-  if (!sgp.begin(&Wire)) return false;
-  VocAlgorithm_init(&vocAlgorithm);
-  return true;
+  return sgp.begin(&Wire);
 }
 
 void readSht45() {
@@ -766,9 +843,9 @@ void readScd41() {
 
   co2Ppm = co2;
   screenChanged = true;  // the LED follows by itself (updateLed())
-  // The BMP580's newest pressure is stored with it (NAN if there is none).
-  // With a fixed test pressure nothing is stored (see pressureFixedHpa).
-  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, pressureHpa);
+  // The BMP580's newest pressure and the VOC index are stored with it (NAN and 0 if
+  // there is none). With a fixed test pressure nothing is stored (see pressureFixedHpa).
+  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, pressureHpa, vocIndex);
 
   // "name:value" pairs can be read by people and by the Serial Plotter
   Serial.printf(
@@ -811,6 +888,106 @@ bool fetchSgp40Reading(uint16_t &raw) {
   return true;
 }
 
+// ---------- VOC index ----------
+// Sensirion's algorithm turns the SGP40's raw signal into the VOC index. It learns the
+// room's usual air (= 100) over hours and forgets it after about a day. What it has
+// learned is saved every VOC_STATE_SAVE_S, so after a short break it carries on.
+
+bool clockSet() {
+  return time(nullptr) >= 1767225600;  // 1 Jan 2026, earlier = not set yet
+}
+
+uint32_t secondsSinceStart() {
+  return (uint32_t)(esp_timer_get_time() / 1000000);
+}
+
+// Seconds until the VOC index has learned the room's usual air, 0 once it has
+uint32_t vocLearnSecondsLeft() {
+  if (!sgpFound || vocRestored) return 0;
+  if (!vocStarted) return VOC_LEARNING_S;
+  uint32_t running = secondsSinceStart() - vocStartedAtS;
+  return running >= VOC_LEARNING_S ? 0 : VOC_LEARNING_S - running;
+}
+
+// Starts the algorithm once it is clear whether the saved state can be used: when the
+// internet time is there to check its age, or after VOC_CLOCK_WAIT_MS without it.
+// Readings before that are thrown away (the algorithm ignores its first 45 s anyway).
+void startVocAlgorithm() {
+  bool timeKnown = clockSet();
+  if (!timeKnown && millis() < VOC_CLOCK_WAIT_MS) return;
+  VocAlgorithm_init(&vocAlgorithm);
+  vocStarted = true;
+  vocRestored = false;
+  vocStartedAtS = secondsSinceStart();
+
+  VocState saved;
+  if (settings.getBytes("vocstate", &saved, sizeof saved) != sizeof saved) {
+    Serial.println(F("VOC index: learning the room's usual air (about 3 h)"));
+  } else if (!timeKnown) {
+    Serial.println(F("VOC index: no internet time to check the saved state, learning the room's usual air again"));
+  } else {
+    uint32_t now = time(nullptr);
+    uint32_t age = now - saved.savedAt;
+    if (now >= saved.savedAt && age <= VOC_STATE_MAX_AGE_S) {
+      VocAlgorithm_set_states(&vocAlgorithm, saved.mean, saved.std);
+      vocRestored = true;
+      Serial.printf("VOC index: carries on with what it had learned (saved %lu s ago)\n", (unsigned long)age);
+    } else {
+      Serial.printf("VOC index: the saved state is %lu min old (more than %lu), learning the room's usual air again\n",
+                    (unsigned long)(age / 60), (unsigned long)(VOC_STATE_MAX_AGE_S / 60));
+    }
+  }
+}
+
+// Every VOC_STATE_SAVE_S once the algorithm has learned, while the SGP40 is being read
+void saveVocStateWhenDue() {
+  if (!vocStarted || vocLearnSecondsLeft() > 0 || !clockSet()) return;
+  if (millis() - vocLastReading > 10000) return;
+  if (vocSavedAt != 0 && millis() - vocLastSave < VOC_STATE_SAVE_S * 1000) return;
+  VocState state;
+  VocAlgorithm_get_states(&vocAlgorithm, &state.mean, &state.std);
+  state.savedAt = time(nullptr);
+  if (settings.putBytes("vocstate", &state, sizeof state) == sizeof state) {
+    vocSavedAt = state.savedAt;
+    vocLastSave = millis();
+  }
+}
+
+// Serial command "voc reset": forgets what the algorithm has learned and starts again
+void resetVoc() {
+  settings.remove("vocstate");
+  vocSavedAt = 0;
+  vocIndex = 0;
+  vocStarted = false;
+  screenChanged = true;
+  startVocAlgorithm();
+}
+
+void printVoc() {
+  if (!sgpFound) {
+    Serial.println(F("VOC index: no SGP40"));
+    return;
+  }
+  if (!vocStarted) {
+    Serial.println(F("VOC index: waits for the internet time to check the saved state (at most 60 s after start-up)"));
+    return;
+  }
+  if (vocIndex > 0) {
+    Serial.printf("VOC index: %u, %s (raw signal %u)\n", vocIndex, vocRating(vocIndex), vocRaw);
+  } else {
+    Serial.printf("VOC index: none yet, the first comes 45 s after the algorithm started (raw signal %u)\n", vocRaw);
+  }
+  uint32_t left = vocLearnSecondsLeft();
+  if (left > 0) {
+    Serial.printf("VOC learning: %lu h %lu min to go, then what it learned is saved every %lu min\n",
+                  (unsigned long)(left / 3600), (unsigned long)(left % 3600 / 60), (unsigned long)(VOC_STATE_SAVE_S / 60));
+    return;
+  }
+  Serial.printf("VOC learning: done%s", vocRestored ? " (carried on from a saved state)" : "");
+  if (vocSavedAt > 0) Serial.printf(", saved %lu s ago", (unsigned long)(time(nullptr) - vocSavedAt));
+  Serial.println();
+}
+
 // One reading per second, also during the warm-up: the algorithm learns from every one
 void updateSgp40() {
   if (!sgpFound) return;
@@ -819,10 +996,15 @@ void updateSgp40() {
     sgpMeasuring = false;
     uint16_t raw;
     if (!fetchSgp40Reading(raw)) return;
+    vocRaw = raw;
+    if (!vocStarted) startVocAlgorithm();
+    if (!vocStarted) return;
     int32_t index = 0;
     VocAlgorithm_process(&vocAlgorithm, raw, &index);
+    vocLastReading = millis();
+    saveVocStateWhenDue();
     if (warmingUp) return;
-    vocRaw = raw;
+    if (index != vocIndex) screenChanged = true;  // the LED follows by itself (updateLed())
     vocIndex = index;
   } else if (millis() - lastSgpStart >= SGP_INTERVAL_MS) {
     lastSgpStart = millis();
@@ -910,7 +1092,7 @@ void updateWifi() {
       configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);  // UTC, updated every 3 hours
       timeStarted = true;
     }
-    webBegin(CO2_GOOD_BELOW, CO2_OK_BELOW, CO2_VENTILATE_BELOW, setSleepMode, setBrightness);  // only the first time
+    webBegin(CO2_LIMITS, VOC_LIMITS, setSleepMode, setBrightness);  // only the first time
   } else {
     Serial.println(F("Wi-Fi lost, reconnecting"));
   }
@@ -961,9 +1143,10 @@ void printStatus() {
   if (warmingUp) {
     Serial.printf("Warm-up: %u s left\n", warmupSecondsLeft());
   } else {
-    Serial.printf("Now: %u ppm, %.2f C, %.1f %%RH, %.2f hPa, %.1f lux%s, VOC index %u (raw %u)\n", co2Ppm, temperatureC,
-                  humidityPct, pressureHpa, lightLux, lightTooBright ? " (or more)" : "", vocIndex, vocRaw);
+    Serial.printf("Now: %u ppm, %.2f C, %.1f %%RH, %.2f hPa, %.1f lux%s\n", co2Ppm, temperatureC, humidityPct,
+                  pressureHpa, lightLux, lightTooBright ? " (or more)" : "");
   }
+  printVoc();
   if (scdFound) printScdPressure();
   printBrightness();
   Serial.printf("Sleep mode: %s\n", sleepMode ? "on (LED off)" : "off");
@@ -1020,9 +1203,21 @@ void runCommand(char *line) {
       setScdPressure(hPa);
     }
     printScdPressure();  // without an option it only shows the pressure
+  } else if (strcmp(command, "voc") == 0) {
+    if (option && strcmp(option, "reset") == 0) {
+      if (!sgpFound) {
+        Serial.println(F("No SGP40"));
+        return;
+      }
+      resetVoc();
+    } else if (option) {
+      Serial.println(F("Use: voc, or voc reset to forget the room's usual air and learn it again"));
+      return;
+    }
+    printVoc();  // without an option it only shows the VOC index
   } else {
     Serial.println(F("Commands: status, files, csv m1|m5 [days], save, sleep on|off, brightness [auto|0-100], led, "
-                     "pressure [auto|700-1200]"));
+                     "pressure [auto|700-1200], voc [reset]"));
   }
 }
 
@@ -1136,8 +1331,8 @@ void loop() {
   readSensors();
   saveBrightnessWhenDue();
   updateLights();
-  webLoop({co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, warmupSecondsLeft(), sleepMode,
-           brightness, autoBrightness});
+  webLoop({co2Ppm, temperatureC, humidityPct, pressureHpa, lightLux, vocIndex, vocLearnSecondsLeft(),
+           warmupSecondsLeft(), sleepMode, brightness, autoBrightness});
 
   if (displayOn) {
     if (sleepMessageShown && millis() - sleepMessageSince >= SLEEP_MESSAGE_MS) {

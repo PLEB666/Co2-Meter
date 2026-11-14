@@ -9,7 +9,6 @@
 
   The page gets its data from these addresses (all times are UTC seconds):
     /api/now                              live values, warm-up, sleep mode, brightness, Wi-Fi signal (JSON)
-                                          (voc is not on the page yet)
     /api/info                             state of the history (JSON)
     /api/days?from=..&to=..               which days have values, for the calendar (JSON)
     /api/data?res=1|5&from=..&to=..      stored values as binary records (history.h)
@@ -32,18 +31,19 @@ struct LiveValues {
   float pressureHpa;          // NAN = no value
   float lightLux;             // NAN = no value
   uint16_t vocIndex;          // 0 = no value yet
+  uint32_t vocLearnSecondsLeft;  // 0 = the VOC index has learned the room's usual air
   uint8_t warmupSecondsLeft;  // 0 = warm-up over
   bool sleepMode;             // LED off, moon on the display
   uint8_t brightness;         // 0-100 %, of the display and the LED
   bool autoBrightness;        // true = the light sensor sets it
 };
 
-// Call when Wi-Fi has connected (more calls do nothing). The CO2 limits give the
-// value on the page the same rating as on the display. setSleepMode is called when
-// the sleep mode switch on the page is used, setBrightness when the brightness slider
-// or its Auto switch is: with BRIGHTNESS_AUTO or a level 0-100, and it returns the
-// level now in use.
-void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateBelow, void (*setSleepMode)(bool on),
+// Call when Wi-Fi has connected (more calls do nothing). The CO2 and VOC limits (good
+// below, OK below, ventilate below) give the values on the page the same rating as on
+// the display. setSleepMode is called when the sleep mode switch on the page is used,
+// setBrightness when the brightness slider or its Auto switch is: with BRIGHTNESS_AUTO
+// or a level 0-100, and it returns the level now in use.
+void webBegin(const uint16_t co2Limits[3], const uint16_t vocLimits[3], void (*setSleepMode)(bool on),
               uint8_t (*setBrightness)(int level));
 
 // Call in loop(). Answers the browser's requests.

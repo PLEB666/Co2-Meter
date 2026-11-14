@@ -14,6 +14,8 @@
     values are then calculated from the saved 1-minute values, so a power cut never
     leaves a hole in them. For the last 14 days both levels exist.
   - Records are only ever appended to a file, never changed. Old files are deleted.
+  - Stored per value: CO2, temperature, humidity, air pressure and the VOC index.
+    Files from before the VOC index (format version 1) are converted once at start-up.
 */
 #pragma once
 
@@ -22,8 +24,9 @@
 // Call once in setup(). Mounts the data partition (formats it on first use).
 void historyBegin();
 
-// Call for every new reading. Pass NAN for a value that is missing.
-void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa);
+// Call for every new reading. Pass NAN for a value that is missing, 0 for a missing
+// CO2 value or VOC index.
+void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa, uint16_t vocIndex);
 
 // Call in loop(). Finishes each minute and saves every 10 minutes.
 void historyLoop();
@@ -45,7 +48,7 @@ bool historyPrintCsv(Print &out, const char *level, uint16_t days);
 bool historyClockSet();
 
 // Writes the stored values from "from" (included) to "to" (not included) as binary
-// records, exactly as they are in the files: 12 bytes per value (layout in
+// records, exactly as they are in the files: 14 bytes per value (layout in
 // history.cpp). The 1-minute values include the ones not saved yet. Returns false
 // for an unknown number of minutes.
 bool historyWriteRecords(Print &out, uint8_t minutes, uint32_t from, uint32_t to);

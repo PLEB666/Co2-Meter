@@ -13,14 +13,15 @@
 // Longest time span one data request may cover. This keeps every answer below about
 // 60 KB, so the sensors are still read on time while the page loads.
 constexpr uint32_t SECONDS_PER_DAY = 86400;
-constexpr uint32_t MAX_SPAN_MINUTE = 2 * SECONDS_PER_DAY;   // 1-minute values, 34 KB
-constexpr uint32_t MAX_SPAN_FIVE = 14 * SECONDS_PER_DAY;    // 5-minute values, 48 KB
+constexpr uint32_t MAX_SPAN_MINUTE = 2 * SECONDS_PER_DAY;   // 1-minute values, 40 KB
+constexpr uint32_t MAX_SPAN_FIVE = 14 * SECONDS_PER_DAY;    // 5-minute values, 56 KB
 constexpr uint32_t MAX_SPAN_DAYS = 45 * SECONDS_PER_DAY;    // calendar markers
 
 static WebServer server(80);
 static bool started = false;
-static LiveValues live = {0, NAN, NAN, NAN, NAN, 0, 0, false, 0, true};
-static uint16_t co2Limits[3];
+static LiveValues live = {0, NAN, NAN, NAN, NAN, 0, 0, 0, false, 0, true};
+static uint16_t co2Limit[3];
+static uint16_t vocLimit[3];
 static void (*sleepModeSetter)(bool on) = nullptr;
 static uint8_t (*brightnessSetter)(int level) = nullptr;
 
@@ -103,9 +104,11 @@ static void handleNow() {
   printJsonNumber(out, "light", live.lightLux, 1);
   out.print(',');
   printJsonNumber(out, "voc", live.vocIndex > 0 ? live.vocIndex : NAN, 0);
+  out.printf(",\"vocLearnLeft\":%lu,\"vocLimits\":[%u,%u,%u]", (unsigned long)live.vocLearnSecondsLeft, vocLimit[0],
+             vocLimit[1], vocLimit[2]);
   out.printf(",\"sleep\":%s,\"brightness\":%u,\"autoBrightness\":%s,\"limits\":[%u,%u,%u],\"rssi\":%d}",
-             live.sleepMode ? "true" : "false", live.brightness, live.autoBrightness ? "true" : "false", co2Limits[0],
-             co2Limits[1], co2Limits[2], WiFi.RSSI());
+             live.sleepMode ? "true" : "false", live.brightness, live.autoBrightness ? "true" : "false", co2Limit[0],
+             co2Limit[1], co2Limit[2], WiFi.RSSI());
 }
 
 static void handleSleep() {
@@ -165,12 +168,11 @@ static void handleData() {
   historyWriteRecords(out, minutes, from, to);
 }
 
-void webBegin(uint16_t co2GoodBelow, uint16_t co2OkBelow, uint16_t co2VentilateBelow, void (*setSleepMode)(bool on),
+void webBegin(const uint16_t co2Limits[3], const uint16_t vocLimits[3], void (*setSleepMode)(bool on),
               uint8_t (*setBrightness)(int level)) {
   if (started) return;
-  co2Limits[0] = co2GoodBelow;
-  co2Limits[1] = co2OkBelow;
-  co2Limits[2] = co2VentilateBelow;
+  memcpy(co2Limit, co2Limits, sizeof co2Limit);
+  memcpy(vocLimit, vocLimits, sizeof vocLimit);
   sleepModeSetter = setSleepMode;
   brightnessSetter = setBrightness;
 
