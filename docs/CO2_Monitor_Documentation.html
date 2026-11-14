@@ -105,7 +105,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.41: the LED shows CO<sub>2</sub> only; the VOC graph is below the humidity graph and shows the learning phase in a lighter shade</span>
+    <span><b>Version</b> 0.42: a second display screen with all six sensor values, switched by a short press; 120&nbsp;s warm-up; the display fades in in 0.5&nbsp;s</span>
     <span><b>Updated</b> 14 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
@@ -221,7 +221,7 @@
   <h3>Project files</h3>
   <table>
     <tr><th>File</th><th>Purpose</th></tr>
-    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program: the six I&sup2;C parts &rarr; 1.5" display, button wake, 30&nbsp;s timeout, CO<sub>2</sub> colour on the 8&nbsp;mm LED, sleep mode, serial output, Wi-Fi with a fixed address and internet time, Serial Monitor commands.</td></tr>
+    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program: the six I&sup2;C parts &rarr; 1.5" display with two screens, button wake and screen switch, 30&nbsp;s timeout, CO<sub>2</sub> colour on the 8&nbsp;mm LED, sleep mode, serial output, Wi-Fi with a fixed address and internet time, Serial Monitor commands.</td></tr>
     <tr><td><code>firmware/co2_monitor/history.h</code>, <code>history.cpp</code></td><td>History storage in the flash (section 7). The Arduino IDE shows them as tabs next to the main program.</td></tr>
     <tr><td><code>firmware/co2_monitor/web.h</code>, <code>web.cpp</code></td><td>Web server: the page and the data addresses it uses (section 8).</td></tr>
     <tr><td><code>firmware/co2_monitor/web/index.html</code>, <code>make_web_page.ps1</code>, <code>../web_page.h</code></td><td>The web page; the script packs it into <code>web_page.h</code>, the compressed copy the firmware serves (8.6).</td></tr>
@@ -256,7 +256,7 @@
     <tr><td class="c">6</td><td><b>Adafruit BMP580</b> (6411)</td><td>Air pressure for the SCD-41's pressure compensation</td><td>I&sup2;C <code>0x46</code>/<code>0x47</code>, STEMMA QT</td><td>3-5&nbsp;V</td><td><span class="st have">have</span></td></tr>
     <tr><td class="c">7</td><td><b>Adafruit SGP40</b> (4829)</td><td>Air quality (VOC index)</td><td>I&sup2;C <code>0x59</code>, STEMMA QT</td><td>3-5&nbsp;V</td><td><span class="st have">have</span></td></tr>
     <tr><td class="c">8</td><td><b>Adafruit STEMMA Speaker</b> (3885)</td><td>Alarm beeps</td><td>GPIO3 (PWM), 3-pin JST PH</td><td>5&nbsp;V</td><td><span class="st have">have</span></td></tr>
-    <tr><td class="c">9</td><td><b>Panel button</b>, Berrybase 10130 (red)</td><td>Wakes the display, switches sleep mode</td><td>GPIO2</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
+    <tr><td class="c">9</td><td><b>Panel button</b>, Berrybase 10130 (red)</td><td>Wakes the display, switches screens and sleep mode</td><td>GPIO2</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
     <tr><td class="c">10</td><td><b>8&nbsp;mm addressable LED</b>, Berrybase PL9823-F8 (diffused)</td><td>CO<sub>2</sub> colour on the front</td><td>GPIO18 (one data wire)</td><td>5&nbsp;V</td><td><span class="st have">have</span></td></tr>
     <tr><td class="c">11</td><td>STEMMA QT cables, plug to plug, 2 &times; 50&nbsp;mm</td><td>Chain: SHT45 to SCD-41, BMP580 to light sensor</td><td>JST SH 1.0&nbsp;mm</td><td>-</td><td><span class="st have">have</span></td></tr>
     <tr><td class="c">12</td><td>STEMMA QT cables, plug to plug, 100&nbsp;mm and 200&nbsp;mm</td><td>Chain: light sensor to SHT45, SCD-41 to display</td><td>JST SH 1.0&nbsp;mm</td><td>-</td><td><span class="st ord">ordered</span></td></tr>
@@ -556,14 +556,14 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
         <li><b>SHT45</b>: high-precision reading every 2&nbsp;s, heater off.</li>
         <li><b>BMP580</b>: air pressure every 2&nbsp;s, at 0x46 or 0x47, whichever answers. It goes to the SCD-41, so it is read from the start, during the warm-up too.</li>
         <li><b>VEML7700</b>: light in lux every second, in steps of 0.06&nbsp;lux up to about 3700&nbsp;lux. Brighter light gives the top value, and <code>status</code> adds "(or more)". It sets the <b>brightness</b> of the display and the LED (see <i>Brightness</i> below), so it is read from the start, during the warm-up too.</li>
-        <li><b>SGP40</b>: one raw reading per second, compensated with the SHT45's temperature and humidity. Sensirion's algorithm turns it into the <b>VOC index</b>: 100 = the room's usual air, higher = more VOCs (smells, solvents, cooking), lower = fewer. The algorithm starts as soon as the internet time is there (at most 60&nbsp;s after start-up), because it first checks whether it can carry on with what it had learned before the restart (<i>VOC index</i> below). The first index comes 45&nbsp;s later. It keeps learning during the warm-up and in sleep mode.</li>
-        <li>The <b>VOC index</b> is on the display (bottom line), on the LED and on the web page, and it is <b>stored</b> with the other values (sections 7 and 8). The <b>air pressure</b> is not on the display, but it is stored and shown on the web page too. The light is only printed (Serial, <code>status</code>) and shown at the bottom of the web page; it is not stored.</li>
-        <li><b>Warm-up</b>: for the first 30&nbsp;s after start-up the sensors measure, but no value is shown, printed or saved. The values from this time are thrown away. The display counts down ("warming up", 30&nbsp;s &hellip; 1&nbsp;s).</li>
-        <li><b>Display</b>: the 1.5" OLED, turned for the case, with the prototype's screen: CO<sub>2</sub> large, temperature and humidity below it, and a small line with the VOC index at the bottom (Figure 4). On during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press. Pressing while it's on restarts the 30&nbsp;s. It fades in and out in 1&nbsp;s; when off, the panel is fully dark and the content is kept. A whole picture takes about 0.2&nbsp;s on the I&sup2;C bus, so it is redrawn at most once a second. Its brightness follows the room light (<i>Brightness</i> below).</li>
+        <li><b>SGP40</b>: one raw reading per second, compensated with the SHT45's temperature and humidity. Sensirion's algorithm turns it into the <b>VOC index</b>: 100 = the room's usual air, higher = more VOCs (smells, solvents, cooking), lower = fewer. The algorithm starts as soon as the internet time is there (at most 60&nbsp;s after start-up), because it first checks whether it can carry on with what it had learned before the restart (<i>VOC index</i> below). The first index comes 45&nbsp;s later, so it is there when the warm-up ends. It keeps learning during the warm-up and in sleep mode.</li>
+        <li>The <b>VOC index</b> is on the display (main screen and sensor screen) and on the web page, and it is <b>stored</b> with the other values (sections 7 and 8). The <b>air pressure</b> is on the sensor screen, stored and shown on the web page too. The <b>light</b> is on the sensor screen, printed (Serial, <code>status</code>) and shown at the bottom of the web page; it is not stored.</li>
+        <li><b>Warm-up</b>: for the first 120&nbsp;s after start-up the sensors measure, but no value is shown, printed or saved. The values from this time are thrown away. The display stays on and counts down ("warming up", 120&nbsp;s &hellip; 1&nbsp;s).</li>
+        <li><b>Display</b>: the 1.5" OLED, turned for the case, with <b>two screens</b> (Figure 4). The <b>main screen</b> is the prototype's: CO<sub>2</sub> large, temperature and humidity below it, and a small line with the VOC index at the bottom. The <b>sensor screen</b> lists all six values: CO<sub>2</sub>, temperature, humidity, air pressure, light and the VOC index. A <b>short press</b> on the button switches between them (<i>The button</i> below). The display always wakes up with the main screen. It is on during the warm-up, then for 30&nbsp;s with the first values, and for 30&nbsp;s after every button press: each press starts the 30&nbsp;s again. It fades in in 0.5&nbsp;s and out in 1&nbsp;s; when off, the panel is fully dark and the content is kept. A whole picture takes about 0.2&nbsp;s on the I&sup2;C bus, so it is redrawn at most once a second. Its brightness follows the room light (<i>Brightness</i> below).</li>
         <li><b>8&nbsp;mm LED</b> (GPIO18, Figure 3): dimmed to suit the room light, on all the time except in sleep mode, shows the CO<sub>2</sub> level as a colour that changes smoothly from green through yellow to red. The VOC index doesn't change it (<code>LED_SHOWS_VOC</code>). It stays off until the first value after the warm-up, then fades in.</li>
         <li><b>Sleep mode</b>: LED off, a small moon on the display. Hold the button for 2&nbsp;s or use the switch on the web page (see <i>Sleep mode</i> below).</li>
         <li><b>Brightness</b>: one level, 0-100&nbsp;%, for the display and the LED together. On <i>Auto</i> the light sensor sets it; the web page and the Serial Monitor can set a fixed level instead (see <i>Brightness</i> below).</li>
-        <li><b>Fading</b>: like a smart bulb, the light never jumps. A new brightness, a new LED colour, and the LED or the display going on or off all fade over 1&nbsp;s (see <i>Fading</i> below).</li>
+        <li><b>Fading</b>: like a smart bulb, the light never jumps. A new brightness, a new LED colour, and the LED or the display going on or off all fade over 1&nbsp;s, the display going on over 0.5&nbsp;s (see <i>Fading</i> below).</li>
         <li><b>Serial</b>: one line per CO<sub>2</sub> reading after the warm-up, with all six values and the brightness, usable in the Serial Monitor and the Serial Plotter.</li>
         <li><b>Wi-Fi and clock</b>: connects with the details in <code>secrets.h</code> at the fixed address 192.168.178.40 (8.2) and reconnects by itself. Gets the time (UTC) from the internet and updates it every 3&nbsp;hours.</li>
         <li><b>History</b>: stores 1-minute and 5-minute values of CO<sub>2</sub>, temperature, humidity, air pressure and the VOC index in the flash (section 7). You can view them with commands in the Serial Monitor (7.6).</li>
@@ -590,8 +590,60 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
           </g>
         </g>
       </svg>
-      <svg viewBox="0 0 300 172" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Display in sleep mode" style="margin-top:8px">
+      <svg viewBox="0 0 300 344" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sensor screen, sleep mode, warm-up and sleep mode message" style="margin-top:8px">
         <g transform="translate(12 12)">
+          <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
+          <rect width="128" height="128" fill="#05080c"/>
+          <g fill="#f2f2f2">
+            <text class="mono" x="0" y="8" font-size="10">Sensors</text>
+            <rect y="10" width="128" height="1"/>
+            <text class="mono" x="0" y="28" font-size="10">CO2</text>
+            <text class="mono" x="108" y="28" font-size="20" text-anchor="end">612</text>
+            <text class="mono" x="111" y="28" font-size="10">ppm</text>
+            <text class="mono" x="0" y="47" font-size="10">Temp</text>
+            <text class="mono" x="108" y="47" font-size="20" text-anchor="end">22.4</text>
+            <circle cx="112" cy="41" r="1.2" fill="none" stroke="#f2f2f2" stroke-width="0.8"/>
+            <text class="mono" x="115" y="47" font-size="10">C</text>
+            <text class="mono" x="0" y="66" font-size="10">Humid</text>
+            <text class="mono" x="108" y="66" font-size="20" text-anchor="end">45.3</text>
+            <text class="mono" x="111" y="66" font-size="10">%</text>
+            <text class="mono" x="0" y="85" font-size="10">Press</text>
+            <text class="mono" x="108" y="85" font-size="20" text-anchor="end">983.1</text>
+            <text class="mono" x="111" y="85" font-size="10">hPa</text>
+            <text class="mono" x="0" y="104" font-size="10">Light</text>
+            <text class="mono" x="108" y="104" font-size="20" text-anchor="end">154</text>
+            <text class="mono" x="111" y="104" font-size="10">lux</text>
+            <text class="mono" x="0" y="123" font-size="10">VOC</text>
+            <text class="mono" x="108" y="123" font-size="20" text-anchor="end">105</text>
+          </g>
+        </g>
+        <g transform="translate(12 184)">
+          <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
+          <rect width="128" height="128" fill="#05080c"/>
+          <g fill="#f2f2f2">
+            <text class="mono" x="0" y="8" font-size="10">CO2 ppm</text>
+            <text class="mono" x="64" y="33" font-size="10" text-anchor="middle">warming up</text>
+            <text class="mono" x="64" y="63" font-size="30" text-anchor="middle">87 s</text>
+            <rect y="80" width="128" height="1"/>
+            <text class="mono" x="0" y="102" font-size="20">--.-</text>
+            <circle cx="51" cy="89" r="1.2" fill="none" stroke="#f2f2f2" stroke-width="0.8"/>
+            <text class="mono" x="54" y="95" font-size="10">C</text>
+            <text class="mono" x="127" y="102" font-size="20" text-anchor="end">--%</text>
+            <text class="mono" x="0" y="121" font-size="10">VOC --</text>
+          </g>
+        </g>
+        <g transform="translate(160 184)">
+          <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
+          <rect width="128" height="128" fill="#05080c"/>
+          <circle cx="64" cy="36" r="22" fill="#f2f2f2"/>
+          <circle cx="77" cy="25" r="20" fill="#05080c"/>
+          <text x="64" y="86" font-size="20" text-anchor="middle" class="mono" fill="#f2f2f2">Sleep mode</text>
+          <text x="64" y="103" font-size="10" text-anchor="middle" class="mono" fill="#f2f2f2">on - LED off</text>
+        </g>
+        <text x="76" y="167" font-size="10" text-anchor="middle" fill="#57606a">Short press: sensor screen</text>
+        <text x="76" y="339" font-size="10" text-anchor="middle" fill="#57606a">During the 120 s warm-up</text>
+        <text x="224" y="339" font-size="10" text-anchor="middle" fill="#57606a">After a long press, for 2.5 s</text>
+        <g transform="translate(160 12)">
           <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
           <rect width="128" height="128" fill="#05080c"/>
           <g fill="#f2f2f2">
@@ -608,32 +660,38 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
           </g>
           <path transform="translate(0 1)" fill="#f2f2f2" d="M55 0h2v1h-2zM54 1h2v1h-2zM53 2h3v3h-3zM53 5h5v1h-5zM54 6h6v1h-6zM55 7h4v1h-4z"/>
         </g>
-        <g transform="translate(160 12)">
-          <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
-          <rect width="128" height="128" fill="#05080c"/>
-          <circle cx="64" cy="36" r="22" fill="#f2f2f2"/>
-          <circle cx="77" cy="25" r="20" fill="#05080c"/>
-          <text x="64" y="86" font-size="20" text-anchor="middle" class="mono" fill="#f2f2f2">Sleep mode</text>
-          <text x="64" y="103" font-size="10" text-anchor="middle" class="mono" fill="#f2f2f2">on - LED off</text>
-        </g>
-        <text x="76" y="167" font-size="10" text-anchor="middle" fill="#57606a">Sleep mode on: moon at the top</text>
-        <text x="224" y="167" font-size="10" text-anchor="middle" fill="#57606a">After a long press, for 2.5 s</text>
+        <text x="224" y="167" font-size="10" text-anchor="middle" fill="#57606a">Sleep mode on: moon at the top</text>
       </svg>
-      <figcaption>Figure 4: The 1.5" display, 128&nbsp;&times;&nbsp;128 pixels (at the top twice the size), with the prototype's layout: CO<sub>2</sub> and its rating at the top, temperature and humidity (from the SHT45) below the line, and the VOC index with its rating in the bottom line ("learning" instead of GOOD or OK for 3 hours after a fresh start). In sleep mode a small moon sits between "CO2 ppm" and the rating. A long press on the button confirms the new mode on the full screen (a sun with "off - LED on" when it is switched off). In the case the display is turned a quarter turn, so the firmware turns the picture back (<code>OLED_ROTATION</code> 3).</figcaption>
+      <figcaption>Figure 4: The 1.5" display, 128&nbsp;&times;&nbsp;128 pixels. At the top, twice the size, the <b>main screen</b> with the prototype's layout: CO<sub>2</sub> and its rating at the top, temperature and humidity (from the SHT45) below the line, and the VOC index with its rating in the bottom line ("learning" instead of GOOD or OK for 3 hours after a fresh start). Below it the <b>sensor screen</b> that a short press switches to: all six values, the name and unit small, the value large (one decimal for temperature, humidity and pressure, and for light below 100&nbsp;lux; "missing" for a sensor that was not found). In sleep mode a small moon sits next to "CO2 ppm" or "Sensors". During the warm-up the main screen counts down; the sensor screen then shows <code>--</code> for every value and "warm-up 87s" at the top right. A long press on the button confirms the new mode on the full screen (a sun with "off - LED on" when it is switched off). In the case the display is turned a quarter turn, so the firmware turns the picture back (<code>OLED_ROTATION</code> 3).</figcaption>
     </figure>
   </div>
 
-  <div class="box note"><span class="label">New sensors:</span> the light sensor sets the brightness, the BMP580's air pressure corrects the CO<sub>2</sub> value, and the SGP40's VOC index is on the display, the LED and the web page (all below). The speaker comes later (section 3, <i>Pins used in the case</i>).</div>
+  <div class="box note"><span class="label">New sensors:</span> the light sensor sets the brightness, the BMP580's air pressure corrects the CO<sub>2</sub> value, and the SGP40's VOC index is on the display and the web page (all below). The speaker comes later (section 3, <i>Pins used in the case</i>).</div>
+
+  <h3 id="button">The button and the two screens</h3>
+  <table>
+    <tr><th style="width:28%">Press</th><th>What happens</th></tr>
+    <tr><td>Short press, display off</td><td>The display wakes with the <b>main screen</b> and fades in in 0.5&nbsp;s. It stays on for 30&nbsp;s.</td></tr>
+    <tr><td>Short press, display on</td><td>Switches between the <b>main screen</b> and the <b>sensor screen</b> (Figure 4), and starts the 30&nbsp;s again.</td></tr>
+    <tr><td>Hold for 2&nbsp;s</td><td>Switches <b>sleep mode</b> on or off (<i>Sleep mode</i> below). The screen doesn't switch; after the confirmation the main screen follows, or the display fades out when sleep mode was switched on.</td></tr>
+  </table>
+  <ul>
+    <li><b>Every press</b> starts the display's 30&nbsp;s again, from the moment the button goes down. A press that wakes the display doesn't switch the screen, so the display always comes back with the main screen.</li>
+    <li>The screen switches when the button is <b>let go</b>, not when it goes down: only then is it clear that the press was not the start of a long press.</li>
+    <li>Drawing a screen holds the program for about 0.2&nbsp;s, longer than a quick press. An interrupt on the button pin notes every press of at least 20&nbsp;ms, so a press during a redraw still switches the screen, a moment later.</li>
+    <li>During the warm-up the button works the same, but the display stays on until the warm-up is over.</li>
+  </ul>
 
   <h3>Settings at the top of the sketch</h3>
   <table>
     <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
     <tr><td><code>SCD_PRESSURE_STEP_HPA</code></td><td>1.0</td><td>The BMP580's pressure is sent to the SCD-41 again when it has moved by this much (hPa) from the value the SCD-41 has. The SCD-41 takes whole hPa.</td></tr>
     <tr><td><code>SENSOR_ALTITUDE_M</code></td><td>0</td><td>Only used <b>without a BMP580</b>: your altitude in metres above sea level, from which the SCD-41 estimates the air pressure. With a BMP580 its measured pressure replaces it right after the start.</td></tr>
-    <tr><td><code>WARMUP_TIME_MS</code></td><td>30000</td><td>Warm-up after start-up (ms): the sensors measure, but nothing is shown, printed or saved.</td></tr>
+    <tr><td><code>WARMUP_TIME_MS</code></td><td>120000</td><td>Warm-up after start-up (ms): the sensors measure, but nothing is shown, printed or saved.</td></tr>
     <tr><td><code>OLED_ADDRESS</code></td><td>0x3D</td><td>0x3C if the A0 jumper on the back of the display is closed.</td></tr>
     <tr><td><code>OLED_ROTATION</code></td><td>3</td><td>0-3: each step turns the picture a quarter turn clockwise. 0 = upright with the display's pin header at the top. 3 = as in the case: seen from the front, the display is turned a quarter turn clockwise, its pin header on the right next to the light sensor. If the text stands on its head there, use 1.</td></tr>
-    <tr><td><code>DISPLAY_ON_TIME_MS</code></td><td>30000</td><td>How long the display stays on (ms).</td></tr>
+    <tr><td><code>DISPLAY_ON_TIME_MS</code></td><td>30000</td><td>How long the display stays on after the last button press and after the warm-up (ms).</td></tr>
+    <tr><td><code>DISPLAY_FADE_IN_MS</code></td><td>500</td><td>How long the display takes to fade in when it goes on (ms). Fading out takes <code>FADE_TIME_MS</code>.</td></tr>
     <tr><td><code>DISPLAY_REDRAW_MS</code></td><td>1000</td><td>Shortest time between two redraws while new values come in (ms). A whole picture takes about 0.2&nbsp;s on the I&sup2;C bus, and the program waits meanwhile.</td></tr>
     <tr><td><code>SHT_INTERVAL_MS</code>, <code>BMP_INTERVAL_MS</code>, <code>VEML_INTERVAL_MS</code></td><td>2000 / 2000 / 1000</td><td>How often the SHT45, the BMP580 and the light sensor are read (ms).</td></tr>
     <tr><td><code>SGP_INTERVAL_MS</code></td><td>1000</td><td>Keep it at 1000: Sensirion's VOC index algorithm expects one SGP40 reading per second.</td></tr>
@@ -653,7 +711,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td><code>AUTO_BRIGHTNESS_SPEED</code></td><td>0.3</td><td>How fast <i>Auto</i> follows the light: the share of the way taken with each reading (one a second). Higher = faster, 1 = at once.</td></tr>
     <tr><td><code>BRIGHTNESS_START</code></td><td>50</td><td>Level (%) of a new monitor until the light sensor's first reading, and the level <i>Auto</i> keeps if the light sensor is missing.</td></tr>
     <tr><td><code>BRIGHTNESS_SAVE_DELAY_MS</code></td><td>3000</td><td>A brightness set on the web page is saved this long after the last change (ms), so moving the slider doesn't write the flash again and again.</td></tr>
-    <tr><td><code>FADE_TIME_MS</code></td><td>1000</td><td>How long every change of the light takes (ms): a new brightness, a new LED colour, the LED or the display going on or off. Longer = softer, 0 = no fading.</td></tr>
+    <tr><td><code>FADE_TIME_MS</code></td><td>1000</td><td>How long every change of the light takes (ms): a new brightness, a new LED colour, the LED going on or off, the display going off (going on: <code>DISPLAY_FADE_IN_MS</code>). Longer = softer, 0 = no fading.</td></tr>
     <tr><td><code>BOARD_LED_TOO</code></td><td>false</td><td><code>true</code> = the board's own RGB LED (GPIO8) shows the colour as well. In the case it faces the floor, so leave it <code>false</code> there.</td></tr>
     <tr><td><code>LED_GREEN</code>, <code>LED_YELLOW</code>, <code>LED_RED</code></td><td>{0,255,0} / {255,160,0} / {255,0,0}</td><td>The three colours at full brightness, as {red, green, blue}. Yellow has less green because the green LED looks brighter than the red one. If yellow looks too green, lower its middle value.</td></tr>
     <tr><td><code>WIFI_HOSTNAME</code></td><td>co2-monitor</td><td>The name shown in your router's device list.</td></tr>
@@ -716,7 +774,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><th style="width:24%">Where</th><th style="width:30%">What it shows</th><th>How to read it</th></tr>
     <tr><td>Display, bottom line</td><td><code>VOC 105&nbsp;&nbsp;GOOD</code></td><td>The index now (updated every second while the display is on) and its rating. VENTILATE and BAD AIR are shown black on white.</td></tr>
     <tr><td></td><td><code>VOC 105&nbsp;&nbsp;learning</code></td><td>Less than 3 hours since a fresh start: the number is valid but swings more. A VENTILATE or BAD AIR is still shown instead of "learning".</td></tr>
-    <tr><td></td><td><code>VOC --</code></td><td>No index yet: the first comes about 45&nbsp;s after the algorithm starts, usually 20&nbsp;s after the warm-up.</td></tr>
+    <tr><td></td><td><code>VOC --</code></td><td>No index yet: the first comes about 45&nbsp;s after the algorithm starts, which is before the 120&nbsp;s warm-up ends, so normally only during the warm-up.</td></tr>
     <tr><td></td><td><code>VOC: SGP40 missing</code></td><td>The sensor was not found at the start (section 12).</td></tr>
     <tr><td>8&nbsp;mm LED</td><td>nothing</td><td>The LED follows CO<sub>2</sub> only (<code>LED_SHOWS_VOC = false</code>).</td></tr>
     <tr><td>Web page, VOC tile</td><td>number, rating badge, learning note</td><td>Updated every 5&nbsp;s. "Still learning the room's usual air, 2 h 57 min to go" after a fresh start (Figure 6).</td></tr>
@@ -786,7 +844,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   <h3 id="fading">Fading</h3>
   <p>Like a smart bulb, the display and the LED never jump to a new setting: they <b>fade</b> to it over <code>FADE_TIME_MS</code> (1&nbsp;s).</p>
   <ul>
-    <li><b>What fades:</b> a new brightness (Auto, the slider, <code>brightness</code>), the LED's colour with each new CO<sub>2</sub> value or VOC index, the LED going off and on (sleep mode, the first value after the warm-up), and the display going on (button press) and off (after 30&nbsp;s, or after the sleep mode message). Only "starting&hellip;" right after a restart appears at once.</li>
+    <li><b>What fades:</b> a new brightness (Auto, the slider, <code>brightness</code>), the LED's colour with each new CO<sub>2</sub> value or VOC index, the LED going off and on (sleep mode, the first value after the warm-up), and the display going on (button press, faster: 0.5&nbsp;s) and off (after 30&nbsp;s, or after the sleep mode message). Only "starting&hellip;" right after a restart appears at once, and a switch between the two screens is instant.</li>
     <li><b>Even to the eye:</b> the brightness fades through the same % steps as the level, so each part of a fade looks like the same change. Going off, a light fades on below 0&nbsp;% until it is dark; then the LED gets black and the display is switched off. Going on is the same backwards, with the new picture already drawn.</li>
     <li><b>A new change during a fade</b> starts from where the light is at that moment, so it never jumps. When you move the slider on the web page, the display and the LED follow about a second behind.</li>
     <li><b>Few steps when very dim:</b> at 0&nbsp;% the LED's colours are 1 of 255, so a fade down there has only a step or two. The display has more steps (6 of 255 at 0&nbsp;%).</li>
@@ -799,14 +857,14 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
   <p>For the night. Sleep mode switches the <b>LED off</b> and puts a <b>small moon</b> in the top line of the display (Figure 4). Everything else carries on: the sensors measure, the history records, and the web page works. Sleep mode is <b>not</b> the ESP32's deep sleep, which would stop all of that.</p>
   <table>
     <tr><th style="width:24%">Switch it with</th><th>How</th></tr>
-    <tr><td>The button</td><td><b>Hold it for 2&nbsp;s.</b> The display wakes as soon as you press, and after 2&nbsp;s it shows a big moon with "Sleep mode on - LED off" (or a sun with "off - LED on") for 2.5&nbsp;s. When switching on, the display then fades out at once; when switching off, it shows the values for the rest of the 30&nbsp;s. A short press still just wakes the display, in sleep mode with the moon at the top.</td></tr>
+    <tr><td>The button</td><td><b>Hold it for 2&nbsp;s.</b> The display wakes as soon as you press, and after 2&nbsp;s it shows a big moon with "Sleep mode on - LED off" (or a sun with "off - LED on") for 2.5&nbsp;s. When switching on, the display then fades out at once; when switching off, it shows the main screen for the rest of the 30&nbsp;s. A short press still wakes the display, in sleep mode with the moon at the top, and switches the screens while it is on.</td></tr>
     <tr><td>The web page</td><td>The <i>Sleep mode</i> switch at the top right (8.3). The display stays dark, so the bedroom does too; if it happens to be on, the moon appears or disappears.</td></tr>
     <tr><td>The Serial Monitor</td><td><code>sleep on</code> or <code>sleep off</code> (7.6). <code>status</code> shows the current mode.</td></tr>
   </table>
   <ul>
     <li><b>Remembered:</b> the mode is stored in the ESP32's settings memory (NVS), apart from the history. It survives a restart, a power cut and a firmware upload. <i>Erase All Flash</i> resets it to off.</li>
     <li><b>Lights that stay on:</b> the ESP32 board's red power LED and the green "on" LEDs of the SCD-41 and SHT45 are wired straight to the power supply. No software can switch them off. How to cover or disconnect them: <a href="#tape">section 11</a>.</li>
-    <li>After a restart in sleep mode the display still shows the warm-up and the first values, as always (about 1&nbsp;minute), then stays dark.</li>
+    <li>After a restart in sleep mode the display still shows the warm-up and the first values, as always (about 2.5&nbsp;minutes), then stays dark.</li>
   </ul>
   </div>
 </section>
@@ -867,7 +925,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <figcaption>Figure 5: How a reading becomes history. Only the part in RAM, at most 10 minutes, is lost on a power cut.</figcaption>
   </figure>
   <ol>
-    <li>Every 5&nbsp;s the SCD-41 delivers a CO<sub>2</sub> value. Together with the latest temperature, humidity, air pressure and VOC index it is added to the average of the current minute, in RAM. Nothing is stored during the 30&nbsp;s warm-up after a start.</li>
+    <li>Every 5&nbsp;s the SCD-41 delivers a CO<sub>2</sub> value. Together with the latest temperature, humidity, air pressure and VOC index it is added to the average of the current minute, in RAM. Nothing is stored during the 120&nbsp;s warm-up after a start.</li>
     <li>Every 10 minutes (at :00, :10, :20&nbsp;&hellip; plus 5&nbsp;s) the finished minutes are appended to today's file in <code>/m1</code>.</li>
     <li>In the same save, every finished 5-minute period is worked out from the saved 1-minute values and appended to <code>/m5</code>. Because it always comes from saved data, a power cut doesn't leave a hole in it: the 5 minutes that were running are completed after the restart from what was saved before.</li>
     <li>Files older than their retention are deleted: 1-minute files after 14 days, 5-minute files after 3 years. If less than 64&nbsp;KB is ever free, the oldest 5-minute day is deleted too. That is only a safety net: 3 years fill about half of the flash.</li>
@@ -997,7 +1055,7 @@ Not saved yet (in RAM): 2 minutes, next save in 505 s
   <table>
     <tr><th style="width:21%">Part</th><th>What it does</th></tr>
     <tr><td>Status line</td><td>Green dot: a new reading arrived within the last 15&nbsp;s (the page asks every 5&nbsp;s). Red dot: no connection. "Waiting for the internet time" while the monitor's clock isn't set.</td></tr>
-    <tr><td>Live values</td><td>Top row: CO<sub>2</sub> and the <b>VOC index</b>, each with the same rating as the display (Good, OK, Ventilate, Bad air; limits in section 6). Below the VOC index, while it is still learning the room: "Still learning the room's usual air" with the time left. Second row: temperature, humidity and <b>air pressure</b> in whole hPa: the pressure where the monitor stands, not the higher sea-level value of a weather report. On a phone CO<sub>2</sub>, the VOC index and the pressure each get a full row. During the 30&nbsp;s warm-up: "Warming up" with the seconds left.</td></tr>
+    <tr><td>Live values</td><td>Top row: CO<sub>2</sub> and the <b>VOC index</b>, each with the same rating as the display (Good, OK, Ventilate, Bad air; limits in section 6). Below the VOC index, while it is still learning the room: "Still learning the room's usual air" with the time left. Second row: temperature, humidity and <b>air pressure</b> in whole hPa: the pressure where the monitor stands, not the higher sea-level value of a weather report. On a phone CO<sub>2</sub>, the VOC index and the pressure each get a full row. During the 120&nbsp;s warm-up: "Warming up" with the seconds left.</td></tr>
     <tr><td>Graphs</td><td>Right below the live values. One graph per value: CO<sub>2</sub>, temperature, humidity, VOC index and air pressure, all on the same time axis in local time; the heading above them names the time shown. Move the mouse over them, or drag a finger along them, to see the values at that moment. Dashed lines mark the CO<sub>2</sub> and VOC limits that fall inside the scale. The VOC line is lighter (darker in dark mode) where the algorithm was still learning; "still learning" then stands above the VOC graph and next to the value under the mouse. A gap means nothing was measured (power off, restart, warm-up). While the range includes the current time, new values are added every minute.</td></tr>
     <tr><td>Last 1-24 h</td><td>The buttons <i>1 h</i>, <i>3 h</i>, <i>6 h</i>, <i>12 h</i> and <i>24 h</i> above the graphs show the last hours up to now. The range then moves along with the time. Picking a day or changing a time ends it; a day picked after it is shown whole.</td></tr>
     <tr><td>Detail</td><td>The last 14 days use the 1-minute values, older days the 5-minute values. The line above the graphs says which.</td></tr>
@@ -1089,19 +1147,22 @@ SCD-41 found, serial 0x...
 SCD-41 automatic self-calibration (ASC): enabled
 SCD-41 measuring
 SCD-41 corrects for 1013 hPa (BMP580)
-Warm-up: the first values follow in 30 s
+Warm-up: the first values follow in 120 s
 VOC index: learning the room's usual air (about 3 h)
 Warm-up done, values are shown and saved from now on
-CO2_ppm:612 Temperature_C:22.41 Humidity_pct:45.3 Pressure_hPa:1012.84 Light_lux:41.3 VOC_index:0 Brightness_pct:62
-CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2 Pressure_hPa:1012.86 Light_lux:41.1 VOC_index:0 Brightness_pct:62
-CO2_ppm:614 Temperature_C:22.42 Humidity_pct:45.2 Pressure_hPa:1012.85 Light_lux:41.2 VOC_index:58 Brightness_pct:62</pre>
-  <p>The display shows "starting&hellip;", then "warming up" with a countdown from 30&nbsp;s and <code>--.-</code> / <code>--%</code> at the bottom. After the countdown the temperature and humidity appear at once, and CO<sub>2</sub> within 5&nbsp;s ("measuring&hellip;" until then). The VOC index follows about 45&nbsp;s after the internet time arrived, so usually 20&nbsp;s after the warm-up; until then the bottom line says <code>VOC --</code>. After a restart within 10 minutes the VOC line says "carries on with what it had learned" instead of "learning". A "not found" at the start, or "MISSING" in <code>status</code>, names a part that is missing. The 8&nbsp;mm LED goes off at the start and lights up dimly in the air quality colour with the first value. <code>led</code> tests it on its own (7.6). In normal room air it is green or yellowish. The picture is turned for the display as it sits in the case (pin header on the right, seen from the front). If the text lies on its side or upside down, change <code>OLED_ROTATION</code> (0-3) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick everything but CO2_ppm to see the CO<sub>2</sub> curve at a useful scale.</p>
+CO2_ppm:612 Temperature_C:22.41 Humidity_pct:45.3 Pressure_hPa:1012.84 Light_lux:41.3 VOC_index:98 Brightness_pct:62
+CO2_ppm:615 Temperature_C:22.42 Humidity_pct:45.2 Pressure_hPa:1012.86 Light_lux:41.1 VOC_index:98 Brightness_pct:62
+CO2_ppm:614 Temperature_C:22.42 Humidity_pct:45.2 Pressure_hPa:1012.85 Light_lux:41.2 VOC_index:99 Brightness_pct:62</pre>
+  <p>The display shows "starting&hellip;", then "warming up" with a countdown from 120&nbsp;s and <code>--.-</code> / <code>--%</code> at the bottom; it stays on all that time. After the countdown the temperature, humidity and VOC index appear at once, and CO<sub>2</sub> within 5&nbsp;s ("measuring&hellip;" until then). After a restart within 10 minutes the VOC line says "carries on with what it had learned" instead of "learning". A "not found" at the start, or "MISSING" in <code>status</code>, names a part that is missing. The 8&nbsp;mm LED goes off at the start and lights up dimly in the air quality colour with the first value. <code>led</code> tests it on its own (7.6). In normal room air it is green or yellowish. The picture is turned for the display as it sits in the case (pin header on the right, seen from the front). If the text lies on its side or upside down, change <code>OLED_ROTATION</code> (0-3) and upload again. <b>Serial Plotter</b> (Tools &rarr; Serial Plotter, 115200) draws the values as a graph. Untick everything but CO2_ppm to see the CO<sub>2</sub> curve at a useful scale.</p>
 
-  <h3>Step 4: Button and display timeout</h3>
+  <h3>Step 4: Button, screens and display timeout</h3>
   <ol>
-    <li>About 30&nbsp;s after the warm-up ends (1&nbsp;minute after start-up) the display fades out. Serial output continues, so the sensors are still running.</li>
-    <li>Press the button. The display fades in with current values, readable well within the 1&nbsp;s fade.</li>
-    <li>Press again after ~20&nbsp;s. The 30&nbsp;s start over.</li>
+    <li>About 30&nbsp;s after the warm-up ends (2.5&nbsp;minutes after start-up) the display fades out. Serial output continues, so the sensors are still running.</li>
+    <li>Press the button briefly. The display fades in within 0.5&nbsp;s with the <b>main screen</b> and current values.</li>
+    <li>Press briefly again. The <b>sensor screen</b> appears at once with all six values (Figure 4); compare them with <code>status</code>. The light value follows a hand held over the light sensor within a second or two. Press again: back to the main screen.</li>
+    <li>Switch to the sensor screen and press again after ~20&nbsp;s, twice in a row. Each press starts the 30&nbsp;s over. Then wait: the display fades out 30&nbsp;s after the last press.</li>
+    <li>Press once: the display wakes with the main screen, even though the sensor screen was showing when it went off.</li>
+    <li>Tap the button as quickly as you can a few times while the sensor screen is on. Every tap switches the screen, also one that falls into a redraw.</li>
   </ol>
 
   <h3>Step 5: Sensor plausibility</h3>
@@ -1492,7 +1553,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Display or LED too dim or too bright on Auto</td><td>Change the ranges: <code>OLED_BRIGHTNESS_MIN</code>/<code>MAX</code> and <code>LED_BRIGHTNESS_MIN</code>/<code>MAX</code> for the dimmest and brightest, <code>LUX_DARK</code>/<code>LUX_BRIGHT</code> for the light at which they are reached (section 6, <i>Brightness</i>). For one evening, the slider on the web page is enough.</td></tr>
     <tr><td>LED colours look wrong when very dim</td><td>At the lowest levels each colour has only a step or two, so yellow and orange can look green or red. Raise <code>LED_BRIGHTNESS_MIN</code> to 2 or 3.</td></tr>
     <tr><td>Fades too slow, too fast, or not wanted</td><td>Change <code>FADE_TIME_MS</code> (section 6, <i>Fading</i>): 2000 for softer fades, 300 for quicker ones, 0 for none. Very dim fades only have a step or two on the LED, which is normal.</td></tr>
-    <tr><td>Holding the button doesn't switch sleep mode</td><td>Hold it for a full 2&nbsp;s, until the big moon or sun appears. A shorter press only wakes the display.</td></tr>
+    <tr><td>Holding the button doesn't switch sleep mode</td><td>Hold it for a full 2&nbsp;s, until the big moon or sun appears. A shorter press only wakes the display or switches the screen.</td></tr>
     <tr><td>Red LED on the ESP32 and green LEDs on the sensors stay on in sleep mode</td><td>They are power LEDs on the supply, not under software control. Cover them or disconnect them (section 11, Figure 7).</td></tr>
     <tr><td>Display text lies on its side or is upside down</td><td>Change <code>OLED_ROTATION</code> in the sketch (0-3, each step a quarter turn clockwise). 3 is for the case, 0 for the display held with its pin header at the top.</td></tr>
     <tr><td>Button does nothing</td><td>Check its two wires: one lug to GPIO2 (J1-5), the other to GND. A cold solder joint on a lug.</td></tr>
@@ -1826,6 +1887,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.42</td><td>14 Nov 2026</td><td><b>Second display screen:</b> the <b>sensor screen</b> lists all six values, CO<sub>2</sub>, temperature, humidity, air pressure, light and the VOC index, with the name and unit small and the value large (Figure 4). A <b>short press</b> while the display is on switches between it and the main screen; the display always wakes up with the main screen, also after the sleep mode message. <b>Every press</b> starts the display's 30&nbsp;s again. The screen switches when the button is let go, so a long press for sleep mode doesn't switch it; an interrupt on the button pin catches a quick press that falls into a redraw (about 0.2&nbsp;s). <b>Warm-up 120&nbsp;s</b> instead of 30&nbsp;s (<code>WARMUP_TIME_MS</code>); the display now stays on during the whole countdown. The VOC index is then already there with the first values. <b>Display fades in in 0.5&nbsp;s</b> (new setting <code>DISPLAY_FADE_IN_MS</code>); fading out and brightness changes keep 1&nbsp;s. <b>Text wrapping off</b> (<code>setTextWrap(false)</code>): on the first upload the last letter of "ppm", "hPa" and "lux" jumped to a new line on the sensor screen. The graphics library breaks the line when a letter plus the blank column after it would pass the right edge, although the letter itself fits. Firmware 1,211,780 bytes (38&nbsp;%). <b>Uploaded</b> and checked over Serial: the warm-up ended after 120&nbsp;s, and the first value line had all six values, the VOC index included. The sensor screen was seen on the display (that is how the line break showed up); the fade and the rest of step 4 in section 9 were not checked yet. New subsection <i>The button and the two screens</i> in section 6; sections 1, 2, 6, 7, 8, 9 and 12 updated.</td></tr>
     <tr><td>0.41</td><td>14 Nov 2026</td><td><b>The LED shows CO<sub>2</sub> only</b> (<code>LED_SHOWS_VOC = false</code>): the VOC index jumped to 270-420 three times within 20 minutes and turned the LED red each time. <b>Learning phase stored:</b> every VOC value in the history carries a mark (its top bit) while the algorithm was still learning; a 5-minute value has it if any of its minutes had. File format 3: the first start converts format 1 and 2 files. Format 2 had no mark, so the conversion marks the first 3 hours after the VOC index started, and again after a gap of more than 20 minutes (on this monitor 10:21-13:20 UTC on 14 Nov). The <code>csv</code> command and the page's download have a new <code>voc_learning</code> column. <b>Web page:</b> the VOC graph is now below the humidity graph (CO<sub>2</sub>, temperature, humidity, VOC index, air pressure; the <i>Show</i> buttons in the same order). Its line is lighter (darker in dark mode) where the algorithm was still learning, with "still learning" next to its name and next to the value under the mouse. Firmware 1,207,912 bytes (38&nbsp;%), page 14.1&nbsp;KB compressed (41&nbsp;KB). <b>Uploaded</b> and checked: all 1,070 1-minute and 219 5-minute values are identical to a copy taken before, and 180 and 36 of them have the learning mark (11:21-14:20 local time). After the restart the VOC index carried on from its saved state: back 50&nbsp;s after the start, without "learning" (the first real test of that). Figure 6 retaken. Sections 6, 7, 8, 9 and 12 updated.</td></tr>
     <tr><td>0.40</td><td>14 Nov 2026</td><td>The <b>VOC index</b> (SGP40) is now used. <b>Rating</b> like CO<sub>2</sub>: GOOD below 150, OK below 250, VENTILATE below 400, then BAD AIR (<code>VOC_GOOD_BELOW</code> etc.; Sensirion gives 150 as an example, there is no official scale). <b>Display:</b> temperature and humidity moved up 8 pixels, and a new bottom line shows "VOC" with the index and its rating, or "learning" for 3 hours after a fresh start (Figure 4). <b>LED:</b> the colour of whichever is worse, CO<sub>2</sub> or the VOC index (<code>LED_SHOWS_VOC</code>). <b>Learning kept:</b> once the algorithm has run 3 hours its state is saved in NVS every 5 minutes, and after a restart it carries on if the state is at most 10 minutes old (Sensirion's limits); the algorithm now starts when the internet time is there, at most 60&nbsp;s after start-up. New Serial command <code>voc</code> / <code>voc reset</code>; <code>status</code> has two VOC lines. <b>History:</b> the VOC index is stored with every value; records grow from 12 to 14 bytes (file format 2), and the first start converts the older files, with the VOC index empty. <b>Web page:</b> a VOC tile next to CO<sub>2</sub> (temperature, humidity and pressure in a second row), a note while it learns, a VOC graph below the CO<sub>2</sub> graph with dashed limit lines, a <i>Show</i> button, and a <code>voc_index</code> CSV column; <code>/api/now</code> has <code>vocLearnLeft</code> and <code>vocLimits</code>. New subsection <i>Reading the VOC index</i> (section 6): where it is shown and how to read each form, typical situations, what it can't tell, and what to keep in mind. Firmware 1,204,464 bytes (38&nbsp;%), page 13.8&nbsp;KB compressed (41&nbsp;KB). <b>Uploaded</b> to the Waveshare board and checked: the 4 history files were converted, and all 852 1-minute and 175 5-minute values are identical to a copy taken before; the VOC index is stored from 10:21 UTC; the first index came 22&nbsp;s after the warm-up, 5, and was 95 a minute later; <code>/api/now</code> and the page show it (Figure 6 retaken). Not tested yet: the saving after 3 hours and carrying on after a restart. Sections 3, 6, 7, 8, 9 (new step 12), 11 and 12 updated.</td></tr>
     <tr><td>0.39</td><td>14 Nov 2026</td><td>The <b>air pressure is stored and on the web page</b>. The firmware now passes the BMP580's newest pressure into the history with every CO<sub>2</sub> value (the records always had room for it, 0.1&nbsp;hPa), so 1-minute and 5-minute values have it from 14 Nov 2026, 10:31; older records stay empty. Web page: a fourth tile <i>Air pressure</i> in whole hPa to the right of the humidity (on a phone in its own row below it), an <i>Air pressure</i> graph below the humidity graph (scale at least 3&nbsp;hPa high, tooltip with one decimal) and a <i>Show</i> button for it; the CSV always has the <code>pressure_hpa</code> column. The display is unchanged and doesn't show the pressure. Page 13.2&nbsp;KB compressed (39&nbsp;KB), firmware 1,197,204 bytes (38&nbsp;%). Uploaded to the Waveshare board; the tile showed 985&nbsp;hPa and the first stored minute 984.8&nbsp;hPa. Sections 6, 7, 7.6, 8 and 9 updated.</td></tr>

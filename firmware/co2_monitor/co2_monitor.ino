@@ -12,20 +12,23 @@
                 algorithm has learned is saved every 5 min, so a restart (a break of up
                 to 10 min) carries on with it instead of learning for hours again.
   - VEML7700 -> light in lux, sets the brightness of the display and the LED
-  - Warm-up: for the first 30 s after start-up the sensors measure, but no value
-    is shown, printed or saved. The display counts down meanwhile.
-  - The display shows CO2, temperature and humidity, laid out as on the prototype,
-    and the VOC index in a small line at the bottom. Pressure and light are not on the
-    display. The pressure is on the web page; light is only printed (Serial, status,
-    /api/now).
-  - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
+  - Warm-up: for the first 120 s after start-up the sensors measure, but no value
+    is shown, printed or saved. The display stays on and counts down meanwhile.
+  - The display has two screens. The main screen shows CO2, temperature and humidity,
+    laid out as on the prototype, and the VOC index in a small line at the bottom. The
+    sensor screen lists all six values: CO2, temperature, humidity, air pressure, light
+    and the VOC index. A short press on the button switches between them; the display
+    always wakes up with the main screen.
+  - The OLED switches off 30 s after the last button press. The button on GPIO2 wakes it,
+    and every press starts the 30 s again. It fades in in 0.5 s.
   - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 all the time, dimmed:
     green -> yellow -> red. The VOC index doesn't change it (LED_SHOWS_VOC).
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
   - Like a smart bulb, the light never jumps: a new brightness, a new LED colour and the
-    LED or the display going on or off all fade over FADE_TIME_MS.
+    LED or the display going on or off all fade over FADE_TIME_MS (the display going on
+    over DISPLAY_FADE_IN_MS).
   - Sleep mode for the night: the LED is off and the display shows a small moon.
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
@@ -85,10 +88,14 @@ constexpr uint8_t OLED_ADDRESS = 0x3D;  // 0x3C if the A0 jumper on its back is 
 // light sensor. If the text stands on its head there, use 1.
 constexpr uint8_t OLED_ROTATION = 3;
 constexpr uint8_t OLED_SIZE = 128;  // 128 x 128 pixels
+// The display stays on this long after the last button press (and after the warm-up)
 constexpr uint32_t DISPLAY_ON_TIME_MS = 30000;
 // Drawing the whole screen takes about 0.2 s on the I2C bus, so it is redrawn at most
 // this often while new values come in.
 constexpr uint32_t DISPLAY_REDRAW_MS = 1000;
+// The display fades in this fast when it goes on (ms). Fading out and brightness changes
+// take FADE_TIME_MS (see "Fading" below).
+constexpr uint32_t DISPLAY_FADE_IN_MS = 500;
 
 // ---------- Sensors ----------
 // The SCD-41's CO2 value depends on the air pressure. The BMP580 measures it, and it is
@@ -99,7 +106,7 @@ constexpr float SCD_PRESSURE_STEP_HPA = 1.0f;
 constexpr uint16_t SENSOR_ALTITUDE_M = 0;
 // After start-up the sensors measure this long before any value is shown, printed
 // or saved. Values measured during the warm-up are thrown away.
-constexpr uint32_t WARMUP_TIME_MS = 30000;
+constexpr uint32_t WARMUP_TIME_MS = 120000;
 constexpr uint32_t SHT_INTERVAL_MS = 2000;
 constexpr uint32_t SCD_POLL_INTERVAL_MS = 1000;
 constexpr uint32_t BMP_INTERVAL_MS = 2000;
@@ -186,8 +193,8 @@ constexpr uint32_t BRIGHTNESS_SAVE_DELAY_MS = 3000;
 // ---------- Fading ----------
 // Like a smart bulb, every change of the light fades instead of jumping: a new brightness
 // (Auto, the slider, Serial), the LED's colour, the LED going on or off (sleep mode, the
-// first CO2 value) and the display going on or off. Each fade takes this long (ms).
-// 0 = no fading, every change at once.
+// first CO2 value) and the display going off. Each fade takes this long (ms); the display
+// going on takes DISPLAY_FADE_IN_MS. 0 = no fading, every change at once.
 constexpr uint32_t FADE_TIME_MS = 1000;
 
 // ---------- Sleep mode ----------
@@ -225,31 +232,34 @@ Preferences settings;             // keeps sleep mode and brightness through a r
 // 8 x 8 moon, shown in the top line of the display while sleep mode is on
 const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0x3C};
 
-// A value that glides to each new target in a straight line, in FADE_TIME_MS. A new
-// target in the middle of a fade starts from where the value is at that moment, so it
-// never jumps, and a slider that keeps moving is followed smoothly.
+// A value that glides to each new target in a straight line, in FADE_TIME_MS (or the
+// time given). A new target in the middle of a fade starts from where the value is at
+// that moment, so it never jumps, and a slider that keeps moving is followed smoothly.
 struct Fade {
   float from = 0;
   float to = 0;
-  uint32_t start = 0;  // millis() when the fade began
+  uint32_t start = 0;     // millis() when the fade began
+  uint32_t duration = 0;  // how long it takes (ms)
 
   float value() const {
     uint32_t elapsed = millis() - start;
-    if (elapsed >= FADE_TIME_MS) return to;
-    return from + (to - from) * elapsed / FADE_TIME_MS;
+    if (elapsed >= duration) return to;
+    return from + (to - from) * elapsed / duration;
   }
   bool done() const {
-    return millis() - start >= FADE_TIME_MS;
+    return millis() - start >= duration;
   }
-  void fadeTo(float target) {
+  void fadeTo(float target, uint32_t time = FADE_TIME_MS) {
     if (target == to) return;
     from = value();
     to = target;
     start = millis();
+    duration = time;
   }
   void jumpTo(float target) {
     from = to = target;
-    start = millis() - FADE_TIME_MS;
+    start = millis();
+    duration = 0;
   }
 };
 
@@ -276,6 +286,10 @@ bool displayPanelOn = false;  // the SSD1327 is switched on (still true while it
 uint32_t displayOnSince = 0;
 bool screenChanged = false;  // something on the display has changed
 uint32_t lastDraw = 0;
+// The two screens a short press switches between. The display always wakes with Main.
+enum class Screen { Main, Sensors };
+Screen screen = Screen::Main;
+bool pressedWhileShowing = false;  // the display showed a screen when the button went down
 Fade displayLevel;           // the display's brightness now, in % (FADE_OFF_LEVEL = off)
 uint8_t oledContrast = 0;    // what the display is set to
 
@@ -332,17 +346,41 @@ uint32_t lastVemlRead = 0;
 uint32_t lastSgpStart = 0;
 bool sgpMeasuring = false;  // a reading was started and is not fetched yet
 
-enum class ButtonEvent { None, Press, LongPress };
+enum class ButtonEvent { None, Press, Click, LongPress };
+
+// Drawing the display holds the program for about 0.2 s, and a quick press can begin and
+// end within that time, unseen by readButton(). So an interrupt watches the pin as well
+// and notes a press that held it low for at least 20 ms (shorter = a bounce or noise).
+volatile bool buttonLow = false;       // the interrupt saw the pin go low
+volatile uint32_t buttonLowSince = 0;  // micros()
+volatile bool buttonPressSeen = false;
+
+void onButtonChange() {
+  uint32_t now = micros();
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    buttonLow = true;
+    buttonLowSince = now;
+  } else if (buttonLow) {
+    buttonLow = false;
+    if (now - buttonLowSince >= 20000) buttonPressSeen = true;
+  }
+}
 
 // Debounced, the button pulls the pin to GND. Press comes as soon as the button goes
-// down, LongPress once more when it has been held for LONG_PRESS_MS.
+// down. Click follows when it is let go before LONG_PRESS_MS, LongPress instead once it
+// has been held that long.
 ButtonEvent readButton() {
   static bool stableState = HIGH;
   static bool lastReading = HIGH;
   static uint32_t lastChange = 0;
   static uint32_t pressedSince = 0;
   static bool longPressReported = false;
+  static bool clickDue = false;  // a whole press that happened while the display was drawn
 
+  if (clickDue) {
+    clickDue = false;
+    return ButtonEvent::Click;
+  }
   bool reading = digitalRead(BUTTON_PIN);
   if (reading != lastReading) {
     lastReading = reading;
@@ -355,10 +393,19 @@ ButtonEvent readButton() {
       longPressReported = false;
       return ButtonEvent::Press;
     }
+    buttonPressSeen = false;  // this press has been seen here
+    return longPressReported ? ButtonEvent::None : ButtonEvent::Click;
   }
   if (stableState == LOW && !longPressReported && millis() - pressedSince >= LONG_PRESS_MS) {
     longPressReported = true;
     return ButtonEvent::LongPress;
+  }
+  // The pin is high and has not changed here, but the interrupt saw a press: it went down
+  // and up while the program was busy. Press now, Click with the next call.
+  if (stableState == HIGH && reading == HIGH && buttonPressSeen && millis() - lastChange > 30) {
+    buttonPressSeen = false;
+    clickDue = true;
+    return ButtonEvent::Press;
   }
   return ButtonEvent::None;
 }
@@ -548,7 +595,7 @@ void printRating(const char *rating, bool inverted, int16_t y) {
 }
 
 /*
-  Screen layout, 128 x 128 pixels, the same as on the prototype's 0.96" display,
+  Main screen, 128 x 128 pixels, the same as on the prototype's 0.96" display,
   with more room:
     y   1  "CO2 ppm"   (moon in sleep mode)        rating
     y  28            CO2 value, large
@@ -556,14 +603,8 @@ void printRating(const char *rating, bool inverted, int16_t y) {
     y  88  temperature                             humidity
     y 114  "VOC" index                  rating or "learning"
 */
-void drawScreen() {
+void drawMainScreen() {
   char text[22];
-  lastDraw = millis();
-  screenChanged = false;
-  if (sleepMessageShown) {
-    drawSleepMessage();
-    return;
-  }
   display.clearDisplay();
 
   // Top line: label left, moon in sleep mode, rating right (inverted when the air is bad)
@@ -625,16 +666,119 @@ void drawScreen() {
   display.display();
 }
 
-// Draws the screen and fades the display in (updateDisplayBrightness() does the fading)
+// Sensor screen: where the value column ends (the unit starts 1 pixel further right)
+constexpr int16_t SENSOR_VALUE_RIGHT = 110;
+constexpr int16_t SENSOR_UNIT_X = 111;
+
+// One line of the sensor screen: the name small on the left, the value large and
+// right-aligned, the unit small after it, name, value and unit on one base line.
+// value nullptr = the sensor is missing. degrees: "C" gets a degree sign.
+void printSensorLine(int16_t y, const char *name, const char *value, const char *unit, bool degrees = false) {
+  printAt(name, 1, 0, y + 7);
+  if (!value) {
+    printAt("missing", 1, SENSOR_VALUE_RIGHT - textWidth("missing", 1), y + 7);
+    return;
+  }
+  printAt(value, 2, SENSOR_VALUE_RIGHT - textWidth(value, 2), y);
+  int16_t unitX = SENSOR_UNIT_X;
+  if (degrees) {
+    display.drawCircle(unitX + 1, y + 8, 1, SSD1327_WHITE);  // the font has no degree sign
+    unitX += 4;
+  }
+  printAt(unit, 1, unitX, y + 7);
+}
+
+// The text for one value of the sensor screen: nullptr if the sensor is missing, "--"
+// while there is no value and during the warm-up (when no value is shown)
+const char *sensorText(char *text, size_t size, bool found, float value, const char *format) {
+  if (!found) return nullptr;
+  if (warmingUp || isnan(value)) return "--";
+  snprintf(text, size, format, value);
+  return text;
+}
+
+/*
+  Sensor screen, all six values (a short press switches to it and back):
+    y   1  "Sensors"  (moon in sleep mode)   "warm-up 87s"
+    y  10  ------------------------------------------------
+    y  14  CO2                                   612 ppm
+    y  33  Temp                                 22.4 °C
+    y  52  Humid                                45.3 %
+    y  71  Press                               983.1 hPa
+    y  90  Light                                 154 lux
+    y 109  VOC                                   105
+*/
+void drawSensorScreen() {
+  char text[16];
+  display.clearDisplay();
+
+  printAt("Sensors", 1, 0, 1);
+  if (sleepMode) display.drawBitmap(47, 1, MOON_ICON, 8, 8, SSD1327_WHITE);
+  if (warmingUp) {
+    snprintf(text, sizeof text, "warm-up %us", warmupSecondsLeft());
+    printRight(text, 1, 1);
+  }
+  display.drawFastHLine(0, 10, OLED_SIZE, SSD1327_WHITE);
+
+  printSensorLine(14, "CO2", sensorText(text, sizeof text, scdFound, co2Ppm > 0 ? co2Ppm : NAN, "%.0f"), "ppm");
+  printSensorLine(33, "Temp", sensorText(text, sizeof text, shtFound, temperatureC, "%.1f"), "C", true);
+  printSensorLine(52, "Humid", sensorText(text, sizeof text, shtFound, humidityPct, "%.1f"), "%");
+  printSensorLine(71, "Press", sensorText(text, sizeof text, bmpFound, pressureHpa, "%.1f"), "hPa");
+  // Light: one decimal in a dim room. ">" when the sensor is at the top of its range.
+  const char *lightFormat = lightTooBright ? ">%.0f" : (lightLux < 100 ? "%.1f" : "%.0f");
+  printSensorLine(90, "Light", sensorText(text, sizeof text, vemlFound, lightLux, lightFormat), "lux");
+  printSensorLine(109, "VOC", sensorText(text, sizeof text, sgpFound, vocIndex > 0 ? vocIndex : NAN, "%.0f"), "");
+
+  display.display();
+}
+
+void drawScreen() {
+  lastDraw = millis();
+  screenChanged = false;
+  if (sleepMessageShown) {
+    drawSleepMessage();
+  } else if (screen == Screen::Sensors) {
+    drawSensorScreen();
+  } else {
+    drawMainScreen();
+  }
+}
+
+// Draws the screen and fades the display in (updateDisplayBrightness() does the fading).
+// A display that was off (or fading out) wakes with the main screen.
 void displayWake() {
   if (!displayFound) return;
-  displayOn = true;
+  if (!displayOn) screen = Screen::Main;
   displayOnSince = millis();
   drawScreen();  // while the display is still dark, so it fades in with the new picture
   if (!displayPanelOn) {
     display.oled_command(SSD1327_DISPLAYON);
     displayPanelOn = true;
   }
+  if (!displayOn) {
+    displayOn = true;
+    displayLevel.fadeTo(brightness, DISPLAY_FADE_IN_MS);
+  }
+}
+
+// Every press of the button: the display stays on for another DISPLAY_ON_TIME_MS. If it
+// was off, it wakes (with the main screen).
+void buttonPressed() {
+  pressedWhileShowing = displayOn && !sleepMessageShown;
+  if (pressedWhileShowing) {
+    displayOnSince = millis();
+  } else {
+    displayWake();
+  }
+}
+
+// A short press while the display shows a screen switches to the other one. A press that
+// woke the display does not.
+void buttonClicked() {
+  if (!pressedWhileShowing || !displayOn || sleepMessageShown) return;
+  screen = screen == Screen::Main ? Screen::Sensors : Screen::Main;
+  displayOnSince = millis();
+  drawScreen();
 }
 
 // Fades the display out; updateDisplayBrightness() switches it off once it is dark
@@ -670,9 +814,11 @@ void setSleepMode(bool on) {
   Serial.println(on ? F("Sleep mode on: LED off") : F("Sleep mode off: LED on"));
 }
 
-// Long press: switches sleep mode and confirms it on the display
+// Long press: switches sleep mode and confirms it on the display. After the message the
+// main screen follows (when sleep mode was switched off).
 void toggleSleepMode() {
   setSleepMode(!sleepMode);
+  screen = Screen::Main;
   sleepMessageShown = true;
   sleepMessageSince = millis();
   displayWake();
@@ -809,6 +955,7 @@ void readSht45() {
 // Read during the warm-up too, so the SCD-41 measures with the right pressure from the start
 void readBmp580() {
   pressureHpa = bmp.performReading() ? bmp.pressure : NAN;
+  if (screen == Screen::Sensors) screenChanged = true;
   sendPressureToScd41();
 }
 
@@ -828,6 +975,7 @@ void readVeml7700() {
   // The newest value, without waiting, with the library's correction for bright light
   lightLux = veml.readLux(VEML_LUX_CORRECTED_NOWAIT);
   lightTooBright = veml.readALS() == 0xFFFF;  // the same value again, raw
+  if (screen == Screen::Sensors) screenChanged = true;
   updateAutoBrightness();
 }
 
@@ -1251,6 +1399,7 @@ void setup() {
   startWifi();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), onButtonChange, CHANGE);  // see readButton()
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 
   settings.begin("co2monitor");
@@ -1271,6 +1420,9 @@ void setup() {
   displayFound = display.begin(OLED_ADDRESS);
   if (displayFound) {
     display.setRotation(OLED_ROTATION);
+    // No line breaks: the library would move a letter that ends at the right edge to a new
+    // line, because it counts the blank column after it (the "m" of the sensor screen's "ppm")
+    display.setTextWrap(false);
     displayOn = displayPanelOn = true;  // begin() switches the display on
     displayLevel.jumpTo(brightness);    // no fade here: "starting..." shows at once
     updateDisplayBrightness();
@@ -1324,7 +1476,8 @@ void setup() {
 
 void loop() {
   ButtonEvent button = readButton();
-  if (button == ButtonEvent::Press) displayWake();
+  if (button == ButtonEvent::Press) buttonPressed();
+  if (button == ButtonEvent::Click) buttonClicked();
   if (button == ButtonEvent::LongPress) toggleSleepMode();
   readSerialCommands();
   updateWifi();
@@ -1344,8 +1497,8 @@ void loop() {
       } else {
         drawScreen();  // the values, until the display times out
       }
-    } else if (millis() - displayOnSince >= DISPLAY_ON_TIME_MS) {
-      displayOff();
+    } else if (!warmingUp && millis() - displayOnSince >= DISPLAY_ON_TIME_MS) {
+      displayOff();  // during the warm-up it stays on with the countdown
     } else if (screenChanged && millis() - lastDraw >= DISPLAY_REDRAW_MS) {
       drawScreen();
     }
