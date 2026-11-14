@@ -15,10 +15,11 @@ The pieces (docs section 13, Printing at school):
 - posts_sht45: the SHT45's two posts on a strip of floor, with the double wall's chamber skin behind
   them, cut off 1 mm above the posts. Drill the pilots, screw the board on: do the holes line up, does the
   thread hold? The other sensor boards have the same hole spacing (20.32); their posts are only taller
-  (SGP40 and BMP580 by 2 mm, SCD-41 by 5 mm), so this one piece stands for all of them.
+  (SGP40 and BMP580 by 2 mm, SCD-41 by 5 mm), so this one piece stands for all of them. Its front post
+  stands next to the cable hole, so it is narrower on that side, like the BMP580's front post.
 
 Every piece comes twice: as in the case, with pilot holes to drill, and as *_no_drill.stl with the screw
-holes printed at their drilled size (DRILLED below), so the screws go straight in. The no-drill pieces
+holes printed big enough for the screws to go straight in (NO_DRILL_SIZES below). The no-drill pieces
 check the fits and the screws, but not the drilling.
 """
 
@@ -28,7 +29,7 @@ import case_v5 as c
 
 OUT = c.OUT / "test_pieces"
 
-ESP_X = 57.5      # past the ESP32's posts at the antenna end (56.23)
+ESP_X = 57.5      # past the ESP32's posts at the antenna end (55.93)
 ESP_Y = (0.5, 28.5)   # from just past the chamber's double wall to between the board edge and the
                       # column-j double wall (26.86 and 29.0)
 ESP_Z = 14.0      # board on its posts at 7.63..9.23, 4.25 mm of back wall over the USB opening
@@ -39,9 +40,11 @@ POST_Y = (c.BOARD_BACK_Y,     # the posts' board face (the chamber's floor vents
 
 BIG = 10.0        # boxes reach this far past the case where a side is not cut
 
-# the screw holes at their drilled size (docs, Printing at school: the drill table), for the no-drill pieces
-DRILLED = {"ESP_PILOT": 1.6,          # M2 x 6 into the ESP32 posts
-           "STANDOFF_PILOT": 2.1}     # M2.5 x 6 into the sensor posts (teardrop, as the pilot)
+# the screw holes of the no-drill pieces. Small printed holes come out about 0.2 mm smaller than drawn
+# on the P1S: at the drill sizes (1.6, 2.1; docs, Printing at school: the drill table) the M2 screws
+# didn't go in and the M2.5 screws cracked the SHT45's posts (14 Nov), so they are drawn 0.2 bigger.
+NO_DRILL_SIZES = {"ESP_PILOT": 1.8,          # M2 x 5 countersunk into the ESP32 posts
+                  "STANDOFF_PILOT": 2.3}     # M2.5 x 5 countersunk into the sensor posts (teardrop, as the pilot)
 NO_DRILL = "_no_drill"
 
 
@@ -67,9 +70,8 @@ def box(x0=None, y0=None, z0=None, x1=None, y1=None, z1=None):
 def posts_box(board):
     """Box around one chamber board's two posts."""
     posts = [(sx, sz) for name, wall, sx, sz in c.sensor_screws() if name == board and wall == "a"]
-    w = c.STANDOFF_W / 2
-    x0 = min(sx for sx, _ in posts) - w - POST_MARGIN
-    x1 = max(sx for sx, _ in posts) + w
+    x0 = min(c.post_x(sx, "a")[0] for sx, _ in posts) - POST_MARGIN
+    x1 = max(c.post_x(sx, "a")[1] for sx, _ in posts)
     # the SHT45's front post stands just behind the cable hole at the foot of the double wall: stop at the post
     x1 = x1 + POST_MARGIN if x1 + POST_MARGIN < c.CABLE_HOLE_X[0] else x1
     z1 = max(sz for _, sz in posts) + 3 + POST_MARGIN       # posts end 3 above the screw (case_v5.make_base)
@@ -78,9 +80,9 @@ def posts_box(board):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    print("building the base, then again with the screw holes drilled ...")
+    print("building the base, then again with the no-drill screw holes ...")
     bases = {"": c.make_base()}
-    with sizes(**DRILLED):
+    with sizes(**NO_DRILL_SIZES):
         bases[NO_DRILL] = c.make_base()
 
     cuts = [
@@ -101,7 +103,7 @@ def main():
               f"  z {bb.min.Z:5.2f}..{bb.max.Z:5.2f}  ({bb.size.X:.1f} x {bb.size.Y:.1f} x {bb.size.Z:.1f})"
               f"  {piece.volume / 1000:5.2f} cm3{flag}")
         c.export_stl(piece, OUT / f"{name}.stl", tolerance=0.02, angular_tolerance=0.2)
-    print("plastic the drill takes out of each piece (mm3):")
+    print("plastic between the pilot holes and the no-drill holes, per piece (mm3):")
     for name, _ in cuts:
         print(f"  {name:12} {volume[name] - volume[name + NO_DRILL]:6.2f}")
     print(f"wrote {OUT}")

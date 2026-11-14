@@ -37,6 +37,10 @@ What changed from v4 (cad/case_v4.py). The outside is 86.3 x 77 x 41.43 (v4: 86.
   sits 2 mm nearer the chamber's double wall to make room beside it.
 - All 4 ESP32 posts are the same and all 4 corners are screwed (v4's 4th post was cut flat on the
   module's side and only carried the board).
+- 14 Nov 2026, after the first test pieces (the SHT45's posts cracked beside the screw holes): the
+  sensor posts are 7 mm wide instead of 5, except on a side that faces a cable hole or the end of the
+  column-j wall, and each ESP32 post is one round 4.4 mm post, its centre 0.5 mm outward from the hole.
+  The screws are M2 x 5 and M2.5 x 5 countersunk (DIN 963).
 
 Coordinates: x along the case (0 = inside of the back wall, at the USB port), y across
 (0 = bay face of the double wall; + = electronics bay, towards the column-j wall;
@@ -52,7 +56,7 @@ from datetime import datetime
 from pathlib import Path
 
 import build123d
-from build123d import (Align, Axis, Box, Circle, Compound, Cylinder, Edge, Keep, Plane, Pos, Rot, Sphere,
+from build123d import (Align, Axis, Box, Circle, Compound, Cone, Cylinder, Edge, Keep, Plane, Pos, Rot, Sphere,
                        export_step, export_stl, fillet, import_step, sweep)
 
 HERE = Path(__file__).parent
@@ -105,8 +109,10 @@ FEET = [(x, y) for x in (X0 + 7.5, X1 - 7.5) for y in (Y0 + 7.5, Y1 - 7.5)]
 # ---- chamber sensors (Adafruit, upright, header edge down, parts towards the outer wall)
 BOARD_T = 1.57
 BOARD_BACK_Y = DW_OUT - 6.0            # back face of the boards; standoffs between it and the double wall
-STANDOFF_W = 5.0
-STANDOFF_PILOT = 1.6                   # teardrop, drilled to 2.1 through the slot; M2.5 x 6
+STANDOFF_W = 7.0                       # 14 Nov: was 5.0; the SHT45 test piece cracked beside its screw holes
+NEAR_HOLE_W = 5.0                      # a post is only half of this wide on a side that faces a cable hole or the
+                                       # column-j wall end: those stay where they were for 5 mm posts (post_x)
+STANDOFF_PILOT = 1.6                   # teardrop, drilled to 2.1 through the slot; M2.5 x 5 countersunk
 STANDOFF_PILOT_DEPTH = 5.0
 HOLE_IN = 2.54
 BOARD_Z = 7.0
@@ -131,7 +137,7 @@ FLOOR_VENT_W, FLOOR_VENT_Y = SLOT_W, (BOARD_BACK_Y - VENT_L, BOARD_BACK_Y)
 
 # ---- cable hole at the bottom of the double wall, just behind the cross wall: the chain comes from
 # the light sensor into the SHT45's front socket. Pointed top: prints without support. Seal after wiring.
-CABLE_HOLE_X = (SLOT_X[8] + STANDOFF_W / 2 + 0.05, CROSS_WALL[0][0])
+CABLE_HOLE_X = (SLOT_X[8] + NEAR_HOLE_W / 2 + 0.05, CROSS_WALL[0][0])
 CABLE_HOLE_H = 4.0
 CHAMBER_HOLE_H = 5.0       # this one is narrower (5.7): a plug passes on edge
 
@@ -157,12 +163,12 @@ J_SLOT_X = SLOT_X                      # same columns as the chamber side
 # compartment skin and closes the air gap; the compartment skin goes on to just past the post.
 _jp = J_BACK_Y - J_POST_D
 J_DOUBLE_WALL = ((_jp - 4.0, _jp - 2.8), (_jp - 1.2, _jp))   # ESP32 skin, compartment skin
-J_WALL_END = BMP_X0 + 25.4 - HOLE_IN + STANDOFF_W / 2 + 0.05  # just past the BMP580's front post
-J_CAP_X = BMP_X0 + 25.4 - HOLE_IN - STANDOFF_W / 2           # 61.23: the cross piece ends at the post's back face
+J_WALL_END = BMP_X0 + 25.4 - HOLE_IN + NEAR_HOLE_W / 2 + 0.05  # just past the BMP580's front post
+J_CAP_X = BMP_X0 + 25.4 - HOLE_IN - NEAR_HOLE_W / 2           # 61.23: where the 5 mm post's back face was
 J_CAP_T = 1.2                                                # as thick as the skins
 # Cable hole at the bottom, shaped like the chamber's, at the rear end: between the back wall and the
 # SGP40's back post, so 6.3 wide instead of 8.
-J_HOLE_X = (0.45, SGP_X0 + HOLE_IN - STANDOFF_W / 2 - 0.3)
+J_HOLE_X = (0.45, SGP_X0 + HOLE_IN - NEAR_HOLE_W / 2 - 0.3)
 # vents as the chamber's: 4 x 12 floor slots on columns 2..8 from the outer wall to the boards' back
 # face; in the back wall 2 slots in each row, between the double wall and the lid boss in the corner.
 J_FLOOR_VENT_X = SLOT_X[1:-1]
@@ -183,7 +189,12 @@ ESP_ZT = ESP_ZB + ESP_T
 ESP_HOLE_IN, ESP_HOLE_D = 1.77, 2.0
 ESP_HOLES = [(ESP_HOLE_IN, ESP_HOLE_IN), (ESP_HOLE_IN, ESP_W - ESP_HOLE_IN),
              (ESP_L - ESP_HOLE_IN, ESP_HOLE_IN), (ESP_L - ESP_HOLE_IN, ESP_W - ESP_HOLE_IN)]
-ESP_NECK_D, ESP_NECK_H, ESP_POST_D = 3.4, 3.6, 5.0
+# Posts: one round post per corner, ESP_POST_D wide from the floor up to the board. Its centre sits
+# ESP_POST_OFF outward from the hole, away from the part under the board next to it: towards the long edge
+# at the antenna end (module), towards the back wall at the USB end (buttons, and the posts run 0.43 into
+# that wall). On that side a post reaches ESP_POST_D / 2 - ESP_POST_OFF = 1.7 from the hole, as the old
+# 3.4 neck did; 0.8 of plastic is left there around the 1.8 no-drill hole.
+ESP_POST_D, ESP_POST_OFF = 4.4, 0.5
 ESP_PILOT = 1.2
 ESP_ROW_Y = {"P1": ESP_Y0 + 1.25, "P2": ESP_Y0 + ESP_W - 1.25}
 HEADER_H, PIN_UP, JUMPER_L = 2.5, 6.0, 14.0
@@ -191,7 +202,7 @@ USED_PINS = {"P1": (1, 12, 13, 14, 15),
              "P2": (1, 5, 6, 10, 12, 15)}
 # Module (x from the USB end, y from the P1 edge, height): ESP32-C6-WROOM-1, 18.0 wide per its datasheet,
 # centred across the board (ASSUMED; Waveshare's photo suggested y 3.9..22.6). Centred, it clears the
-# 3.4 necks of the two antenna-end posts by 0.21 on each side, so all 4 posts are the same.
+# two antenna-end posts by 0.21 on each side, so all 4 posts are the same.
 ESP_MODULE = (29.2, 55.0, (ESP_W - 18.0) / 2, (ESP_W + 18.0) / 2, 3.2)
 ESP_USB = (-0.5, 6.55, ESP_W / 2, 8.94, 3.26)
 # RESET and BOOT, with their legs, from Waveshare's drawing (7 Nov): right at the long edges
@@ -387,6 +398,14 @@ def sensor_screws():
     return screws
 
 
+def post_x(sx, wall):
+    """x range of the sensor post behind the screw at x sx: STANDOFF_W wide, but only NEAR_HOLE_W / 2 on
+    a side that faces the chamber's cable hole (SHT45 front post), the column-j wall end (BMP580 front
+    post) or the ESP32 cable hole (SGP40 back post), so the holes and the cables through them stay."""
+    lo, hi = (-math.inf, CABLE_HOLE_X[0] - 0.05) if wall == "a" else (J_HOLE_X[1] + 0.3, J_WALL_END - 0.05)
+    return max(sx - STANDOFF_W / 2, lo), min(sx + STANDOFF_W / 2, hi)
+
+
 def speaker_holes():
     return [(SPK_X + hx, SPK_Y + hy) for hx, hy in SPK_HOLES]
 
@@ -394,6 +413,19 @@ def speaker_holes():
 def esp_hole(i):
     hx, hy = ESP_HOLES[i]
     return ESP_X0 + hx, ESP_Y0 + hy
+
+
+def esp_post(i):
+    """ESP32 post i: a round post from the floor to the board, its centre ESP_POST_OFF outward from the
+    hole: towards the back wall at the USB end (away from the buttons), towards the long edge at the
+    antenna end (away from the module)."""
+    x, y = esp_hole(i)
+    hx, hy = ESP_HOLES[i]
+    if hx < ESP_L / 2:
+        x -= ESP_POST_OFF
+    else:
+        y += -ESP_POST_OFF if hy < ESP_W / 2 else ESP_POST_OFF
+    return rod(x, y, FLOOR, ESP_ZB, ESP_POST_D)
 
 
 def make_base():
@@ -433,7 +465,8 @@ def make_base():
     # chamber sensors: standoffs against the double wall
     for _, wall, sx, sz in sensor_screws():
         if wall == "a":
-            base += block(sx - STANDOFF_W / 2, BOARD_BACK_Y, FLOOR, sx + STANDOFF_W / 2, DW_OUT, sz + 3)
+            x0, x1 = post_x(sx, wall)
+            base += block(x0, BOARD_BACK_Y, FLOOR, x1, DW_OUT, sz + 3)
             base -= teardrop_y(sx, sz, BOARD_BACK_Y - 0.5, BOARD_BACK_Y + STANDOFF_PILOT_DEPTH, STANDOFF_PILOT)
 
     # column-j compartment: as v4
@@ -441,7 +474,8 @@ def make_base():
     for name in J_BOARDS:
         posts = [(sx, sz) for n, wall, sx, sz in sensor_screws() if n == name]
         for sx, sz in posts:
-            post = block(sx - STANDOFF_W / 2, post_y0, FLOOR, sx + STANDOFF_W / 2, J_BACK_Y, sz + 3)
+            x0, x1 = post_x(sx, "j")
+            post = block(x0, post_y0, FLOOR, x1, J_BACK_Y, sz + 3)
             over_vent = J_FLOOR_VENT_Y[0] < J_BACK_Y and any(abs(sx - vx) < 0.01 for vx in J_FLOOR_VENT_X)
             if over_vent:                                                # 45 degree underside over the vent
                 post = post.split(Plane(origin=(sx, post_y0, FLOOR), z_dir=(0, -1, 1)), keep=Keep.TOP)
@@ -462,10 +496,9 @@ def make_base():
         w / math.sqrt(2), 6, w / math.sqrt(2))
 
     # ESP32 posts: 4 the same (v4 cut the 4th flat on the module's side and left it unscrewed)
-    neck_z = ESP_ZB - ESP_NECK_H
     for i in range(len(ESP_HOLES)):
         x, y = esp_hole(i)
-        base += rod(x, y, FLOOR, neck_z, ESP_POST_D) + rod(x, y, neck_z, ESP_ZB, ESP_NECK_D)
+        base += esp_post(i)
         base -= rod(x, y, ESP_ZB - 5.0, ESP_ZB + 1, ESP_PILOT)
 
     # display: recess for its glass (open at the top), rail and lip at the header end, and a block
@@ -856,14 +889,17 @@ def make_speaker():
 def make_screws():
     """Screw heads, to check that the screwdriver and the heads have room."""
     heads = []
-    for i in range(len(ESP_HOLES)):                   # M2 x 6 button head (ISO 7380: 3.5 x 1.1)
+    # countersunk heads (DIN 963, 90 degrees) sit with their cone in the board's hole, so they stand
+    # (head - hole) / 2 out of the board
+    up = (Align.CENTER, Align.CENTER, Align.MIN)
+    for i in range(len(ESP_HOLES)):                   # M2 x 5 countersunk, head 3.8, in the 2.0 hole: 0.9 out
         x, y = esp_hole(i)
-        heads.append(rod(x, y, ESP_ZT, ESP_ZT + 1.1, 3.5))
-    for _, wall, sx, sz in sensor_screws():           # M2.5 x 6 socket head, on the parts side
+        heads.append(Pos(x, y, ESP_ZT) * Cone(ESP_HOLE_D / 2, 1.9, 0.9, align=up))
+    for _, wall, sx, sz in sensor_screws():           # M2.5 x 5 countersunk, head 4.7, in a 2.5 hole: 1.1 out
         if wall == "a":
-            heads.append(Pos(sx, BOARD_BACK_Y - BOARD_T - 1.25, sz) * Rot(90, 0, 0) * Cylinder(2.25, 2.5))
+            heads.append(Pos(sx, BOARD_BACK_Y - BOARD_T, sz) * Rot(90, 0, 0) * Cone(1.25, 2.35, 1.1, align=up))
         else:
-            heads.append(Pos(sx, J_FRONT_Y + 1.25, sz) * Rot(90, 0, 0) * Cylinder(2.25, 2.5))
+            heads.append(Pos(sx, J_FRONT_Y, sz) * Rot(-90, 0, 0) * Cone(1.25, 2.35, 1.1, align=up))
     for sy, sz in OLED_SCREWS:                         # M2.5 x 4 socket head, behind the display
         heads.append(rod_x(OLED_BACK - 2.5, OLED_BACK, sy, sz, 4.5))
     for sx, sz in VEML_SCREWS:                         # M2.5 x 6: head on the bay side of the wall, nut on the board
