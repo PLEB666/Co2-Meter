@@ -22,7 +22,9 @@
   - The OLED switches off 30 s after the last button press. The button on GPIO2 wakes it,
     and every press starts the 30 s again. It fades in in 0.5 s.
   - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 all the time, dimmed:
-    green -> yellow -> red. The VOC index doesn't change it (LED_SHOWS_VOC).
+    green -> yellow -> red. The VOC index doesn't change its colour (LED_SHOWS_VOC), but
+    from "VENTILATE" on (LED_BREATH_FROM_VOC) the LED slowly breathes: dims and brightens
+    again every 3 s, until the VOC index has been lower again for a minute.
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
@@ -153,6 +155,21 @@ constexpr uint16_t VOC_LIMITS[3] = {VOC_GOOD_BELOW, VOC_OK_BELOW, VOC_VENTILATE_
 // the VOC index jumps to 300-400 for a few minutes at every spray, perfume or frying pan,
 // which would turn the LED red each time. The display and the web page still show it.
 constexpr bool LED_SHOWS_VOC = false;
+// The VOC index makes the LED breathe instead: its colour stays that of the CO2, but from
+// this VOC index on it slowly dims and brightens again, over and over. So a high VOC index
+// shows at a glance without turning the CO2 colour red. VOC_OK_BELOW = from "VENTILATE"
+// on, the same point where the display's bottom line turns inverted. 0 = never breathes.
+constexpr uint16_t LED_BREATH_FROM_VOC = VOC_OK_BELOW;
+// One breath (bright -> dim -> bright) takes this long (ms)
+constexpr uint32_t LED_BREATH_TIME_MS = 3000;
+// How far a breath dims the LED, in % steps of the brightness (as on the web page's
+// slider, so it looks even to the eye). 40 = to about a quarter. At a brightness below
+// 40 % the LED goes dark for a moment at the bottom of each breath.
+constexpr float LED_BREATH_DEPTH = 40;
+// The LED goes on breathing this long after the VOC index has dropped below
+// LED_BREATH_FROM_VOC, and then stops at the end of a breath, so a VOC index that wavers
+// around the limit doesn't start and stop it every few seconds
+constexpr uint32_t LED_BREATH_HOLD_MS = 60000;
 // true = the board's own RGB LED (GPIO8) shows the colour as well. In the case the
 // board's LED faces the floor, so it stays off there.
 constexpr bool BOARD_LED_TOO = false;
@@ -307,6 +324,7 @@ Fade ledLevel;                   // the LED's brightness now, in % (FADE_OFF_LEV
 Fade ledRed, ledGreen, ledBlue;  // its colour now, at full brightness (0-255 each)
 LedColour ledSent = {0, 0, 0};   // what was last sent to the LED
 bool ledResend = true;           // send it even if it looks the same (at the start, after the LED test)
+bool ledBreathing = false;       // it breathes because the VOC index is high (ledBreathDip())
 uint32_t lastLightsUpdate = 0;
 
 bool warmingUp = true;
@@ -484,9 +502,36 @@ void pl9823Write(uint8_t r, uint8_t g, uint8_t b) {
 
 float brightnessBetween(uint8_t min, uint8_t max, float level);  // in "Brightness" below
 
+// How much darker the LED is at this moment because it breathes for a high VOC index, in
+// % steps of the brightness (0 = not at all). A breath starts and ends at 0, at its
+// brightest, and follows a cosine in between, so starting and stopping never jump.
+float ledBreathDip() {
+  static uint32_t breathStart = 0;  // millis() when the breathing began
+  static uint32_t lastPhase = 0;    // where in a breath it was at the last call (ms)
+  static uint32_t vocHighAt = 0;    // millis() when the VOC index was last at the limit or above
+  uint32_t now = millis();
+  bool vocHigh = LED_BREATH_FROM_VOC > 0 && vocIndex >= LED_BREATH_FROM_VOC;
+  if (vocHigh) vocHighAt = now;
+  if (!ledBreathing) {
+    if (!vocHigh) return 0;
+    ledBreathing = true;
+    breathStart = now;
+    lastPhase = 0;
+  }
+  uint32_t phase = (now - breathStart) % LED_BREATH_TIME_MS;
+  bool breathEnded = phase < lastPhase;  // a new breath has just begun
+  lastPhase = phase;
+  if (breathEnded && !vocHigh && now - vocHighAt >= LED_BREATH_HOLD_MS) {
+    ledBreathing = false;
+    return 0;
+  }
+  return LED_BREATH_DEPTH * (1 - cosf(2 * PI * phase / LED_BREATH_TIME_MS)) / 2;
+}
+
 // Every FADE_STEP_MS (from loop()). The LED fades to the air quality colour at the
 // current brightness, and down to off until the first value arrives and in sleep mode.
-// It is only sent a colour when that has changed.
+// While the VOC index is high it breathes (ledBreathDip()). It is only sent a colour
+// when that has changed.
 void updateLed() {
   bool on = (co2Ppm > 0 || (LED_SHOWS_VOC && vocIndex > 0)) && !sleepMode;
   if (on) {
@@ -505,7 +550,7 @@ void updateLed() {
   ledLevel.fadeTo(on ? brightness : FADE_OFF_LEVEL);
 
   LedColour shown = {0, 0, 0};
-  float level = ledLevel.value();
+  float level = ledLevel.value() - ledBreathDip();
   if (level > FADE_OFF_LEVEL) {
     float scale = brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level);
     shown = {dimmed(ledRed.value(), scale), dimmed(ledGreen.value(), scale), dimmed(ledBlue.value(), scale)};
@@ -1126,6 +1171,10 @@ void printVoc() {
     Serial.printf("VOC index: %u, %s (raw signal %u)\n", vocIndex, vocRating(vocIndex), vocRaw);
   } else {
     Serial.printf("VOC index: none yet, the first comes 45 s after the algorithm started (raw signal %u)\n", vocRaw);
+  }
+  if (ledBreathing) {
+    Serial.printf("LED: breathes, the VOC index is (or was in the last %lu s) %u or more\n",
+                  (unsigned long)(LED_BREATH_HOLD_MS / 1000), LED_BREATH_FROM_VOC);
   }
   uint32_t left = vocLearnSecondsLeft();
   if (left > 0) {
