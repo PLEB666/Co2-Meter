@@ -14,8 +14,9 @@
     values are then calculated from the saved 1-minute values, so a power cut never
     leaves a hole in them. For the last 14 days both levels exist.
   - Records are only ever appended to a file, never changed. Old files are deleted.
-  - Stored per value: CO2, temperature, humidity, air pressure and the VOC index.
-    Files from before the VOC index (format version 1) are converted once at start-up.
+  - Stored per value: CO2, temperature, humidity, air pressure and the VOC index, with a
+    mark while the VOC algorithm was still learning the room's usual air. Files of the
+    older formats (1: no VOC index, 2: no learning mark) are converted once at start-up.
 */
 #pragma once
 
@@ -25,8 +26,9 @@
 void historyBegin();
 
 // Call for every new reading. Pass NAN for a value that is missing, 0 for a missing
-// CO2 value or VOC index.
-void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa, uint16_t vocIndex);
+// CO2 value or VOC index. vocLearning: the VOC algorithm is still learning.
+void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa, uint16_t vocIndex,
+                      bool vocLearning);
 
 // Call in loop(). Finishes each minute and saves every 10 minutes.
 void historyLoop();

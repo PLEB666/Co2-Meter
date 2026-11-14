@@ -11,6 +11,7 @@
 #include <esp_timer.h>
 #include <time.h>
 
+#include <algorithm>
 #include <vector>
 
 // ---------- Settings ----------
@@ -38,10 +39,11 @@ constexpr uint32_t PARTITION_SIZE = 0x9E0000;
 constexpr time_t CLOCK_VALID_AFTER = 1767225600;
 constexpr uint32_t SECONDS_PER_DAY = 86400;
 
-// ---------- File format (version 2) ----------
-// Version 1 (up to docs v0.39) had no VOC index: 12-byte records. Such files are
-// converted at start-up (convertOldFiles()).
-constexpr uint8_t FORMAT_VERSION = 2;
+// ---------- File format (version 3) ----------
+// Version 1 (up to docs v0.39) had no VOC index: 12-byte records. Version 2 (docs v0.40)
+// had no learning mark (VOC_LEARNING). Such files are converted at start-up
+// (convertOldFiles()).
+constexpr uint8_t FORMAT_VERSION = 3;
 constexpr char FORMAT_MAGIC[4] = {'C', 'O', '2', 'H'};
 
 // Markers for a missing value
@@ -50,6 +52,11 @@ constexpr int16_t NO_TEMPERATURE = INT16_MIN;
 constexpr uint16_t NO_HUMIDITY = UINT16_MAX;
 constexpr uint16_t NO_PRESSURE = 0;
 constexpr uint16_t NO_VOC = 0;
+
+// The VOC field holds the index (1-500) in its low bits, plus VOC_LEARNING while
+// Sensirion's algorithm was still learning the room's usual air (3 h after a fresh start)
+constexpr uint16_t VOC_LEARNING = 0x8000;
+constexpr uint16_t VOC_VALUE = 0x7FFF;
 
 struct __attribute__((packed)) FileHeader {
   char magic[4];        // "CO2H"
@@ -67,7 +74,7 @@ struct __attribute__((packed)) SampleRecord {
   int16_t temperature;  // 0.01 °C
   uint16_t humidity;    // 0.01 %RH
   uint16_t pressure;    // 0.1 hPa (BMP580)
-  uint16_t voc;         // VOC index 1-500 (SGP40)
+  uint16_t voc;         // VOC index 1-500 (SGP40), + VOC_LEARNING
 };
 
 // The records of format version 1, only read to convert them
@@ -117,6 +124,7 @@ struct Channel {
 // Each value has its own count, because one sensor can fail while the others work.
 struct Accumulator {
   Channel co2, temperature, humidity, pressure, voc;
+  bool vocLearning = false;  // a VOC index of the period was measured while learning
   uint8_t records = 0;
 
   void add(const SampleRecord &r) {
@@ -124,20 +132,24 @@ struct Accumulator {
     if (r.temperature != NO_TEMPERATURE) temperature.add(r.temperature);
     if (r.humidity != NO_HUMIDITY) humidity.add(r.humidity);
     if (r.pressure != NO_PRESSURE) pressure.add(r.pressure);
-    if (r.voc != NO_VOC) voc.add(r.voc);
+    if ((r.voc & VOC_VALUE) != NO_VOC) {
+      voc.add(r.voc & VOC_VALUE);
+      if (r.voc & VOC_LEARNING) vocLearning = true;
+    }
     if (records < UINT8_MAX) records++;
   }
 
   SampleRecord average(uint32_t start) const {
+    uint16_t vocAverage = (uint16_t)voc.average(NO_VOC);
+    if (vocAverage != NO_VOC && vocLearning) vocAverage |= VOC_LEARNING;
     return {start, (uint16_t)co2.average(NO_CO2), (int16_t)temperature.average(NO_TEMPERATURE),
-            (uint16_t)humidity.average(NO_HUMIDITY), (uint16_t)pressure.average(NO_PRESSURE),
-            (uint16_t)voc.average(NO_VOC)};
+            (uint16_t)humidity.average(NO_HUMIDITY), (uint16_t)pressure.average(NO_PRESSURE), vocAverage};
   }
 };
 
 // Converts a reading to the whole-number units of SampleRecord
 static SampleRecord toRecord(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa,
-                             uint16_t vocIndex) {
+                             uint16_t vocIndex, bool vocLearning) {
   SampleRecord r;
   r.time = 0;
   r.co2 = co2Ppm;
@@ -145,6 +157,7 @@ static SampleRecord toRecord(uint16_t co2Ppm, float temperatureC, float humidity
   r.humidity = isnan(humidityPct) ? NO_HUMIDITY : (uint16_t)lroundf(constrain(humidityPct, 0.0f, 100.0f) * 100);
   r.pressure = isnan(pressureHpa) ? NO_PRESSURE : (uint16_t)lroundf(constrain(pressureHpa, 300.0f, 1250.0f) * 10);
   r.voc = min(vocIndex, (uint16_t)500);  // 0 = none
+  if (r.voc != NO_VOC && vocLearning) r.voc |= VOC_LEARNING;
   return r;
 }
 
@@ -486,22 +499,68 @@ static bool deriveFiveMinutes(uint32_t doneUntil) {
   return true;
 }
 
-// ---------- Converting files of format version 1 ----------
+// ---------- Converting files of older formats ----------
 
 enum class Conversion { NotNeeded, Done, Failed };
 
-// Rewrites one file of format version 1 in the current format, with "no value" for the
-// VOC index. The new file is written next to the old one ("....bin.new") and then
-// renamed onto it, which LittleFS does in one step. A power cut in the middle leaves
-// the old file as it was, and it is converted at the next start.
-static Conversion convertFile(const Level &level, const char *path) {
+// Version 2 didn't store whether the VOC algorithm was still learning. The conversion
+// guesses it the way that firmware worked: it learned for 3 h after the VOC index
+// started, and again after a break. A break of up to 10 min carried on with the saved
+// state, but the last minutes before a power cut weren't saved (SAVE_INTERVAL_S), so a
+// gap of up to VOC_RELEARN_GAP_S in the values counts as no break.
+constexpr uint32_t VOC_LEARNING_S = 3 * 3600;
+constexpr uint32_t VOC_RELEARN_GAP_S = 20 * 60;
+
+struct LearningGuess {
+  uint32_t lastVoc = 0;        // start of the last record with a VOC index
+  uint32_t learningUntil = 0;  // records before this were measured while learning
+
+  // The record's VOC field, with VOC_LEARNING if it was probably measured while learning
+  uint16_t mark(const SampleRecord &r) {
+    uint16_t value = r.voc & VOC_VALUE;
+    if (value == NO_VOC) return NO_VOC;
+    if (lastVoc == 0 || r.time - lastVoc > VOC_RELEARN_GAP_S) learningUntil = r.time + VOC_LEARNING_S;
+    lastVoc = r.time;
+    return r.time < learningUntil ? value | VOC_LEARNING : value;
+  }
+};
+
+// Format version of a file of this level, 0 if it isn't one
+static uint8_t fileVersion(const Level &level, const char *path) {
+  File f = LittleFS.open(path, FILE_READ);
+  FileHeader header;
+  if (!f || f.read((uint8_t *)&header, sizeof header) != sizeof header || memcmp(header.magic, FORMAT_MAGIC, 4) != 0
+      || header.minutes != level.minutes) {
+    return 0;
+  }
+  if (header.version == 1 && header.recordSize == sizeof(SampleRecordV1)) return 1;
+  if (header.version >= 2 && header.version <= FORMAT_VERSION && header.recordSize == sizeof(SampleRecord)) {
+    return header.version;
+  }
+  return 0;
+}
+
+// Rewrites one file of an older format in the current one: version 1 gets "no value" for
+// the VOC index, version 2 the guessed learning mark. Files in the current format are
+// only read, so that the guess knows when the VOC index ran. The new file is written next
+// to the old one ("....bin.new") and then renamed onto it, which LittleFS does in one
+// step. A power cut in the middle leaves the old file as it was, and it is converted at
+// the next start.
+static Conversion convertFile(const Level &level, const char *path, LearningGuess &guess) {
+  uint8_t version = fileVersion(level, path);
+  if (version == FORMAT_VERSION) {
+    readRecords<SampleRecord>(level, path, [&](const SampleRecord &r) {
+      guess.mark(r);
+      return true;
+    });
+    return Conversion::NotNeeded;
+  }
+  if (version == 0) return Conversion::NotNeeded;  // not a file of this level
+
   File in = LittleFS.open(path, FILE_READ);
   if (!in) return Conversion::Failed;
   FileHeader header;
-  if (in.read((uint8_t *)&header, sizeof header) != sizeof header || memcmp(header.magic, FORMAT_MAGIC, 4) != 0
-      || header.version != 1 || header.minutes != level.minutes || header.recordSize != sizeof(SampleRecordV1)) {
-    return Conversion::NotNeeded;  // already converted, or not a file of this level
-  }
+  in.read((uint8_t *)&header, sizeof header);
 
   char newPath[32];
   snprintf(newPath, sizeof newPath, "%s.new", path);
@@ -511,16 +570,24 @@ static Conversion convertFile(const Level &level, const char *path) {
   header.recordSize = sizeof(SampleRecord);
   bool ok = out.write((const uint8_t *)&header, sizeof header) == sizeof header;
 
-  SampleRecordV1 buffer[16];
   SampleRecord converted[16];
   size_t bytes;
-  while (ok && (bytes = in.read((uint8_t *)buffer, sizeof buffer)) >= sizeof(SampleRecordV1)) {
-    size_t count = bytes / sizeof(SampleRecordV1);
-    for (size_t i = 0; i < count; i++) {
-      const SampleRecordV1 &o = buffer[i];
-      converted[i] = {o.time, o.co2, o.temperature, o.humidity, o.pressure, NO_VOC};
+  if (version == 1) {
+    SampleRecordV1 buffer[16];
+    while (ok && (bytes = in.read((uint8_t *)buffer, sizeof buffer)) >= sizeof(SampleRecordV1)) {
+      size_t count = bytes / sizeof(SampleRecordV1);
+      for (size_t i = 0; i < count; i++) {
+        const SampleRecordV1 &o = buffer[i];
+        converted[i] = {o.time, o.co2, o.temperature, o.humidity, o.pressure, NO_VOC};
+      }
+      ok = out.write((const uint8_t *)converted, count * sizeof(SampleRecord)) == count * sizeof(SampleRecord);
     }
-    ok = out.write((const uint8_t *)converted, count * sizeof(SampleRecord)) == count * sizeof(SampleRecord);
+  } else {
+    while (ok && (bytes = in.read((uint8_t *)converted, sizeof converted)) >= sizeof(SampleRecord)) {
+      size_t count = bytes / sizeof(SampleRecord);
+      for (size_t i = 0; i < count; i++) converted[i].voc = guess.mark(converted[i]);
+      ok = out.write((const uint8_t *)converted, count * sizeof(SampleRecord)) == count * sizeof(SampleRecord);
+    }
   }
   in.close();
   out.close();
@@ -536,7 +603,7 @@ static Conversion convertFile(const Level &level, const char *path) {
   return Conversion::Failed;
 }
 
-// Converts every file of format version 1 (written before the VOC index was stored).
+// Converts every file of an older format (1: no VOC index, 2: no learning mark).
 // Runs at every start; once all files are converted it only reads their headers.
 static void convertOldFiles() {
   uint16_t done = 0, failed = 0;
@@ -556,18 +623,29 @@ static void convertOldFiles() {
     // First the ".new" files left over from a power cut while converting. Next to its
     // old file one may be unfinished: it goes, and the old file is converted again.
     // Alone it is complete (the old file is only removed after it was written).
+    std::vector<String> dataPaths;
     for (const String &path : paths) {
+      if (isDataFile(path.substring(path.lastIndexOf('/') + 1))) dataPaths.push_back(path);
       if (!path.endsWith(".new")) continue;
       String dataPath = path.substring(0, path.length() - 4);
       if (LittleFS.exists(dataPath)) {
         LittleFS.remove(path);
-      } else {
-        LittleFS.rename(path, dataPath);
+      } else if (LittleFS.rename(path, dataPath)) {
+        dataPaths.push_back(dataPath);
       }
     }
-    for (const String &path : paths) {
-      if (!isDataFile(path.substring(path.lastIndexOf('/') + 1))) continue;
-      Conversion result = convertFile(*level, path.c_str());
+
+    // In time order (the names are dates), so the learning guess sees the values in order
+    std::sort(dataPaths.begin(), dataPaths.end());
+    bool needed = false;
+    for (const String &path : dataPaths) {
+      uint8_t version = fileVersion(*level, path.c_str());
+      if (version != 0 && version < FORMAT_VERSION) needed = true;
+    }
+    if (!needed) continue;
+    LearningGuess guess;
+    for (const String &path : dataPaths) {
+      Conversion result = convertFile(*level, path.c_str(), guess);
       if (result == Conversion::Done) done++;
       if (result == Conversion::Failed) {
         failed++;
@@ -575,7 +653,10 @@ static void convertOldFiles() {
       }
     }
   }
-  if (done > 0) Serial.printf("History: %u file%s converted to the new format (with VOC index)\n", done, done == 1 ? "" : "s");
+  if (done > 0) {
+    Serial.printf("History: %u file%s converted to the new format (VOC index with learning mark)\n", done,
+                  done == 1 ? "" : "s");
+  }
   if (failed > 0) Serial.printf("History: %u file%s could not be converted, see above\n", failed, failed == 1 ? "" : "s");
 }
 
@@ -606,11 +687,12 @@ void historyBegin() {
   checkClock();  // the clock survives a software restart
 }
 
-void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa, uint16_t vocIndex) {
+void historyAddSample(uint16_t co2Ppm, float temperatureC, float humidityPct, float pressureHpa, uint16_t vocIndex,
+                      bool vocLearning) {
   if (!enabled) return;
   checkClock();
   closeMinuteIfOver(clockNow());
-  minuteSum.add(toRecord(co2Ppm, temperatureC, humidityPct, pressureHpa, vocIndex));
+  minuteSum.add(toRecord(co2Ppm, temperatureC, humidityPct, pressureHpa, vocIndex, vocLearning));
 }
 
 void historyLoop() {
@@ -710,7 +792,10 @@ static void printSample(Print &out, const SampleRecord &r) {
   printValue(out, r.temperature, NO_TEMPERATURE, 100, 2);
   printValue(out, r.humidity, NO_HUMIDITY, 100, 2);
   printValue(out, r.pressure, NO_PRESSURE, 10, 1);
-  printValue(out, r.voc, NO_VOC, 1, 0);
+  uint16_t voc = r.voc & VOC_VALUE;
+  printValue(out, voc, NO_VOC, 1, 0);
+  out.print(',');  // 1 = the VOC algorithm was still learning
+  if (voc != NO_VOC) out.print(r.voc & VOC_LEARNING ? 1 : 0);
   out.println();
 }
 
@@ -733,7 +818,7 @@ bool historyPrintCsv(Print &out, const char *levelName, uint16_t days) {
   if (from < oldestKept) from = oldestKept;
 
   char path[24];
-  out.println(F("time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa,voc_index"));
+  out.println(F("time_utc,co2_ppm,temperature_c,humidity_pct,pressure_hpa,voc_index,voc_learning"));
   for (uint32_t day = from - from % SECONDS_PER_DAY; day <= now; day += SECONDS_PER_DAY) {
     filePathFor(path, sizeof path, *level, day);
     readRecords<SampleRecord>(*level, path, [&](const SampleRecord &r) {

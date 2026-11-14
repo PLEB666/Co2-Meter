@@ -24,10 +24,10 @@ applyTheme();
 </script>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#15181c;--sub:#5d6573;--line:#e1e4e8;--grid:#edf0f2;--acc:#2a78d6;--on-acc:#fff;
---co2:#2a78d6;--voc:#c4458a;--tmp:#eb6834;--hum:#1baf7a;--prs:#8e5cc9;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
+--co2:#2a78d6;--voc:#c4458a;--vocl:#e9a8cb;--tmp:#eb6834;--hum:#1baf7a;--prs:#8e5cc9;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
 --good:#e3f3e8;--good-tx:#1e6b34;--ok:#fbf0cf;--ok-tx:#7a5300;--vent:#fde4d4;--vent-tx:#93400f;--bad:#fbe0e0;--bad-tx:#a32d2d;color-scheme:light}
 :root[data-theme=dark]{--bg:#0f1216;--card:#171b21;--ink:#e6e8eb;--sub:#9aa2ad;--line:#2a3039;--grid:#20262e;--acc:#4b93ea;--on-acc:#fff;
---co2:#4b93ea;--voc:#e276b4;--tmp:#f07a45;--hum:#22b886;--prs:#a986e8;--err:#ff8a80;
+--co2:#4b93ea;--voc:#e276b4;--vocl:#8a4b6f;--tmp:#f07a45;--hum:#22b886;--prs:#a986e8;--err:#ff8a80;
 --good:#17351f;--good-tx:#9fd9ae;--ok:#3a2f10;--ok-tx:#f0cf74;--vent:#42230f;--vent-tx:#f5ad80;--bad:#451a1a;--bad-tx:#f2a0a0;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -100,7 +100,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 .chip[aria-pressed=false] .sq{background:none!important;box-shadow:inset 0 0 0 1.5px var(--sub)}
 .sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .chip .sq{margin:0}
-.b-co2{background:var(--co2)}.b-voc{background:var(--voc)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}.b-pres{background:var(--prs)}
+.b-co2{background:var(--co2)}.b-voc{background:var(--voc)}.b-vocl{background:var(--vocl)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}.b-pres{background:var(--prs)}
 .charttop{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-bottom:8px}
 .wintext{font-size:16px;font-weight:600}
 .charthead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin-bottom:4px}
@@ -111,7 +111,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 #chart .gl{stroke:var(--grid)}
 #chart .lim{stroke:var(--sub);stroke-dasharray:3 4;opacity:.7}
 #chart .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-#chart .s-co2{stroke:var(--co2)}#chart .s-voc{stroke:var(--voc)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}#chart .s-pres{stroke:var(--prs)}
+#chart .s-co2{stroke:var(--co2)}#chart .s-voc{stroke:var(--voc)}#chart .s-vocl{stroke:var(--vocl)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}#chart .s-pres{stroke:var(--prs)}
 #cross{stroke:var(--sub);display:none}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
 #msg:empty{display:none}
@@ -190,9 +190,9 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
       <p class="lbl">Show</p>
       <div class="line" id="toggles">
         <button class="chip" data-s="co2" aria-pressed="true"><i class="sq b-co2"></i>CO₂</button>
-        <button class="chip" data-s="voc" aria-pressed="true"><i class="sq b-voc"></i>VOC index</button>
         <button class="chip" data-s="tmp" aria-pressed="true"><i class="sq b-tmp"></i>Temperature</button>
         <button class="chip" data-s="hum" aria-pressed="true"><i class="sq b-hum"></i>Humidity</button>
+        <button class="chip" data-s="voc" aria-pressed="true"><i class="sq b-voc"></i>VOC index</button>
         <button class="chip" data-s="pres" aria-pressed="true"><i class="sq b-pres"></i>Air pressure</button>
       </div>
     </div>
@@ -222,9 +222,9 @@ const DAY = 86400;
 const DEVICE = new URLSearchParams(location.search).get('device');
 const SERIES = [
   {key: 'co2', name: 'CO₂', unit: 'ppm', dec: 0, minRange: 100},
-  {key: 'voc', name: 'VOC index', unit: '', dec: 0, minRange: 50},
   {key: 'tmp', name: 'Temperature', unit: '°C', dec: 1, minRange: 1},
   {key: 'hum', name: 'Humidity', unit: '%', dec: 1, minRange: 5},
+  {key: 'voc', name: 'VOC index', unit: '', dec: 0, minRange: 50},
   {key: 'pres', name: 'Air pressure', unit: 'hPa', dec: 1, minRange: 3},
 ];
 const RATINGS = [['Good', 'good'], ['OK', 'ok'], ['Ventilate', 'vent'], ['Bad air', 'bad']];
@@ -266,10 +266,11 @@ function parse(buffer, res) {
   const tmp = o => { const x = v.getInt16(o, true); return x === -32768 ? null : x / 100; };
   const hum = o => { const x = v.getUint16(o, true); return x === 65535 ? null : x / 100; };
   const pres = o => { const x = v.getUint16(o, true); return x ? x / 10 : null; };
-  const voc = o => v.getUint16(o, true) || null;
+  const voc = o => (v.getUint16(o, true) & 0x7fff) || null;
+  const vl = o => (v.getUint16(o, true) & 0x8000) !== 0;  // the VOC algorithm was still learning
   for (let o = 0; o + size <= buffer.byteLength; o += size) {
     const t = v.getUint32(o, true), p = {t, r: res, m: t + res * 30};  // m = middle of the period
-    Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10), voc: voc(o + 12)});
+    Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10), voc: voc(o + 12), vl: vl(o + 12)});
     out.push(p);
   }
   return out;
@@ -560,6 +561,9 @@ function drawChart() {
     const top = T0 + i * (PH + G), k = s.key, vals = [];
     for (const p of points) if (p[k] != null) vals.push(p[k]);
     o += `<text class="pl" x="${L}" y="${top - 9}">${s.name}${s.unit ? ` (${s.unit})` : ''}</text>`;
+    if (k === 'voc' && points.some(p => p.vl && p.voc != null)) {  // key for the lighter shade, after the name
+      o += `<line class="ln s-vocl" x1="${L + 76}" x2="${L + 94}" y1="${top - 13}" y2="${top - 13}"/><text x="${L + 100}" y="${top - 9}">still learning</text>`;
+    }
     if (!vals.length) {
       o += `<text x="${L}" y="${top + PH / 2}">No values</text>`;
       return;
@@ -585,8 +589,22 @@ function drawChart() {
       if (p[k] != null) run.push(p);
     }
     if (run.length) runs.push(run);
+    // The VOC line is drawn in a lighter shade where the algorithm was still learning
     for (const r of runs) {
-      o += `<path class="ln s-${k}" d="M${r.map(p => px(p) + ' ' + Y(p[k])).join('L')}${r.length === 1 ? 'l0 0' : ''}"/>`;
+      const parts = [];
+      let part = [r[0]];
+      for (let i = 1; i < r.length; i++) {
+        if (k === 'voc' && r[i].vl !== r[i - 1].vl) {
+          if (part.length > 1) parts.push(part);
+          part = [r[i - 1]];  // joins the two shades without a gap
+        }
+        part.push(r[i]);
+      }
+      parts.push(part);
+      for (const q of parts) {
+        const cls = k === 'voc' && q[q.length - 1].vl ? 'vocl' : k;
+        o += `<path class="ln s-${cls}" d="M${q.map(p => px(p) + ' ' + Y(p[k])).join('L')}${q.length === 1 ? 'l0 0' : ''}"/>`;
+      }
     }
   });
 
@@ -625,7 +643,8 @@ function showTip(e) {
   let h = `<div class="tt">${twoDays ? dateText(p.t, {weekday: 'short'}) + ' ' : ''}${clock(p.t)}${p.r > 1 ? '–' + clock(p.t + p.r * 60) : ''}</div>`;
   for (const s of geo.act) {
     const v = p[s.key];
-    h += `<div><i class="sq b-${s.key}"></i>${s.name} <b>${fmt(v, s.dec)}</b> ${v == null ? '' : s.unit}`;
+    const learning = s.key === 'voc' && v != null && p.vl;
+    h += `<div><i class="sq b-${learning ? 'vocl' : s.key}"></i>${s.name} <b>${fmt(v, s.dec)}</b> ${v == null ? '' : s.unit}${learning ? 'still learning' : ''}`;
     h += '</div>';
   }
   const tip = $('tip');
@@ -662,8 +681,8 @@ function toCsv(rows) {
   const local = t => { const d = new Date(t * 1000); return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const utc = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
   const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2], ['pressure_hpa', 'pres', 1], ['voc_index', 'voc', 0]];
-  const lines = [['time_local', 'time_utc', ...cols.map(c => c[0])].join(sep)];
-  for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2]))].join(sep));
+  const lines = [['time_local', 'time_utc', ...cols.map(c => c[0]), 'voc_learning'].join(sep)];
+  for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2])), p.voc == null ? '' : p.vl ? 1 : 0].join(sep));
   return lines.join('\r\n') + '\r\n';
 }
 

@@ -19,8 +19,8 @@
     display. The pressure is on the web page; light is only printed (Serial, status,
     /api/now).
   - The OLED switches off after 30 s. The button on GPIO2 wakes it for another 30 s.
-  - The 8 mm LED (PL9823-F8 on GPIO18) shows the air quality all the time, dimmed:
-    green -> yellow -> red, for whichever is worse, CO2 or the VOC index (LED_SHOWS_VOC).
+  - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 all the time, dimmed:
+    green -> yellow -> red. The VOC index doesn't change it (LED_SHOWS_VOC).
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
@@ -142,9 +142,10 @@ constexpr uint16_t VOC_LIMITS[3] = {VOC_GOOD_BELOW, VOC_OK_BELOW, VOC_VENTILATE_
 
 // ---------- LED ----------
 // The 8 mm LED on LED_PIN shows the air quality colour. Its brightness: see "Brightness" below.
-// true = the colour is that of whichever is worse, CO2 or the VOC index (both mean: open
-// a window; the display and the web page say which). false = CO2 only.
-constexpr bool LED_SHOWS_VOC = true;
+// true = the colour is that of whichever is worse, CO2 or the VOC index. false = CO2 only:
+// the VOC index jumps to 300-400 for a few minutes at every spray, perfume or frying pan,
+// which would turn the LED red each time. The display and the web page still show it.
+constexpr bool LED_SHOWS_VOC = false;
 // true = the board's own RGB LED (GPIO8) shows the colour as well. In the case the
 // board's LED faces the floor, so it stays off there.
 constexpr bool BOARD_LED_TOO = false;
@@ -845,7 +846,8 @@ void readScd41() {
   screenChanged = true;  // the LED follows by itself (updateLed())
   // The BMP580's newest pressure and the VOC index are stored with it (NAN and 0 if
   // there is none). With a fixed test pressure nothing is stored (see pressureFixedHpa).
-  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, pressureHpa, vocIndex);
+  if (pressureFixedHpa == 0) historyAddSample(co2Ppm, temperatureC, humidityPct, pressureHpa, vocIndex,
+                                                vocLearnSecondsLeft() > 0);
 
   // "name:value" pairs can be read by people and by the Serial Plotter
   Serial.printf(
