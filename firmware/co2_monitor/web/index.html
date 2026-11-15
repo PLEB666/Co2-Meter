@@ -117,7 +117,7 @@ h1{font-size:22px;font-weight:600;margin:0}
 #cross{stroke:var(--sub);display:none}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
 #msg:empty{display:none}
-#tip{position:absolute;top:12px;z-index:2;display:none;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+#tip{position:absolute;top:0;z-index:2;display:none;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.14)}
 #tip b{font-weight:600}
 #tip .tt{color:var(--sub);margin-bottom:2px}
 footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
@@ -238,6 +238,7 @@ let marks = {};               // day of the shown month -> 'has'
 let points = [];              // values in the graph
 let win = {start: 0, end: 0}; // time range of the graph, UTC seconds
 let geo = null;               // graph layout, for the tooltip
+let ptr = null;               // last mouse or finger spot over the graphs
 let lastHours = 0;            // > 0 while "Last … h" is chosen; the range then moves with the time
 let show = {co2: true, voc: true, tmp: true, hum: true, pres: true};
 try { Object.assign(show, JSON.parse(localStorage.getItem('show'))); } catch (e) {}
@@ -645,8 +646,10 @@ function markStuck() {
 
 function showTip(e) {
   if (!geo || !points.length) return;
+  ptr = {clientX: e.clientX, clientY: e.clientY, pointerType: e.pointerType};
+  const r = $('wrap').getBoundingClientRect();
   const x = e.clientX - $('chart').getBoundingClientRect().left;
-  if (x < geo.L - 4 || x > geo.W - geo.R + 4) return hideTip();
+  if (x < geo.L - 4 || x > geo.W - geo.R + 4 || e.clientY < r.top || e.clientY > r.bottom) return hideTip();
   const t = win.start + (x - geo.L) / (geo.W - geo.L - geo.R) * (win.end - win.start);
   let i = 0, j = points.length - 1;
   while (i < j) { const mid = (i + j) >> 1; if (points[mid].m < t) i = mid + 1; else j = mid; }
@@ -669,8 +672,11 @@ function showTip(e) {
   const tip = $('tip');
   tip.innerHTML = h;
   tip.style.display = 'block';
-  const w = tip.offsetWidth;
+  const w = tip.offsetWidth, th = tip.offsetHeight, y = e.clientY - r.top;
   tip.style.left = (cx + 14 + w > geo.W ? Math.max(0, cx - 14 - w) : cx + 14) + 'px';
+  // Next to the mouse, or above the finger, and always inside the part of the graphs on screen
+  const lo = Math.max(0, 8 - r.top), hi = $('axis').getBoundingClientRect().top - r.top - th - 6;
+  tip.style.top = Math.max(lo, Math.min(hi, e.pointerType === 'touch' ? y - th - 36 : y - th / 2)) + 'px';
 }
 
 function hideTip() {
@@ -818,10 +824,11 @@ function setup() {
 
   const wrap = $('wrap');
   wrap.onpointermove = wrap.onpointerdown = showTip;
-  wrap.onpointerleave = hideTip;
+  wrap.onpointerleave = () => { ptr = null; hideTip(); };
   let resizeTimer;
   addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (geo) drawChart(); }, 150); });
-  addEventListener('scroll', markStuck, {passive: true});
+  // The mouse wheel moves the graphs under a resting mouse: move the box along with them
+  addEventListener('scroll', () => { markStuck(); if (ptr) showTip(ptr); }, {passive: true});
 
   $('dl').onclick = download;
   for (const id of ['dlfrom', 'dlto', 'dlres']) $(id).oninput = () => { $('dlnote').textContent = ''; };

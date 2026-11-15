@@ -1,5 +1,7 @@
 # Packs index.html into ..\web_page.h, gzip-compressed, so the firmware can serve it.
-# Run it after every change to index.html, then upload the firmware again.
+# It also writes the mockup docs\mockup\index.html: the same page with mockup.js, which
+# makes up the values, so the page can be tried without a monitor (GitHub Pages).
+# Run it after every change to index.html or mockup.js, then upload the firmware again.
 # Usage (PowerShell):  .\make_web_page.ps1
 $ErrorActionPreference = 'Stop'
 
@@ -31,3 +33,17 @@ $text = @(
 ) -join "`n"
 [System.IO.File]::WriteAllText([System.IO.Path]::GetFullPath($target), $text, (New-Object System.Text.UTF8Encoding $false))
 Write-Host "web_page.h written: $($packed.Length) bytes ($($bytes.Length) bytes uncompressed)"
+
+# The mockup: mockup.js goes in front of the page's own script, so its fake /api answers
+# are in place before the page asks for anything
+$page = [System.IO.File]::ReadAllText($source)
+$mock = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'mockup.js'))
+$main = [regex]::Match($page, "<script>\r?\n'use strict';")
+if (-not $main.Success) { throw "index.html: the page's main script (<script> + 'use strict';) not found" }
+$page = $page.Substring(0, $main.Index) + "<script>`n" + $mock.TrimEnd() + "`n</script>`n" + $page.Substring($main.Index)
+$page = $page.Replace('<title>CO2 monitor</title>', '<title>CO2 monitor mockup</title>')
+$page = $page -replace '^<!doctype html>\r?\n', "<!doctype html>`n<!-- Made by firmware/co2_monitor/web/make_web_page.ps1 from index.html and mockup.js - change those, not this file. -->`n"
+$mockDir = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\docs\mockup'))
+New-Item -ItemType Directory -Force $mockDir | Out-Null
+[System.IO.File]::WriteAllText((Join-Path $mockDir 'index.html'), $page, (New-Object System.Text.UTF8Encoding $false))
+Write-Host "docs\mockup\index.html written: $($page.Length) characters"

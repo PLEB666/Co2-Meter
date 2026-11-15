@@ -1,0 +1,1112 @@
+<!doctype html>
+<!-- Made by firmware/co2_monitor/web/make_web_page.ps1 from index.html and mockup.js - change those, not this file. -->
+<!--
+  CO2 monitor web page. The firmware serves a compressed copy (web_page.h).
+  After changing this file, run make_web_page.ps1 and upload the firmware again.
+  To try changes without uploading, open this file in a browser with the monitor's
+  address added: index.html?device=192.168.178.40
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>CO2 monitor mockup</title>
+<script>
+// Light or dark before anything is drawn: the saved choice, otherwise the device setting
+var themeChoice = 'auto';
+try { themeChoice = localStorage.getItem('theme') || 'auto'; } catch (e) {}
+function applyTheme() {
+  var dark = themeChoice === 'dark' || (themeChoice === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+}
+applyTheme();
+</script>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#15181c;--sub:#5d6573;--line:#e1e4e8;--grid:#edf0f2;--acc:#2a78d6;--on-acc:#fff;
+--co2:#2a78d6;--voc:#c4458a;--vocl:#e9a8cb;--tmp:#eb6834;--hum:#1baf7a;--prs:#8e5cc9;--live:#1baf7a;--dead:#d03b3b;--err:#c62828;
+--good:#e3f3e8;--good-tx:#1e6b34;--ok:#fbf0cf;--ok-tx:#7a5300;--vent:#fde4d4;--vent-tx:#93400f;--bad:#fbe0e0;--bad-tx:#a32d2d;color-scheme:light}
+:root[data-theme=dark]{--bg:#0f1216;--card:#171b21;--ink:#e6e8eb;--sub:#9aa2ad;--line:#2a3039;--grid:#20262e;--acc:#4b93ea;--on-acc:#fff;
+--co2:#4b93ea;--voc:#e276b4;--vocl:#8a4b6f;--tmp:#f07a45;--hum:#22b886;--prs:#a986e8;--err:#ff8a80;
+--good:#17351f;--good-tx:#9fd9ae;--ok:#3a2f10;--ok-tx:#f0cf74;--vent:#42230f;--vent-tx:#f5ad80;--bad:#451a1a;--bad-tx:#f2a0a0;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 28px}
+section{margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.lbl{font-size:13px;color:var(--sub);margin:0 0 6px}
+.sub{color:var(--sub)}
+button,input,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px}
+button{cursor:pointer}
+button:hover:not(:disabled){border-color:var(--sub)}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:22px;font-weight:600;margin:0}
+.status{font-size:13px;color:var(--sub)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--sub)}
+.dot.on{background:var(--live)}.dot.off{background:var(--dead)}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:2px;gap:2px}
+.seg button{border:0;background:none;height:28px;color:var(--sub)}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.switch{display:inline-flex;align-items:center;gap:8px}
+.switch svg{width:15px;height:15px;fill:currentColor;color:var(--sub)}
+.track{position:relative;width:30px;height:18px;border-radius:9px;background:var(--line);transition:background .15s}
+.knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.switch[aria-checked=true] svg{color:var(--acc)}
+.switch[aria-checked=true] .track{background:var(--acc)}
+.switch[aria-checked=true] .knob{left:14px}
+.bright{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.bright>svg{width:16px;height:16px;flex:none;color:var(--sub)}
+.bright input{width:110px;height:auto;padding:0;margin:0;border:0;background:none;accent-color:var(--acc);cursor:pointer}
+.bright.auto input{accent-color:var(--sub)}
+.bright input:disabled,.bright input:disabled+.pct{opacity:.4;cursor:default}
+.pct{min-width:2.9em;text-align:right;font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
+.bright .switch{border:0;background:none;height:30px;padding:0 6px}
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.tiles .card{grid-column:span 2}
+.tiles .air{grid-column:span 3}
+.note{font-size:12px;color:var(--sub);margin:4px 0 0}
+.note:empty{display:none}
+.val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px}
+.big{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.badge{font-size:12px;padding:2px 8px;border-radius:6px;margin-left:auto;background:var(--bg);color:var(--sub)}
+.badge:empty{display:none}
+.good{background:var(--good);color:var(--good-tx)}.ok{background:var(--ok);color:var(--ok-tx)}
+.vent{background:var(--vent);color:var(--vent-tx)}.bad{background:var(--bad);color:var(--bad-tx)}
+.row{display:grid;grid-template-columns:280px minmax(0,1fr);gap:12px}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:600}
+.calhead button{width:34px;padding:0;font-size:18px;line-height:1}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.wd{font-size:12px;color:var(--sub);margin-bottom:2px}
+.cal button{height:36px;padding:0;border-color:transparent;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-variant-numeric:tabular-nums}
+.cal button i,.legend i{display:block;width:5px;height:5px;border-radius:50%}
+.cal .has i,.legend .m{background:var(--acc)}
+.cal .today{border-color:var(--line)}
+.cal .sel{background:var(--acc);color:var(--on-acc)}
+.cal .sel.has i{background:var(--on-acc)}
+.legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:8px 0 0}
+.legend i{display:inline-block;margin-left:6px}
+.legend i:first-child{margin-left:0}
+.controls{display:flex;flex-direction:column;gap:14px}
+.day{font-size:17px;font-weight:600}
+.line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.line+.line{margin-top:8px}
+.hint{font-size:13px;color:var(--sub);margin:6px 0 0;min-height:1.5em}
+.hint.err{color:var(--err)}
+.chip{display:inline-flex;align-items:center;gap:7px}
+.chip[aria-pressed=false]{color:var(--sub);background:none}
+.chip[aria-pressed=false] .sq{background:none!important;box-shadow:inset 0 0 0 1.5px var(--sub)}
+.sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.chip .sq{margin:0}
+.b-co2{background:var(--co2)}.b-voc{background:var(--voc)}.b-vocl{background:var(--vocl)}.b-tmp{background:var(--tmp)}.b-hum{background:var(--hum)}.b-pres{background:var(--prs)}
+.charttop{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-bottom:8px}
+.wintext{font-size:16px;font-weight:600}
+.charthead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin-bottom:4px}
+#wrap{position:relative;min-height:140px;touch-action:pan-y}
+#wrap svg{display:block;width:100%;overflow:visible}
+#wrap text{font-size:11px;fill:var(--sub);font-variant-numeric:tabular-nums}
+#wrap .pl{font-size:12px;fill:var(--ink)}
+#axis{position:sticky;bottom:0;z-index:1;margin:0 -16px;padding:0 16px;background:var(--card)}
+#axis.stuck{box-shadow:0 -1px 0 var(--line),0 -8px 14px -8px rgba(0,0,0,.18)}
+#chart .gl{stroke:var(--grid)}
+#chart .lim{stroke:var(--sub);stroke-dasharray:3 4;opacity:.7}
+#chart .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+#chart .s-co2{stroke:var(--co2)}#chart .s-voc{stroke:var(--voc)}#chart .s-vocl{stroke:var(--vocl)}#chart .s-tmp{stroke:var(--tmp)}#chart .s-hum{stroke:var(--hum)}#chart .s-pres{stroke:var(--prs)}
+#cross{stroke:var(--sub);display:none}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:0 20px;color:var(--sub);text-align:center;pointer-events:none}
+#msg:empty{display:none}
+#tip{position:absolute;top:0;z-index:2;display:none;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+#tip b{font-weight:600}
+#tip .tt{color:var(--sub);margin-bottom:2px}
+footer{font-size:12px;color:var(--sub);text-align:center;margin-top:16px}
+@media (max-width:720px){
+  .row{grid-template-columns:minmax(0,1fr)}
+  .row .controls{order:-1}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles .card{grid-column:span 1}
+  .tiles .air,.tiles .card:last-child{grid-column:1/-1}
+  .big{font-size:26px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1>CO<sub>2</sub> monitor</h1>
+    <div class="status"><span id="dot" class="dot"></span><span id="status">Connecting…</span></div>
+  </div>
+  <div class="line">
+    <div class="bright" id="brightbox" role="group" aria-label="Brightness of the display and LED" title="Brightness of the monitor's display and LED together. Auto: the light sensor sets it, the darker the room the dimmer. Moving the slider switches Auto off and keeps that level.">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.8v2.6M12 19.6v2.6M1.8 12h2.6M19.6 12h2.6M4.8 4.8l1.8 1.8M17.4 17.4l1.8 1.8M4.8 19.2l1.8-1.8M17.4 6.6l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input type="range" id="bright" min="0" max="100" step="1" value="50" disabled aria-label="Brightness in percent">
+      <span id="brightval" class="pct">–</span>
+      <button id="autobright" class="switch" role="switch" aria-checked="false" disabled>Auto<span class="track"><span class="knob"></span></span></button>
+    </div>
+    <button id="sleep" class="switch" role="switch" aria-checked="false" disabled title="Turns the LED off and shows a moon on the display. Holding the monitor's button for 2 s does the same."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Sleep mode<span class="track"><span class="knob"></span></span></button>
+    <div class="seg" id="theme" role="group" aria-label="Colour theme">
+      <button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+    </div>
+  </div>
+</header>
+
+<section class="tiles">
+  <div class="card air"><p class="lbl">CO<sub>2</sub></p><div class="val"><span id="co2" class="big">–</span><span class="sub">ppm</span><span id="badge" class="badge"></span></div></div>
+  <div class="card air" title="Volatile organic compounds, from cooking, cleaning products, paint, perfume or many people. The index is relative: 100 is the room's usual air over the last day, higher means more than usual (up to 500), lower means cleaner."><p class="lbl">VOC index</p><div class="val"><span id="voc" class="big">–</span><span class="sub">100 = usual air</span><span id="vocbadge" class="badge"></span></div><p id="vocnote" class="note"></p></div>
+  <div class="card"><p class="lbl">Temperature</p><div class="val"><span id="tmp" class="big">–</span><span class="sub">°C</span></div></div>
+  <div class="card"><p class="lbl">Humidity</p><div class="val"><span id="hum" class="big">–</span><span class="sub">%</span></div></div>
+  <div class="card" title="Measured where the monitor stands. Weather reports convert the pressure to sea level, so they show a higher value."><p class="lbl">Air pressure</p><div class="val"><span id="prs" class="big">–</span><span class="sub">hPa</span></div></div>
+</section>
+
+<section class="card">
+  <div class="charttop">
+    <div id="wintext" class="wintext"></div>
+    <div class="line"><span class="sub">Last</span>
+      <div class="seg" id="last" role="group" aria-label="Show the last hours">
+        <button data-h="1">1 h</button><button data-h="3">3 h</button><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">24 h</button>
+      </div>
+    </div>
+  </div>
+  <div class="charthead"><span id="res"></span><span>Local time</span></div>
+  <div id="wrap"><svg id="chart" height="0" role="img" aria-label="Graphs of the chosen values over the chosen time"></svg><div id="axis"><svg id="times" height="0" aria-hidden="true"></svg></div><p id="msg"></p><div id="tip"></div></div>
+</section>
+
+<section class="row">
+  <div class="card">
+    <div class="calhead"><button id="prev" aria-label="Previous month">‹</button><span id="month"></span><button id="next" aria-label="Next month">›</button></div>
+    <div class="cal wd" id="wd"></div>
+    <div class="cal" id="cal"></div>
+    <p class="legend"><i class="m"></i>Values stored</p>
+  </div>
+  <div class="card controls">
+    <div><p class="lbl">Day</p><div id="daylabel" class="day"></div></div>
+    <div>
+      <p class="lbl">Time range, up to 24 hours</p>
+      <div class="line"><input type="time" id="from" value="00:00" aria-label="From"><span class="sub">to</span><input type="time" id="to" value="00:00" aria-label="To"></div>
+      <div class="line"><button id="whole">Whole day</button><button id="night">Night 22–08</button></div>
+      <p id="span" class="hint"></p>
+    </div>
+    <div>
+      <p class="lbl">Show</p>
+      <div class="line" id="toggles">
+        <button class="chip" data-s="co2" aria-pressed="true"><i class="sq b-co2"></i>CO₂</button>
+        <button class="chip" data-s="tmp" aria-pressed="true"><i class="sq b-tmp"></i>Temperature</button>
+        <button class="chip" data-s="hum" aria-pressed="true"><i class="sq b-hum"></i>Humidity</button>
+        <button class="chip" data-s="voc" aria-pressed="true"><i class="sq b-voc"></i>VOC index</button>
+        <button class="chip" data-s="pres" aria-pressed="true"><i class="sq b-pres"></i>Air pressure</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <p class="lbl">Download values as a CSV file</p>
+  <div class="line">
+    <input type="date" id="dlfrom" aria-label="Start date"><span class="sub">to</span><input type="date" id="dlto" aria-label="End date">
+    <select id="dlres" aria-label="Detail">
+      <option value="best">Best available detail</option>
+      <option value="1" id="dlres1">1-minute values</option>
+      <option value="5" id="dlres5">5-minute values</option>
+    </select>
+    <button id="dl" class="primary">Download CSV</button>
+  </div>
+  <p id="dlnote" class="hint"></p>
+</section>
+<footer id="foot"></footer>
+</main>
+
+<script>
+// Mockup of the monitor for trying the web page without one (docs section 8.7).
+// It answers the page's /api/... requests in the browser with made-up values from a small
+// room simulation: two people, sleeping, cooking, airing, heating, the weather.
+// make_web_page.ps1 puts it into docs/mockup/index.html, in front of the page's own script.
+// The answers have the same form as the firmware's (web.cpp, history.cpp).
+(function () {
+  'use strict';
+  const DAY = 86400, MIN = 60;
+  const HISTORY_DAYS = 60;            // made-up history: 1-minute values for the last 14 days, 5-minute before
+  const KEEP = {m1: 14, m5: 1096};    // keepDays as in the firmware
+  const LIMITS = [600, 1000, 1500], VOC_LIMITS = [150, 250, 400];
+  const MAX_SPAN = {1: 2 * DAY, 5: 14 * DAY, days: 45 * DAY};
+
+  const opened = Date.now() / 1000;
+  const utcDay = t => t - t % DAY;
+  const S0 = utcDay(opened) - HISTORY_DAYS * DAY;   // first minute of the history
+  const oldest = {m1: utcDay(opened) - KEEP.m1 * DAY, m5: S0};
+  const lastMinute = () => Math.floor(Date.now() / 1000 / MIN) * MIN - MIN;  // newest finished minute
+
+  // Repeatable random numbers 0..1 and smooth noise over time
+  const hash = n => {
+    n = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
+    n = Math.imul(n ^ (n >>> 13), 0xc2b2ae35);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  };
+  const rnd = (a, b) => hash(a * 7919 + b * 104729);
+  const noise = (t, period, seed) => {
+    const x = t / period, i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f);
+    return rnd(i, seed) * (1 - s) + rnd(i + 1, seed) * s;
+  };
+
+  // Local midnight a number of days before today, for the gaps below
+  const localDay = (back, h, m) => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - back, h, m).getTime() / 1000; };
+  const GAPS = [
+    {from: localDay(9, 14, 0), to: localDay(9, 15, 35), learn: true},    // power off 95 min: the VOC index learns again
+    {from: localDay(3, 10, 12), to: localDay(3, 10, 16), learn: false},  // restart (upload): VOC state restored
+  ];
+  const restartAt = GAPS[1].to;
+
+  // The day plan of the room, different every day
+  function plan(d) {
+    const key = d.getFullYear() * 400 + d.getMonth() * 31 + d.getDate(), r = k => rnd(key, k);
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    return {
+      wake: weekend ? 8 + r(1) : 6.4 + 0.5 * r(1),
+      leave: weekend ? (r(2) > 0.5 ? 13 + r(3) : 99) : 7.8 + 0.3 * r(2),
+      back: weekend ? 15.5 + r(4) : 16.4 + 1.5 * r(4),
+      bed: 22.4 + 1.1 * r(5),
+      sleepers: r(6) > 0.85 ? 3 : 2,                         // a guest now and then: worse air at night
+      airEvening: r(7) > 0.35 ? 19.6 + 2 * r(8) : -1,
+      airMinutes: 5 + 12 * r(9),
+      cook: r(10) > 0.15 ? 18.2 + r(11) : -1,
+      cookVoc: 90 + 160 * r(12),
+    };
+  }
+
+  // Simulation, one step per minute, stored the way the monitor stores its records
+  const SIZE = (HISTORY_DAYS + 9) * DAY / MIN;
+  const rec = {co2: new Uint16Array(SIZE), tmp: new Int16Array(SIZE), hum: new Uint16Array(SIZE), pres: new Uint16Array(SIZE), voc: new Uint16Array(SIZE)};
+  const st = {co2: 520, tmp: 20.5, hum: 44, voc: 100, i: 0, learnUntil: S0 + 3 * 3600};
+  let planDay = -1, today = null;
+
+  function step() {
+    const i = st.i, t = S0 + i * MIN;
+    if (i >= SIZE) return false;
+    st.i++;
+    const d = new Date(t * 1000), h = d.getHours() + d.getMinutes() / 60;
+    if (d.getDate() !== planDay) { planDay = d.getDate(); today = plan(d); }
+    const p = today;
+
+    const asleep = h < p.wake || h >= p.bed;
+    const away = !asleep && h >= p.leave && h < p.back;
+    const people = asleep ? p.sleepers : away ? 0 : 2;
+    const airing = (h >= p.wake + 0.4 && h < p.wake + 0.4 + 10 / 60) || (p.airEvening > 0 && h >= p.airEvening && h < p.airEvening + p.airMinutes / 60);
+    const cooking = p.cook > 0 && h >= p.cook && h < p.cook + 0.7;
+
+    // CO2: 50 m3 room, 0.2 L/min per sleeping and 0.3 per awake person, 0.7 air changes an hour (10 with the window open)
+    const outdoor = 420 + 15 * noise(t, 6 * 3600, 1);
+    const ach = airing ? 10 : 0.7;
+    st.co2 += people * (asleep ? 0.2 : 0.3) * 1000 / 50 - ach / 60 * (st.co2 - outdoor);
+    // Temperature: heating 21.3 while someone is up, 19 at night and while away, cold air from the window
+    const heat = airing ? 15 : asleep || away ? 19.2 : 21.3 + (cooking ? 0.8 : 0);
+    st.tmp += (heat - st.tmp) / (airing ? 20 : 80) +0.004 * Math.max(0, Math.sin(Math.PI * (h - 10) / 8)) * noise(t, DAY, 2);
+    // Humidity: people and cooking add, the window takes away
+    const wet = airing ? 34 : 40 + 10 * noise(t, 4 * DAY, 3) + people * 1.5 + (cooking ? 8 : 0);
+    st.hum += (wet - st.hum) / (airing ? 8 : 45);
+    // VOC index: about 100 is the room's usual air; cooking and people raise it, fresh air lowers it
+    const vocAim = airing ? 60 : 85 + people * 7 + (cooking ? p.cookVoc : 0) + (noise(t, 5400, 4) > 0.93 ? 140 : 0);
+    st.voc += (vocAim - st.voc) / (vocAim > st.voc ? 8 : 25);
+
+    const gap = GAPS.find(g => t >= g.from && t < g.to);
+    if (gap) {
+      if (gap.learn) st.learnUntil = gap.to + 3 * 3600;
+      return true;  // nothing stored, all five stay 0 = missing
+    }
+    const pres = 975 + 9 * (2 * noise(t, 3.1 * DAY, 5) - 1) + 3 * (2 * noise(t, 0.9 * DAY, 6) - 1) + 0.5 * Math.sin(2 * Math.PI * t / 43200);
+    const jitter = (k, a) => (rnd(i, k) - 0.5) * 2 * a;
+    rec.co2[i] = Math.max(400, Math.round(st.co2 + jitter(11, 6)));
+    rec.tmp[i] = Math.round((st.tmp + jitter(12, 0.03)) * 100);
+    rec.hum[i] = Math.round(Math.min(75, Math.max(20, st.hum - 3 * (st.tmp - 21) + jitter(13, 0.3))) * 100);
+    rec.pres[i] = Math.round((pres + jitter(14, 0.06)) * 10);
+    rec.voc[i] = Math.min(500, Math.max(1, Math.round(st.voc + jitter(15, 3)))) | (t < st.learnUntil ? 0x8000 : 0);
+    return true;
+  }
+
+  // Simulates up to the newest finished minute
+  function catchUp() {
+    const end = Math.min(SIZE, (lastMinute() - S0) / MIN + 1);
+    while (st.i < end && step()) {}
+    return st.i;  // minutes simulated
+  }
+  const index = t => Math.floor((t - S0) / MIN);
+
+  // ---------- Answers ----------
+
+  function records(res, from, to) {
+    const n = catchUp(), out = [];
+    if (res === 1) {
+      for (let i = Math.max(0, index(Math.max(from, oldest.m1))); i < n && S0 + i * MIN < to; i++) {
+        if (S0 + i * MIN >= from && rec.co2[i]) out.push([S0 + i * MIN, rec.co2[i], rec.tmp[i], rec.hum[i], rec.pres[i], rec.voc[i]]);
+      }
+    } else {
+      // 5-minute values: the average of the minutes in each 5 minutes, learning if any minute was
+      for (let t = Math.max(from, S0) - Math.max(from, S0) % 300; t < to; t += 300) {
+        if (t < from) continue;
+        const a = index(t);
+        if (a + 5 > n) break;  // the newest 5 minutes aren't finished yet
+        let k = 0, c = 0, tm = 0, hu = 0, pr = 0, vo = 0, learn = 0;
+        for (let i = a; i < a + 5; i++) {
+          if (!rec.co2[i]) continue;
+          k++; c += rec.co2[i]; tm += rec.tmp[i]; hu += rec.hum[i]; pr += rec.pres[i]; vo += rec.voc[i] & 0x7fff; learn |= rec.voc[i] & 0x8000;
+        }
+        if (k) out.push([t, Math.round(c / k), Math.round(tm / k), Math.round(hu / k), Math.round(pr / k), Math.round(vo / k) | learn]);
+      }
+    }
+    const buf = new ArrayBuffer(out.length * 14), v = new DataView(buf);
+    out.forEach((r, j) => {
+      const o = j * 14;
+      v.setUint32(o, r[0], true); v.setUint16(o + 4, r[1], true); v.setInt16(o + 6, r[2], true);
+      v.setUint16(o + 8, r[3], true); v.setUint16(o + 10, r[4], true); v.setUint16(o + 12, r[5], true);
+    });
+    return buf;
+  }
+
+  function days(from, to) {
+    const n = catchUp(), out = [];
+    for (let day = utcDay(from); day < to; day += DAY) {
+      let first = 0, last = 0;
+      for (let i = Math.max(0, index(day)); i < Math.min(n, index(day + DAY)); i++) {
+        if (!rec.co2[i]) continue;
+        if (!first) first = S0 + i * MIN;
+        last = S0 + i * MIN;
+      }
+      if (!first) continue;
+      const fine = day >= oldest.m1;
+      out.push({day, res: fine ? 1 : 5, first: fine ? first : first - first % 300, last: fine ? last : last - last % 300});
+    }
+    return out;
+  }
+
+  function info() {
+    const n = catchUp();
+    let stored = 0;
+    for (let i = 0; i < n; i++) if (rec.co2[i]) stored++;
+    const m1 = Math.max(0, stored - (oldest.m1 - S0) / MIN);
+    return {on: true, clock: true, usedKB: Math.round((m1 + stored / 5) * 14 / 1024) + 16, totalKB: 10112, unsaved: Math.floor(Date.now() / 60000) % 10,
+      oldest: {m1: oldest.m1, m5: oldest.m5}, keepDays: {m1: KEEP.m1, m5: KEEP.m5}};
+  }
+
+  const device = {sleep: false, auto: true, level: 50};
+  function lightNow() {
+    const t = Date.now() / 1000, d = new Date(), h = d.getHours() + d.getMinutes() / 60, p = plan(d);
+    const sun = Math.max(0, Math.sin(Math.PI * (h - 7.5) / 10));
+    const up = !(h < p.wake || h >= p.bed) && !(h >= p.leave && h < p.back);
+    return Math.max(sun * (40 + 360 * noise(t, 1800, 7)), up && h > 16.5 ? 110 + 30 * noise(t, 600, 8) : 0.2);
+  }
+  const autoLevel = lux => Math.round(Math.min(100, Math.max(1, 5 + 30 * Math.log10(1 + lux))));
+
+  function now() {
+    const n = catchUp(), i = n - 1, t = Math.floor(Date.now() / 1000), j = k => (Math.random() - 0.5) * k;
+    const lux = lightNow();
+    return {time: t, clock: true, uptime: Math.round(t - restartAt), warmup: 0,
+      co2: Math.round(rec.co2[i] + j(8)), temperature: +(rec.tmp[i] / 100 + j(0.04)).toFixed(2), humidity: +(rec.hum[i] / 100 + j(0.3)).toFixed(1),
+      pressure: +(rec.pres[i] / 10 + j(0.06)).toFixed(2), light: +lux.toFixed(1), voc: Math.max(1, Math.round((rec.voc[i] & 0x7fff) + j(4))),
+      vocLearnLeft: Math.max(0, Math.round(st.learnUntil - t)), vocLimits: VOC_LIMITS, sleep: device.sleep,
+      brightness: device.auto ? autoLevel(lux) : device.level, autoBrightness: device.auto, limits: LIMITS, rssi: -46 - Math.round(Math.random() * 5)};
+  }
+
+  function answer(path, q, method) {
+    const json = x => [JSON.stringify(x), 'application/json', 200];
+    const bad = text => [text, 'text/plain', 400];
+    const span = max => {
+      const from = +q.get('from') || 0, to = +q.get('to') || 0;
+      return from === 0 || to <= from || to - from > max ? null : [from, to];
+    };
+    if (path === '/api/now' && method === 'GET') return json(now());
+    if (path === '/api/info' && method === 'GET') return json(info());
+    if (path === '/api/days' && method === 'GET') {
+      const s = span(MAX_SPAN.days);
+      return s ? json(days(...s)) : bad('Needs from and to (UTC seconds), at most 45 days apart');
+    }
+    if (path === '/api/data' && method === 'GET') {
+      const res = +q.get('res');
+      if (res !== 1 && res !== 5) return bad('res must be 1 or 5');
+      const s = span(MAX_SPAN[res]);
+      return s ? [records(res, ...s), 'application/octet-stream', 200] : bad('Needs from and to (UTC seconds), at most ' + MAX_SPAN[res] / DAY + ' days apart');
+    }
+    if (path === '/api/sleep' && method === 'POST') {
+      if (q.get('on') !== '0' && q.get('on') !== '1') return bad('on must be 0 or 1');
+      device.sleep = q.get('on') === '1';
+      return json({sleep: device.sleep});
+    }
+    if (path === '/api/brightness' && method === 'POST') {
+      const level = q.get('level');
+      if (q.get('auto') === '1') device.auto = true;
+      else if (/^\d{1,3}$/.test(level || '') && +level <= 100) { device.auto = false; device.level = +level; }
+      else return bad('Needs auto=1 or level=0..100');
+      return json({auto: device.auto, brightness: device.auto ? autoLevel(lightNow()) : device.level});
+    }
+    return ['Not found', 'text/plain', 404];
+  }
+
+  // Requests to /api/... are answered here, after a short delay like the real monitor's
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, options) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, location.href), at = url.pathname.indexOf('/api/');
+    if (at < 0) return realFetch(input, options);
+    const [body, type, status] = answer(url.pathname.slice(at), url.searchParams, ((options && options.method) || 'GET').toUpperCase());
+    return new Promise(done => setTimeout(() => done(new Response(body, {status, headers: {'Content-Type': type}})), 60 + Math.random() * 140));
+  };
+
+  // A note at the top, so nobody takes the values for real ones
+  document.addEventListener('DOMContentLoaded', () => {
+    const note = document.createElement('div');
+    note.className = 'card';
+    note.style.cssText = 'margin-bottom:12px;padding:8px 14px;font-size:13px;color:var(--sub);border-style:dashed';
+    note.innerHTML = '<b style="color:var(--ink)">Mockup</b> with made-up values, for trying the page without a monitor. Nothing is sent anywhere: the sleep switch and the brightness only change this copy.';
+    document.querySelector('main').prepend(note);
+  });
+})();
+</script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const DAY = 86400;
+const DEVICE = new URLSearchParams(location.search).get('device');
+const SERIES = [
+  {key: 'co2', name: 'CO₂', unit: 'ppm', dec: 0, minRange: 100},
+  {key: 'tmp', name: 'Temperature', unit: '°C', dec: 1, minRange: 1},
+  {key: 'hum', name: 'Humidity', unit: '%', dec: 1, minRange: 5},
+  {key: 'voc', name: 'VOC index', unit: '', dec: 0, minRange: 50},
+  {key: 'pres', name: 'Air pressure', unit: 'hPa', dec: 1, minRange: 3},
+];
+const RATINGS = [['Good', 'good'], ['OK', 'ok'], ['Ventilate', 'vent'], ['Bad air', 'bad']];
+const LEVEL_NAMES = {1: '1-minute values', 5: '5-minute values'};
+
+let info = null;              // /api/info: state of the history
+let live = null, liveAt = 0;  // /api/now and when it arrived
+let marks = {};               // day of the shown month -> 'has'
+let points = [];              // values in the graph
+let win = {start: 0, end: 0}; // time range of the graph, UTC seconds
+let geo = null;               // graph layout, for the tooltip
+let ptr = null;               // last mouse or finger spot over the graphs
+let lastHours = 0;            // > 0 while "Last … h" is chosen; the range then moves with the time
+let show = {co2: true, voc: true, tmp: true, hum: true, pres: true};
+try { Object.assign(show, JSON.parse(localStorage.getItem('show'))); } catch (e) {}
+
+const now = () => Date.now() / 1000;
+const today = () => { const d = new Date(); return {y: d.getFullYear(), m: d.getMonth(), d: d.getDate()}; };
+let sel = today();                  // chosen day
+let view = {y: sel.y, m: sel.m};    // month shown in the calendar
+
+const pad = n => String(n).padStart(2, '0');
+const dayStart = (y, m, d) => new Date(y, m, d).getTime() / 1000;
+const isoDate = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const clock = t => { const d = new Date(t * 1000); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };  // always 24 h
+const dateText = (t, o) => new Date(t * 1000).toLocaleDateString([], o || {day: 'numeric', month: 'long', year: 'numeric'});
+const fmt = (v, dec) => v == null ? '–' : v.toLocaleString([], {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function get(path, options) {
+  const r = await fetch((DEVICE ? 'http://' + DEVICE : '') + path, Object.assign({cache: 'no-store'}, options));
+  if (!r.ok) throw new Error(path + ': ' + r.status);
+  return r;
+}
+
+// Turns the binary records of /api/data into objects (layout in history.cpp)
+function parse(buffer, res) {
+  const v = new DataView(buffer), size = 14, out = [];
+  const co2 = o => v.getUint16(o, true) || null;
+  const tmp = o => { const x = v.getInt16(o, true); return x === -32768 ? null : x / 100; };
+  const hum = o => { const x = v.getUint16(o, true); return x === 65535 ? null : x / 100; };
+  const pres = o => { const x = v.getUint16(o, true); return x ? x / 10 : null; };
+  const voc = o => (v.getUint16(o, true) & 0x7fff) || null;
+  const vl = o => (v.getUint16(o, true) & 0x8000) !== 0;  // the VOC algorithm was still learning
+  for (let o = 0; o + size <= buffer.byteLength; o += size) {
+    const t = v.getUint32(o, true), p = {t, r: res, m: t + res * 30};  // m = middle of the period
+    Object.assign(p, {co2: co2(o + 4), tmp: tmp(o + 6), hum: hum(o + 8), pres: pres(o + 10), voc: voc(o + 12), vl: vl(o + 12)});
+    out.push(p);
+  }
+  return out;
+}
+
+const getRecords = async (res, from, to) => parse(await (await get(`/api/data?res=${res}&from=${from}&to=${to}`)).arrayBuffer(), res);
+
+// Oldest stored time over all levels, 0 if nothing is stored
+function oldestData() {
+  const v = info && info.oldest ? Object.values(info.oldest).filter(Boolean) : [];
+  return v.length ? Math.min(...v) : 0;
+}
+
+// ---------- Live values ----------
+
+let liveToken = 0;
+async function loadLive() {
+  const token = ++liveToken;
+  try {
+    const r = await (await get('/api/now')).json();
+    if (token === liveToken) { live = r; liveAt = Date.now(); }
+  } catch (e) {}
+  showLive();
+}
+
+// Sleep mode: LED off and a moon on the display
+let sleepBusy = false;
+async function toggleSleep() {
+  const b = $('sleep'), on = b.getAttribute('aria-checked') !== 'true';
+  sleepBusy = true;
+  b.disabled = true;
+  b.setAttribute('aria-checked', on);
+  liveToken++;  // a reading already on its way still has the old state
+  try { live.sleep = (await (await get('/api/sleep?on=' + (on ? 1 : 0), {method: 'POST'})).json()).sleep; } catch (e) {}
+  sleepBusy = false;
+  showLive();
+}
+
+// Brightness of the display and LED together. Auto: the light sensor sets it.
+// Moving the slider switches Auto off and sends the level while it moves, one request
+// at a time, always the newest level.
+let brightWish = null, brightSending = false, brightMoved = 0;
+async function sendBrightness(query) {
+  brightWish = query;
+  brightMoved = Date.now();
+  if (brightSending) return;  // the loop below sends the newest wish next
+  brightSending = true;
+  while (brightWish) {
+    const q = brightWish;
+    brightWish = null;
+    liveToken++;  // a reading already on its way still has the old state
+    try {
+      const r = await (await get('/api/brightness?' + q, {method: 'POST'})).json();
+      Object.assign(live, {brightness: r.brightness, autoBrightness: r.auto});
+    } catch (e) {}
+  }
+  brightSending = false;
+  showLive();
+}
+
+function showBrightness(level, auto) {
+  $('bright').value = level;
+  $('brightval').textContent = level + ' %';
+  $('autobright').setAttribute('aria-checked', auto);
+  $('brightbox').classList.toggle('auto', auto);
+}
+
+// Rating badge for a value, with the limits good below, OK below, ventilate below
+function rate(b, value, limits) {
+  if (value == null || !limits) {
+    b.textContent = '';
+    b.className = 'badge';
+    return;
+  }
+  let i = 0;
+  while (i < 3 && value >= limits[i]) i++;
+  b.textContent = RATINGS[i][0];
+  b.className = 'badge ' + RATINGS[i][1];
+}
+
+function showLive() {
+  const ok = live && Date.now() - liveAt < 15000;
+  $('dot').className = 'dot ' + (ok ? 'on' : live ? 'off' : '');
+  let s = live ? 'No connection to the monitor, retrying' : 'Connecting…';
+  if (ok) {
+    const age = Math.round((Date.now() - liveAt) / 1000);
+    s = 'Live, updated ' + (age < 2 ? 'just now' : age + ' s ago');
+    if (!live.clock) s += ', waiting for the internet time';
+  }
+  $('status').textContent = s;
+  if (!sleepBusy) {
+    $('sleep').disabled = !ok;
+    $('sleep').setAttribute('aria-checked', !!(live && live.sleep));
+  }
+  $('bright').disabled = $('autobright').disabled = !(ok && live.brightness != null);
+  // Not while the slider is being moved, so it doesn't jump back under the finger
+  if (ok && live.brightness != null && !brightSending && Date.now() - brightMoved > 2000) showBrightness(live.brightness, live.autoBrightness);
+  if (!live) return;
+
+  const warm = live.warmup > 0;
+  $('co2').textContent = fmt(warm ? null : live.co2, 0);
+  $('tmp').textContent = fmt(warm ? null : live.temperature, 1);
+  $('hum').textContent = fmt(warm ? null : live.humidity, 0);
+  $('prs').textContent = fmt(warm ? null : live.pressure, 0);
+  $('voc').textContent = fmt(warm ? null : live.voc, 0);
+  const b = $('badge');
+  if (warm) {
+    b.textContent = 'Warming up, ' + live.warmup + ' s';
+    b.className = 'badge';
+  } else {
+    rate(b, live.co2, live.limits);
+  }
+  rate($('vocbadge'), warm ? null : live.voc, live.vocLimits);
+  // The VOC index needs a few hours to learn the room's usual air after a fresh start
+  let note = '';
+  if (!warm && live.voc != null && live.vocLearnLeft > 0) {
+    const min = Math.ceil(live.vocLearnLeft / 60), h = Math.floor(min / 60);
+    note = `Still learning the room’s usual air, ${h ? h + ' h ' : ''}${min % 60} min to go`;
+  }
+  $('vocnote').textContent = note;
+
+  const up = live.uptime, d = Math.floor(up / DAY), h = Math.floor(up % DAY / 3600), m = Math.floor(up % 3600 / 60);
+  const parts = ['Wi-Fi signal ' + live.rssi + ' dBm'];
+  if (live.light != null) parts.push('Room light ' + fmt(live.light, live.light < 10 ? 1 : 0) + ' lux');
+  if (info && info.on) parts.push(`History ${fmt(info.usedKB, 0)} of ${fmt(info.totalKB, 0)} KB used`);
+  parts.push('Running for ' + (d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`));
+  $('foot').textContent = parts.join(' · ');
+}
+
+// ---------- Calendar ----------
+
+let monthToken = 0;
+async function loadMonth() {
+  const token = ++monthToken, {y, m} = view;
+  drawCalendar();
+  if (!info || !info.clock) return;
+  try {
+    const days = await (await get(`/api/days?from=${dayStart(y, m, 0)}&to=${dayStart(y, m + 1, 2)}`)).json();
+    if (token !== monthToken) return;
+    // The monitor counts days in UTC; mark every local day that overlaps one with values
+    const found = {}, n = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= n; d++) {
+      const s = dayStart(y, m, d), e = dayStart(y, m, d + 1);
+      for (const x of days) {
+        if (x.first < e && x.last + x.res * 60 > s) found[d] = 'has';
+      }
+    }
+    marks = found;
+  } catch (e) {}
+  drawCalendar();
+}
+
+function drawCalendar() {
+  const {y, m} = view, t = today(), oldest = oldestData();
+  $('month').textContent = new Date(y, m, 1).toLocaleDateString([], {month: 'long', year: 'numeric'});
+  const first = (new Date(y, m, 1).getDay() + 6) % 7, n = new Date(y, m + 1, 0).getDate();
+  let h = '<span></span>'.repeat(first);
+  for (let d = 1; d <= n; d++) {
+    const c = [marks[d] || '', y === t.y && m === t.m && d === t.d ? 'today' : '', y === sel.y && m === sel.m && d === sel.d ? 'sel' : ''];
+    const label = new Date(y, m, d).toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'}) + (marks[d] ? ', has values' : '');
+    const future = new Date(y, m, d) > new Date(t.y, t.m, t.d);
+    h += `<button class="${c.join(' ').trim()}" data-d="${d}" aria-label="${label}"${future ? ' disabled' : ''}>${d}<i></i></button>`;
+  }
+  $('cal').innerHTML = h;
+  $('prev').disabled = !oldest || dayStart(y, m, 1) <= oldest;
+  $('next').disabled = y > t.y || (y === t.y && m >= t.m);
+  $('daylabel').textContent = new Date(sel.y, sel.m, sel.d).toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+}
+
+function moveMonth(step) {
+  const d = new Date(view.y, view.m + step, 1);
+  view = {y: d.getFullYear(), m: d.getMonth()};
+  marks = {};
+  loadMonth();
+}
+
+function selectDay(d) {
+  sel = {y: d.getFullYear(), m: d.getMonth(), d: d.getDate()};
+  if (view.y !== sel.y || view.m !== sel.m) {
+    view = {y: sel.y, m: sel.m};
+    marks = {};
+    loadMonth();
+  } else {
+    drawCalendar();
+  }
+}
+
+// ---------- Graph ----------
+
+function windowTimes() {
+  const read = id => ($(id).value || '00:00').split(':').map(Number);
+  const [fh, fm] = read('from'), [th, tm] = read('to');
+  const start = new Date(sel.y, sel.m, sel.d, fh, fm).getTime() / 1000;
+  let end = new Date(sel.y, sel.m, sel.d, th, tm).getTime() / 1000;
+  if (end <= start) end = new Date(sel.y, sel.m, sel.d + 1, th, tm).getTime() / 1000;
+  return {start, end};
+}
+
+// Values for a time range. The newest part comes from the 1-minute values, the
+// older part from the 5-minute values, as far as each level goes back.
+async function fetchRange(start, end) {
+  const o = info.oldest, parts = [];
+  for (const [res, from] of [[1, o.m1 || start], [5, o.m5]]) {
+    if (start >= end) break;
+    if (!from || end <= from) continue;
+    const s = Math.max(start, from);
+    parts.unshift(await getRecords(res, s, end));
+    end = s;
+  }
+  return parts.flat();
+}
+
+// Shows the last few hours, up to now
+function showLast(hours) {
+  lastHours = hours;
+  const n = new Date(), s = new Date(n.getTime() - hours * 3600000), hhmm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+  selectDay(s);
+  $('from').value = hhmm(s);
+  $('to').value = hhmm(n);
+  loadChart();
+}
+
+// The time shown in the graph, in words
+function windowText() {
+  const s = new Date(win.start * 1000), e = new Date(win.end * 1000), times = `${clock(win.start)}–${clock(win.end)}`;
+  const day = d => d.toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'});
+  if (lastHours) return `Last ${lastHours} h, ${times}`;
+  if (s.getHours() + s.getMinutes() + e.getHours() + e.getMinutes() === 0) return s.toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'});
+  return s.getDate() === e.getDate() || (e.getHours() + e.getMinutes() === 0) ? `${day(s)}, ${times}` : `${day(s)} ${clock(win.start)} – ${day(e)} ${clock(win.end)}`;
+}
+
+function message(text) {
+  $('msg').textContent = text;
+  if (!text) return;
+  for (const id of ['chart', 'times']) {
+    $(id).innerHTML = '';
+    $(id).setAttribute('height', 0);
+  }
+  $('axis').classList.remove('stuck');
+  geo = null;
+  hideTip();
+}
+
+let chartToken = 0;
+async function loadChart() {
+  const token = ++chartToken;
+  win = windowTimes();
+  const hours = Math.round((win.end - win.start) / 360) / 10, end = new Date(win.end * 1000);
+  const endsNextDay = end.getDate() !== sel.d && (end.getHours() > 0 || end.getMinutes() > 0);
+  $('span').textContent = (endsNextDay ? `Until ${clock(win.end)} the next day, ` : '') + fmt(hours, hours % 1 ? 1 : 0) + ' h';
+  $('wintext').textContent = windowText();
+  document.querySelectorAll('#last button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.h === lastHours));
+  if (!info) return;
+  if (!info.on) return message('The history is off. The Serial Monitor shows why.');
+  if (!info.clock) return message('The monitor is waiting for the internet time. The graphs appear once its clock is set.');
+  if (win.start >= now()) { points = []; return message('This time is still to come.'); }
+  $('res').textContent = 'Loading…';
+  try {
+    const p = await fetchRange(win.start, win.end);
+    if (token !== chartToken) return;
+    points = p;
+    drawChart();
+  } catch (e) {
+    if (token !== chartToken) return;
+    $('res').textContent = '';
+    message('Couldn’t reach the monitor. It tries again in a minute.');
+  }
+}
+
+function niceStep(x) {
+  const p = Math.pow(10, Math.floor(Math.log10(x)));
+  for (const f of [1, 2, 2.5, 5, 10]) if (f * p >= x) return f * p;
+}
+
+function drawChart() {
+  const svg = $('chart'), act = SERIES.filter(s => show[s.key]);
+  hideTip();
+  geo = null;
+  const kinds = [...new Set(points.map(p => p.r))].sort((a, b) => a - b);
+  const desc = kinds.map(r => LEVEL_NAMES[r]).join(' and ');
+  $('res').textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
+  if (!act.length) return message('Choose at least one value to show.');
+  if (!points.length) return message('No values stored for this time.');
+  message('');
+
+  const W = $('wrap').clientWidth, narrow = W < 520, L = narrow ? 38 : 46, R = 10, PH = narrow ? 100 : 124, G = 42, T0 = 22;
+  const B = T0 + act.length * (PH + G) - G, H = B + 6;  // B = bottom of the last graph
+  const X = t => L + (t - win.start) / (win.end - win.start) * (W - L - R);
+  let o = '';
+  act.forEach((s, i) => {
+    const top = T0 + i * (PH + G), k = s.key, vals = [];
+    for (const p of points) if (p[k] != null) vals.push(p[k]);
+    o += `<text class="pl" x="${L}" y="${top - 9}">${s.name}${s.unit ? ` (${s.unit})` : ''}</text>`;
+    if (k === 'voc' && points.some(p => p.vl && p.voc != null)) {  // key for the lighter shade, after the name
+      o += `<line class="ln s-vocl" x1="${L + 76}" x2="${L + 94}" y1="${top - 13}" y2="${top - 13}"/><text x="${L + 100}" y="${top - 9}">still learning</text>`;
+    }
+    if (!vals.length) {
+      o += `<text x="${L}" y="${top + PH / 2}">No values</text>`;
+      return;
+    }
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < s.minRange) { const mid = (hi + lo) / 2; lo = mid - s.minRange / 2; hi = mid + s.minRange / 2; }
+    const step = niceStep((hi - lo) / 4), dec = (String(+step.toFixed(6)).split('.')[1] || '').length;
+    lo = Math.floor(lo / step) * step;
+    hi = Math.ceil(hi / step) * step;
+    const Y = v => (top + PH - (v - lo) / (hi - lo) * PH).toFixed(1), px = p => X(p.m).toFixed(1);
+    for (let v = lo; v <= hi + step / 2; v += step) {
+      o += `<line class="gl" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 6}" y="${+Y(v) + 4}" text-anchor="end">${fmt(v, dec)}</text>`;
+    }
+    const lims = live && {co2: live.limits, voc: live.vocLimits}[k];
+    if (lims) for (const lim of lims) if (lim > lo && lim < hi) o += `<line class="lim" x1="${L}" x2="${W - R}" y1="${Y(lim)}" y2="${Y(lim)}"/>`;
+
+    // Lines break where values are missing for more than 2.5 periods
+    const runs = [];
+    let run = [];
+    for (const p of points) {
+      const prev = run[run.length - 1];
+      if (p[k] == null || (prev && p.t - prev.t > Math.max(p.r, prev.r) * 150)) { if (run.length) runs.push(run); run = []; }
+      if (p[k] != null) run.push(p);
+    }
+    if (run.length) runs.push(run);
+    // The VOC line is drawn in a lighter shade where the algorithm was still learning
+    for (const r of runs) {
+      const parts = [];
+      let part = [r[0]];
+      for (let i = 1; i < r.length; i++) {
+        if (k === 'voc' && r[i].vl !== r[i - 1].vl) {
+          if (part.length > 1) parts.push(part);
+          part = [r[i - 1]];  // joins the two shades without a gap
+        }
+        part.push(r[i]);
+      }
+      parts.push(part);
+      for (const q of parts) {
+        const cls = k === 'voc' && q[q.length - 1].vl ? 'vocl' : k;
+        o += `<path class="ln s-${cls}" d="M${q.map(p => px(p) + ' ' + Y(p[k])).join('L')}${q.length === 1 ? 'l0 0' : ''}"/>`;
+      }
+    }
+  });
+
+  o += `<line id="cross" y1="${T0 - 4}" y2="${B + 4}"/>`;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+  svg.innerHTML = o;
+
+  // Time labels in their own strip below the graphs. It stays at the bottom of the screen
+  // until the end of the graphs scrolls up to it. Every label is centred on its time, at
+  // even steps of 10 min to 12 h, as many as fit ("00:00" plus a gap = 50 px).
+  const AH = 24, span = win.end - win.start, fit = Math.max(2, Math.floor((W - L - R) / 50));
+  const step = [600, 900, 1800, 3600, 7200, 10800, 21600, 43200].find(s => span / s <= fit) || 43200;
+  const offset = -new Date(win.start * 1000).getTimezoneOffset() * 60;
+  let a = '';
+  for (let t = Math.ceil((win.start + offset) / step) * step - offset; t <= win.end; t += step) {
+    const d = new Date(t * 1000), midnight = t > win.start && d.getHours() === 0 && d.getMinutes() === 0;
+    a += `<text x="${X(t).toFixed(1)}" y="16" text-anchor="middle"${midnight ? ' class="pl"' : ''}>${midnight ? d.toLocaleDateString([], {weekday: 'short'}) : clock(t)}</text>`;
+  }
+  const times = $('times');
+  times.setAttribute('viewBox', `0 0 ${W} ${AH}`);
+  times.setAttribute('height', AH);
+  times.innerHTML = a;
+  geo = {L, R, W, X, act};
+  markStuck();
+}
+
+// A line above the time labels while they stand in for the end of the graphs further down
+function markStuck() {
+  const axis = $('axis');
+  axis.classList.toggle('stuck', !!geo && axis.getBoundingClientRect().bottom < $('wrap').getBoundingClientRect().bottom - 1);
+}
+
+function showTip(e) {
+  if (!geo || !points.length) return;
+  ptr = {clientX: e.clientX, clientY: e.clientY, pointerType: e.pointerType};
+  const r = $('wrap').getBoundingClientRect();
+  const x = e.clientX - $('chart').getBoundingClientRect().left;
+  if (x < geo.L - 4 || x > geo.W - geo.R + 4 || e.clientY < r.top || e.clientY > r.bottom) return hideTip();
+  const t = win.start + (x - geo.L) / (geo.W - geo.L - geo.R) * (win.end - win.start);
+  let i = 0, j = points.length - 1;
+  while (i < j) { const mid = (i + j) >> 1; if (points[mid].m < t) i = mid + 1; else j = mid; }
+  if (i > 0 && Math.abs(points[i - 1].m - t) < Math.abs(points[i].m - t)) i--;
+  const p = points[i];
+  if (Math.abs(p.m - t) > p.r * 90) return hideTip();
+
+  const cx = geo.X(p.m), cross = $('cross');
+  cross.setAttribute('x1', cx);
+  cross.setAttribute('x2', cx);
+  cross.style.display = 'block';
+  const twoDays = new Date(win.start * 1000).getDate() !== new Date((win.end - 1) * 1000).getDate();
+  let h = `<div class="tt">${twoDays ? dateText(p.t, {weekday: 'short'}) + ' ' : ''}${clock(p.t)}${p.r > 1 ? '–' + clock(p.t + p.r * 60) : ''}</div>`;
+  for (const s of geo.act) {
+    const v = p[s.key];
+    const learning = s.key === 'voc' && v != null && p.vl;
+    h += `<div><i class="sq b-${learning ? 'vocl' : s.key}"></i>${s.name} <b>${fmt(v, s.dec)}</b> ${v == null ? '' : s.unit}${learning ? 'still learning' : ''}`;
+    h += '</div>';
+  }
+  const tip = $('tip');
+  tip.innerHTML = h;
+  tip.style.display = 'block';
+  const w = tip.offsetWidth, th = tip.offsetHeight, y = e.clientY - r.top;
+  tip.style.left = (cx + 14 + w > geo.W ? Math.max(0, cx - 14 - w) : cx + 14) + 'px';
+  // Next to the mouse, or above the finger, and always inside the part of the graphs on screen
+  const lo = Math.max(0, 8 - r.top), hi = $('axis').getBoundingClientRect().top - r.top - th - 6;
+  tip.style.top = Math.max(lo, Math.min(hi, e.pointerType === 'touch' ? y - th - 36 : y - th / 2)) + 'px';
+}
+
+function hideTip() {
+  $('tip').style.display = 'none';
+  const cross = $('cross');
+  if (cross) cross.style.display = 'none';
+}
+
+// ---------- Download ----------
+
+// Start of the time a level keeps (the monitor deletes older files)
+function keptFrom(res) {
+  const days = info.keepDays[{1: 'm1', 5: 'm5'}[res]];
+  return days ? Math.floor(now() / DAY - days) * DAY : 0;
+}
+
+// Finest level that still keeps the start date. The monitor's days are UTC days,
+// so a local day may begin up to a day earlier.
+function bestLevel(start) {
+  return start + DAY > keptFrom(1) ? 1 : 5;
+}
+
+function toCsv(rows) {
+  // The browser's number format, so Excel splits the columns (22,5 and ; in German, for example)
+  const comma = (1.5).toLocaleString().includes(','), sep = comma ? ';' : ',';
+  const num = (v, d) => v == null ? '' : comma ? v.toFixed(d).replace('.', ',') : v.toFixed(d);
+  const local = t => { const d = new Date(t * 1000); return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const utc = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  const cols = [['co2_ppm', 'co2', 0], ['temperature_c', 'tmp', 2], ['humidity_pct', 'hum', 2], ['pressure_hpa', 'pres', 1], ['voc_index', 'voc', 0]];
+  const lines = [['time_local', 'time_utc', ...cols.map(c => c[0]), 'voc_learning'].join(sep)];
+  for (const p of rows) lines.push([local(p.t), utc(p.t), ...cols.map(c => num(p[c[1]], c[2])), p.voc == null ? '' : p.vl ? 1 : 0].join(sep));
+  return lines.join('\r\n') + '\r\n';
+}
+
+function saveFile(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type: 'text/csv'}));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function setDownloadDates() {
+  // How far back the two finer levels go, as set in the monitor's firmware
+  const back = d => d >= 730 ? `${Math.round(d / 365.25)} years` : `${d} days`;
+  for (const res of [1, 5]) {
+    const days = info.keepDays[{1: 'm1', 5: 'm5'}[res]];
+    const name = LEVEL_NAMES[res];
+    $('dlres' + res).textContent = name.charAt(0).toUpperCase() + name.slice(1) + (days ? ` (last ${back(days)})` : '');
+  }
+  const t = new Date(), oldest = oldestData(), min = oldest ? isoDate(new Date(oldest * 1000)) : '';
+  for (const id of ['dlfrom', 'dlto']) {
+    $(id).max = isoDate(t);
+    $(id).min = min;
+  }
+  if (!$('dlto').value) {
+    $('dlto').value = isoDate(t);
+    const from = isoDate(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 6));
+    $('dlfrom').value = min && from < min ? min : from;
+  }
+}
+
+async function download() {
+  const note = $('dlnote'), fail = text => { note.textContent = text; note.className = 'hint err'; };
+  note.className = 'hint';
+  const a = $('dlfrom').value, b = $('dlto').value;
+  if (!a || !b) return fail('Choose a start and an end date.');
+  if (a > b) return fail('The start date must be on or before the end date.');
+  if (!info || !info.on || !info.clock) return fail('The monitor has no stored values yet.');
+  const [ay, am, ad] = a.split('-').map(Number), [by, bm, bd] = b.split('-').map(Number);
+  const start = dayStart(ay, am - 1, ad), end = dayStart(by, bm - 1, bd + 1);
+  const choice = $('dlres').value, res = choice === 'best' ? bestLevel(start) : +choice;
+  if (start + DAY <= keptFrom(res)) return fail(`The ${LEVEL_NAMES[res]} only go back to ${dateText(keptFrom(res))}. Choose a later start date or less detail.`);
+
+  const chunk = {1: DAY, 5: 14 * DAY}[res], total = Math.ceil((end - start) / chunk), rows = [];
+  $('dl').disabled = true;
+  try {
+    for (let t = start, i = 1; t < end; t += chunk, i++) {
+      note.textContent = `Loading part ${i} of ${total}…`;
+      for (const p of await getRecords(res, t, Math.min(t + chunk, end))) rows.push(p);
+    }
+  } catch (e) {
+    return fail('Couldn’t reach the monitor. Try again.');
+  } finally {
+    $('dl').disabled = false;
+  }
+  if (!rows.length) return fail('No values stored between these dates.');
+  const name = `co2_${a}_${b}_${res}min.csv`;
+  saveFile(name, toCsv(rows));
+  note.textContent = `Saved ${name}, ${fmt(rows.length, 0)} rows of ${LEVEL_NAMES[res]}.`;
+}
+
+// ---------- Start ----------
+
+function setup() {
+  const showTheme = () => document.querySelectorAll('#theme button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === themeChoice));
+  document.querySelectorAll('#theme button').forEach(b => b.onclick = () => {
+    themeChoice = b.dataset.v;
+    try { localStorage.setItem('theme', themeChoice); } catch (e) {}
+    applyTheme();
+    showTheme();
+  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  showTheme();
+  $('sleep').onclick = toggleSleep;
+  $('bright').oninput = () => {
+    showBrightness(+$('bright').value, false);
+    sendBrightness('level=' + $('bright').value);
+  };
+  $('autobright').onclick = () => {
+    const on = $('autobright').getAttribute('aria-checked') !== 'true';
+    showBrightness(+$('bright').value, on);
+    sendBrightness(on ? 'auto=1' : 'level=' + $('bright').value);
+  };
+
+  for (let i = 0; i < 7; i++) $('wd').innerHTML += '<span>' + new Date(2024, 0, 1 + i).toLocaleDateString([], {weekday: 'short'}).slice(0, 2) + '</span>';
+  $('prev').onclick = () => moveMonth(-1);
+  $('next').onclick = () => moveMonth(1);
+  $('cal').onclick = e => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    selectDay(new Date(view.y, view.m, +b.dataset.d));
+    if (lastHours) $('from').value = $('to').value = '00:00';  // a day after "Last … h": the whole day
+    lastHours = 0;
+    loadChart();
+  };
+
+  const setRange = (from, to) => { $('from').value = from; $('to').value = to; lastHours = 0; loadChart(); };
+  $('whole').onclick = () => setRange('00:00', '00:00');
+  $('night').onclick = () => setRange('22:00', '08:00');
+  $('from').onchange = $('to').onchange = () => { lastHours = 0; loadChart(); };
+  document.querySelectorAll('#last button').forEach(b => b.onclick = () => showLast(+b.dataset.h));
+
+  document.querySelectorAll('#toggles .chip').forEach(b => {
+    b.setAttribute('aria-pressed', show[b.dataset.s]);
+    b.onclick = () => {
+      show[b.dataset.s] = !show[b.dataset.s];
+      b.setAttribute('aria-pressed', show[b.dataset.s]);
+      try { localStorage.setItem('show', JSON.stringify(show)); } catch (e) {}
+      if (geo || points.length) drawChart();
+    };
+  });
+
+  const wrap = $('wrap');
+  wrap.onpointermove = wrap.onpointerdown = showTip;
+  wrap.onpointerleave = () => { ptr = null; hideTip(); };
+  let resizeTimer;
+  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (geo) drawChart(); }, 150); });
+  // The mouse wheel moves the graphs under a resting mouse: move the box along with them
+  addEventListener('scroll', () => { markStuck(); if (ptr) showTip(ptr); }, {passive: true});
+
+  $('dl').onclick = download;
+  for (const id of ['dlfrom', 'dlto', 'dlres']) $(id).oninput = () => { $('dlnote').textContent = ''; };
+}
+
+async function start() {
+  setup();
+  drawCalendar();
+  loadLive();
+  setInterval(loadLive, 5000);
+  setInterval(showLive, 1000);
+  for (;;) {
+    try { info = await (await get('/api/info')).json(); break; } catch (e) {}
+    message('Couldn’t reach the monitor. Retrying…');
+    await sleep(5000);
+  }
+  setDownloadDates();
+  loadMonth();
+  loadChart();
+
+  // Every minute: follow new values while the graph shows the current time.
+  // "Last … h" moves along, so it keeps ending now.
+  let minutes = 0;
+  setInterval(async () => {
+    minutes++;
+    const clockWasSet = info.clock;
+    try { info = await (await get('/api/info')).json(); } catch (e) {}
+    if (!clockWasSet && info.clock) { setDownloadDates(); loadMonth(); }
+    else if (minutes % 10 === 0) loadMonth();
+    if (lastHours) showLast(lastHours);
+    else if (win.end > now() - 120 && win.start < now()) loadChart();
+  }, 60000);
+}
+
+start();
+</script>
+</body>
+</html>
