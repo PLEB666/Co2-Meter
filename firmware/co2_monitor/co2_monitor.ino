@@ -21,10 +21,12 @@
     always wakes up with the main screen.
   - The OLED switches off 30 s after the last button press. The button on GPIO2 wakes it,
     and every press starts the 30 s again. It fades in in 0.5 s.
-  - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 all the time, dimmed:
-    green -> yellow -> red. The VOC index doesn't change its colour (LED_SHOWS_VOC), but
-    from "VENTILATE" on (LED_BREATH_FROM_VOC) the LED slowly breathes: dims and brightens
-    again every 3 s, until the VOC index has been lower again for a minute. The LED has
+  - The 8 mm LED (PL9823-F8 on GPIO18) shows the CO2 all the time, dimmed, with the
+    colours of the Technoline WL 1030's traffic light, but blended smoothly instead of in
+    steps: dark green -> light green -> orange -> red. The VOC index doesn't change its
+    colour (LED_SHOWS_VOC), but from "VENTILATE" on (LED_BREATH_FROM_VOC), and from
+    2000 ppm CO2 (LED_BREATH_FROM_CO2), the LED slowly breathes: dims and brightens
+    again every 3 s, until the value has been lower again for a minute. The LED has
     its own task, and while it breathes or fades it flicks between neighbouring steps
     (LED_DITHER), so it dims smoothly although it only uses its lowest 25 of 256 steps.
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
@@ -134,10 +136,12 @@ constexpr uint8_t BMP580_ADDRESS_A = 0x46;  // the two addresses its
 constexpr uint8_t BMP580_ADDRESS_B = 0x47;  // address jumper can choose
 constexpr uint8_t SGP40_ADDRESS = 0x59;
 
-// CO2 rating limits in ppm (shown in the top right corner of the display)
-constexpr uint16_t CO2_GOOD_BELOW = 800;
+// CO2 rating limits in ppm (shown in the top right corner of the display and on the web
+// page). The steps of the Technoline WL 1030's traffic light: dark green below 600, light
+// green to 1000, orange (ventilate) to 1500, then red (ventilate now).
+constexpr uint16_t CO2_GOOD_BELOW = 600;
 constexpr uint16_t CO2_OK_BELOW = 1000;
-constexpr uint16_t CO2_VENTILATE_BELOW = 2000;
+constexpr uint16_t CO2_VENTILATE_BELOW = 1500;
 
 // VOC index rating limits (shown at the bottom of the display), with the same four
 // ratings. The index is relative: 100 = the room's usual air over the last day, more =
@@ -162,6 +166,9 @@ constexpr bool LED_SHOWS_VOC = false;
 // shows at a glance without turning the CO2 colour red. VOC_OK_BELOW = from "VENTILATE"
 // on, the same point where the display's bottom line turns inverted. 0 = never breathes.
 constexpr uint16_t LED_BREATH_FROM_VOC = VOC_OK_BELOW;
+// From this CO2 value (ppm) on the LED breathes as well, like the WL 1030, whose icons
+// flash above 2000 ppm. The LED is red there anyway. 0 = never breathes for CO2.
+constexpr uint16_t LED_BREATH_FROM_CO2 = 2000;
 // One breath (bright -> dim -> bright) takes this long (ms)
 constexpr uint32_t LED_BREATH_TIME_MS = 3000;
 // How far a breath dims the LED, in % steps of the brightness (as on the web page's
@@ -171,8 +178,9 @@ constexpr uint32_t LED_BREATH_TIME_MS = 3000;
 // dark for a moment.
 constexpr float LED_BREATH_DEPTH = 40;
 // The LED goes on breathing this long after the VOC index has dropped below
-// LED_BREATH_FROM_VOC, and then stops at the end of a breath, so a VOC index that wavers
-// around the limit doesn't start and stop it every few seconds
+// LED_BREATH_FROM_VOC (and the CO2 below LED_BREATH_FROM_CO2), and then stops at the end
+// of a breath, so a value that wavers around the limit doesn't start and stop it every
+// few seconds
 constexpr uint32_t LED_BREATH_HOLD_MS = 60000;
 // The LED has 256 steps per colour, but it is so bright that it only uses the lowest
 // 1-25 of them (LED_BRIGHTNESS_MIN/MAX below), at 35 % brightness 1-3. A breath or a fade
@@ -194,12 +202,21 @@ constexpr bool BOARD_LED_TOO = false;
 struct LedColour {
   uint8_t r, g, b;
 };
-// The colour changes smoothly: green below CO2_GOOD_BELOW, yellow at CO2_OK_BELOW,
-// red from CO2_VENTILATE_BELOW (for the VOC index its own limits). Yellow has less
-// green because the green LED is brighter.
-constexpr LedColour LED_GREEN = {0, 255, 0};
-constexpr LedColour LED_YELLOW = {255, 160, 0};
-constexpr LedColour LED_RED = {255, 0, 0};
+// The four colours of the WL 1030's traffic light, one for each rating step, at full
+// brightness. The green LED looks brighter than the red one, so light green has only a
+// little red and orange only a little green.
+constexpr LedColour LED_COLOURS[4] = {
+    {0, 255, 0},    // dark green (GOOD)
+    {100, 255, 0},  // light green (OK): yellowish green
+    {255, 60, 0},   // orange (VENTILATE)
+    {255, 0, 0},    // red (BAD AIR)
+};
+// Where each colour is pure: the middle of its step. In between the LED blends from one
+// colour into the next, so it never jumps, and at each limit it is halfway between the
+// two (at 1000 ppm between light green and orange). Below the first point dark green,
+// above the last red. Move these with the limits.
+constexpr uint16_t CO2_COLOUR_AT[4] = {500, 800, 1250, 1750};  // 400-600, 600-1000, 1000-1500, 1500-2000
+constexpr uint16_t VOC_COLOUR_AT[4] = {125, 200, 325, 450};    // 100-150, 150-250, 250-400, 400-500
 
 // ---------- Brightness ----------
 // One level, 0-100 %, sets the display and the LED together. On Auto the light sensor
@@ -341,7 +358,7 @@ Fade ledLevel;                   // the LED's brightness now, in % (FADE_OFF_LEV
 Fade ledRed, ledGreen, ledBlue;  // its colour now, at full brightness (0-255 each)
 LedColour ledSent = {0, 0, 0};   // what was last sent to the LED
 bool ledResend = true;           // send it even if it looks the same (at the start)
-bool ledBreathing = false;       // it breathes because the VOC index is high (ledBreathDip())
+bool ledBreathing = false;       // it breathes because the VOC index or the CO2 is high (ledBreathDip())
 // While the Serial command "led" runs: the colour it shows (0xRRGGBB) instead of the air
 // quality colour. One 32-bit value, so the LED task never reads half of a new colour.
 constexpr uint32_t NO_LED_TEST = 0xFFFFFFFF;
@@ -475,20 +492,22 @@ LedColour blendColour(LedColour from, LedColour to, float share) {
           (uint8_t)lroundf(from.b + (to.b - from.b) * share)};
 }
 
-// Where a value sits on the LED's colour scale: 0 = green (below the "good" limit),
-// 1 = yellow (at the "OK" limit), 2 = red (from the "ventilate" limit), smoothly between
-float colourPosition(uint16_t value, const uint16_t limits[3]) {
-  if (value < limits[0]) return 0;
-  if (value < limits[1]) return (float)(value - limits[0]) / (limits[1] - limits[0]);
-  if (value < limits[2]) return 1 + (float)(value - limits[1]) / (limits[2] - limits[1]);
-  return 2;
+// Where a value sits on the LED's colour scale: 0 = dark green, 1 = light green,
+// 2 = orange, 3 = red, smoothly between. colourAt: where each colour is pure.
+float colourPosition(uint16_t value, const uint16_t colourAt[4]) {
+  if (value <= colourAt[0]) return 0;
+  for (uint8_t i = 1; i < 4; i++) {
+    if (value < colourAt[i]) return i - 1 + (float)(value - colourAt[i - 1]) / (colourAt[i] - colourAt[i - 1]);
+  }
+  return 3;
 }
 
 // The colour for CO2, or for whichever is worse, CO2 or the VOC index (LED_SHOWS_VOC)
 LedColour airColour() {
-  float position = co2Ppm > 0 ? colourPosition(co2Ppm, CO2_LIMITS) : 0;
-  if (LED_SHOWS_VOC && vocIndex > 0) position = max(position, colourPosition(vocIndex, VOC_LIMITS));
-  return position <= 1 ? blendColour(LED_GREEN, LED_YELLOW, position) : blendColour(LED_YELLOW, LED_RED, position - 1);
+  float position = co2Ppm > 0 ? colourPosition(co2Ppm, CO2_COLOUR_AT) : 0;
+  if (LED_SHOWS_VOC && vocIndex > 0) position = max(position, colourPosition(vocIndex, VOC_COLOUR_AT));
+  uint8_t from = min((uint8_t)position, (uint8_t)2);  // the colour below it (red = 2 -> 3, all the way)
+  return blendColour(LED_COLOURS[from], LED_COLOURS[from + 1], position - from);
 }
 
 // One colour of the LED as a whole step, 0-255. value: what it should be, with a fraction.
@@ -533,18 +552,20 @@ void pl9823Write(uint8_t r, uint8_t g, uint8_t b) {
 
 float brightnessBetween(uint8_t min, uint8_t max, float level);  // in "Brightness" below
 
-// How much darker the LED is at this moment because it breathes for a high VOC index, in
-// % steps of the brightness (0 = not at all). A breath starts and ends at 0, at its
-// brightest, and follows a cosine in between, so starting and stopping never jump.
+// How much darker the LED is at this moment because it breathes for a high VOC index or a
+// very high CO2 value, in % steps of the brightness (0 = not at all). A breath starts and
+// ends at 0, at its brightest, and follows a cosine in between, so starting and stopping
+// never jump.
 float ledBreathDip() {
   static uint32_t breathStart = 0;  // millis() when the breathing began
   static uint32_t lastPhase = 0;    // where in a breath it was at the last call (ms)
-  static uint32_t vocHighAt = 0;    // millis() when the VOC index was last at the limit or above
+  static uint32_t highAt = 0;       // millis() when the VOC index or the CO2 was last at its limit or above
   uint32_t now = millis();
-  bool vocHigh = LED_BREATH_FROM_VOC > 0 && vocIndex >= LED_BREATH_FROM_VOC;
-  if (vocHigh) vocHighAt = now;
+  bool high = (LED_BREATH_FROM_VOC > 0 && vocIndex >= LED_BREATH_FROM_VOC) ||
+              (LED_BREATH_FROM_CO2 > 0 && co2Ppm >= LED_BREATH_FROM_CO2);
+  if (high) highAt = now;
   if (!ledBreathing) {
-    if (!vocHigh) return 0;
+    if (!high) return 0;
     ledBreathing = true;
     breathStart = now;
     lastPhase = 0;
@@ -552,7 +573,7 @@ float ledBreathDip() {
   uint32_t phase = (now - breathStart) % LED_BREATH_TIME_MS;
   bool breathEnded = phase < lastPhase;  // a new breath has just begun
   lastPhase = phase;
-  if (breathEnded && !vocHigh && now - vocHighAt >= LED_BREATH_HOLD_MS) {
+  if (breathEnded && !high && now - highAt >= LED_BREATH_HOLD_MS) {
     ledBreathing = false;
     return 0;
   }
@@ -561,7 +582,7 @@ float ledBreathDip() {
 
 // Every LED_FRAME_MS, in the LED's own task (ledTask()). The LED fades to the air quality
 // colour at the current brightness, and down to off until the first value arrives and in
-// sleep mode. While the VOC index is high it breathes (ledBreathDip()). While it breathes
+// sleep mode. While the VOC index or the CO2 is high it breathes (ledBreathDip()). While it breathes
 // or fades it is dithered (LED_DITHER). It is only sent a colour when that has changed.
 void updateLed() {
   bool on = (co2Ppm > 0 || (LED_SHOWS_VOC && vocIndex > 0)) && !sleepMode;
@@ -1221,8 +1242,8 @@ void printVoc() {
     Serial.printf("VOC index: none yet, the first comes 45 s after the algorithm started (raw signal %u)\n", vocRaw);
   }
   if (ledBreathing) {
-    Serial.printf("LED: breathes, the VOC index is (or was in the last %lu s) %u or more\n",
-                  (unsigned long)(LED_BREATH_HOLD_MS / 1000), LED_BREATH_FROM_VOC);
+    Serial.printf("LED: breathes, the VOC index is %u or more or the CO2 %u ppm or more (now or in the last %lu s)\n",
+                  LED_BREATH_FROM_VOC, LED_BREATH_FROM_CO2, (unsigned long)(LED_BREATH_HOLD_MS / 1000));
   }
   uint32_t left = vocLearnSecondsLeft();
   if (left > 0) {
