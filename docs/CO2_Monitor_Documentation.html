@@ -105,7 +105,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.52: the web page mockup is one simple HTML file</span>
+    <span><b>Version</b> 0.53: the web page mockup is online on GitHub Pages</span>
     <span><b>Updated</b> 15 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
@@ -1124,11 +1124,11 @@ Not saved yet (in RAM): 2 minutes, next save in 505 s
   </table>
 
   <h3>8.7 Mockup of the page</h3>
-  <p><code>docs/web_page_mockup.html</code> shows how the monitor's page looks, <b>without a monitor</b>: one HTML file with made-up values. Open it in any browser, for example with a double-click. A dashed box at the top says it is a mockup.</p>
+  <p><code>docs/web_page_mockup.html</code> shows how the monitor's page looks, <b>without a monitor</b>: one HTML file with made-up values. Open it in any browser, for example with a double-click, or online at <b><code>https://pleb666.github.io/Co2-Meter/web_page_mockup.html</code></b>. A small dashed box at the top says <i>Mockup, test values</i>.</p>
   <ul>
     <li><b>Values:</b> 7 days of 1-minute values that follow a simple daily rhythm (CO<sub>2</sub> high at night, warmest at 16:00, a VOC peak at 19:00) with a little noise. The live values change a bit every 5&nbsp;s. Everything on the page can be tried: the graphs and the values box, the calendar, <i>Last 1-24 h</i> and the download. The sleep switch and the brightness only change the mockup.</li>
     <li><b>Made by</b> <code>make_web_page.ps1</code> from <code>index.html</code> and <code>web/mockup.js</code>, which answers the page's requests in the browser. So the mockup always matches the real page: run the script after a change, then commit and push.</li>
-    <li><b>On GitHub:</b> GitHub shows an HTML file as text. To open it there as a page, GitHub Pages has to be switched on once (repository <i>Settings</i>, <i>Pages</i>: branch <code>main</code>, folder <code>/docs</code>). It is then at <code>https://pleb666.github.io/Co2-Meter/web_page_mockup.html</code> for anyone with the link (the repository is public). The empty file <code>docs/.nojekyll</code> makes GitHub Pages serve the files as they are.</li>
+    <li><b>Online:</b> GitHub Pages is switched on for the repository (<i>Settings</i>, <i>Pages</i>: branch <code>main</code>, folder <code>/docs</code>), so the link above works for anyone who has it (the repository is public). A push shows up there after about a minute. The empty file <code>docs/.nojekyll</code> makes GitHub Pages serve the files as they are.</li>
   </ul>
 </section>
 
@@ -1919,6 +1919,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.53</td><td>15 Nov 2026</td><td><b>Mockup online.</b> GitHub Pages is switched on, so the mockup opens at <code>https://pleb666.github.io/Co2-Meter/web_page_mockup.html</code>. The note at its top now only says <i>Mockup, test values</i>. Section 8.7 updated.</td></tr>
     <tr><td>0.52</td><td>15 Nov 2026</td><td><b>Simpler mockup, one file.</b> The mockup is now <code>docs/web_page_mockup.html</code> (was <code>docs/mockup/index.html</code>) and only shows how the page looks: 7 days of values on a simple daily rhythm with a little noise, and live values that change a bit every 5&nbsp;s. The room simulation, the gaps and the request limits are gone (<code>mockup.js</code> 240 &rarr; 83 lines). GitHub Pages is not switched on yet. Section 8.7 rewritten, sections 1 and 8.6 updated.</td></tr>
     <tr><td>0.51</td><td>15 Nov 2026</td><td><b>Mockup of the web page for testing.</b> A copy of the page with made-up values runs without a monitor, on any PC or phone: <code>https://pleb666.github.io/Co2-Meter/mockup/</code> (GitHub Pages, new section 8.7). <code>web/mockup.js</code> answers the page's requests in the browser from a small room simulation with 60 days of history; <code>make_web_page.ps1</code> now also writes <code>docs/mockup/index.html</code>, so the mockup always matches the page. Useful for trying changes like the values box in 0.50 on a phone. The firmware is unchanged. Sections 1 (project files) and 8.6 updated.</td></tr>
     <tr><td>0.50</td><td>15 Nov 2026</td><td><b>Web page: the values box over the graphs stays on screen.</b> The small box with the time and the values was always drawn at the top of the CO<sub>2</sub> graph, so once the page was scrolled down to a lower graph it was out of sight. It now follows the mouse up and down (next to it), or sits just above the finger on a phone, and never leaves the part of the graphs on screen or covers the time labels. When the mouse wheel scrolls the page under a mouse that is held still, the box moves along. Page 14.7&nbsp;KB compressed (43&nbsp;KB).</td></tr>

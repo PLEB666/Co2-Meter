@@ -82,7 +82,7 @@
     const note = document.createElement('div');
     note.className = 'card';
     note.style.cssText = 'margin-bottom:12px;padding:8px 14px;font-size:13px;color:var(--sub);border-style:dashed';
-    note.innerHTML = '<b style="color:var(--ink)">Mockup</b> with made-up values: this is how the monitor\'s page looks. Nothing is sent anywhere.';
+    note.textContent = 'Mockup, test values';
     document.querySelector('main').prepend(note);
   });
 })();
