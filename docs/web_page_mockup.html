@@ -11,7 +11,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:,">
+<link id="icon" rel="icon" href="data:,">
 <title>CO2 monitor mockup</title>
 <script>
 // Light or dark before anything is drawn: the saved choice, otherwise the device setting
@@ -321,6 +321,8 @@ const SERIES = [
   {key: 'pres', name: 'Air pressure', unit: 'hPa', dec: 1, minRange: 3},
 ];
 const RATINGS = [['Good', 'good'], ['OK', 'ok'], ['Ventilate', 'vent'], ['Bad air', 'bad']];
+// Tab icon colour for each CO2 rating (the LED's steps), grey while there is no live value
+const ICON_COLOURS = ['#1e7a3a', '#5aa832', '#e8890c', '#d23a2e'], ICON_GREY = '#8a919c';
 const LEVEL_NAMES = {1: '1-minute values', 5: '5-minute values'};
 
 let info = null;              // /api/info: state of the history
@@ -432,17 +434,31 @@ function showBrightness(level, auto) {
   $('brightbox').classList.toggle('auto', auto);
 }
 
-// Rating badge for a value, with the limits good below, OK below, ventilate below
+// Rating badge for a value, with the limits good below, OK below, ventilate below.
+// Returns the rating (0 good ... 3 bad air), -1 without a value.
 function rate(b, value, limits) {
   if (value == null || !limits) {
     b.textContent = '';
     b.className = 'badge';
-    return;
+    return -1;
   }
   let i = 0;
   while (i < 3 && value >= limits[i]) i++;
   b.textContent = RATINGS[i][0];
   b.className = 'badge ' + RATINGS[i][1];
+  return i;
+}
+
+// Tab icon: a "CO2" badge in the colour of the CO2 rating, grey for -1
+let iconColour = '';
+function showIcon(rating) {
+  const c = rating >= 0 ? ICON_COLOURS[rating] : ICON_GREY;
+  if (c === iconColour) return;
+  iconColour = c;
+  $('icon').href = 'data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="${c}"/>` +
+    '<g fill="#fff" font-family="Arial,Helvetica,sans-serif" font-weight="700" text-anchor="middle">' +
+    '<text x="13" y="21" font-size="13">CO</text><text x="27" y="25" font-size="9">2</text></g></svg>');
 }
 
 function showLive() {
@@ -462,7 +478,7 @@ function showLive() {
   $('bright').disabled = $('autobright').disabled = !(ok && live.brightness != null);
   // Not while the slider is being moved, so it doesn't jump back under the finger
   if (ok && live.brightness != null && !brightSending && Date.now() - brightMoved > 2000) showBrightness(live.brightness, live.autoBrightness);
-  if (!live) return;
+  if (!live) { showIcon(-1); return; }
 
   const warm = live.warmup > 0;
   $('co2').textContent = fmt(warm ? null : live.co2, 0);
@@ -471,12 +487,14 @@ function showLive() {
   $('prs').textContent = fmt(warm ? null : live.pressure, 0);
   $('voc').textContent = fmt(warm ? null : live.voc, 0);
   const b = $('badge');
+  let rating = -1;
   if (warm) {
     b.textContent = 'Warming up, ' + live.warmup + ' s';
     b.className = 'badge';
   } else {
-    rate(b, live.co2, live.limits);
+    rating = rate(b, live.co2, live.limits);
   }
+  showIcon(ok ? rating : -1);
   rate($('vocbadge'), warm ? null : live.voc, live.vocLimits);
   // The VOC index needs a few hours to learn the room's usual air after a fresh start
   let note = '';
