@@ -105,8 +105,8 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.54: the web page has a tab icon in the colour of the CO<sub>2</sub> rating</span>
-    <span><b>Updated</b> 17 Nov 2026</span>
+    <span><b>Version</b> 0.55: power consumption measured, 0.4-0.5&nbsp;W</span>
+    <span><b>Updated</b> 18 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
 </header>
@@ -1561,6 +1561,27 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li>Each Adafruit board has two connectors, so modules can be chained. The connectors are small; pull them out by the plug, not the wires.</li>
     <li>A plug with its cable bent as tight as it goes needs about 4&nbsp;mm in front of the socket (measured). The lengths in the case: section 13, <i>Cables and the I&sup2;C chain</i>.</li>
   </ul>
+
+  <div style="break-inside: avoid">
+  <h3 id="power">Power consumption</h3>
+  <p><b>Measured</b> on 18 Nov 2026 at the USB supply, with the whole monitor running on the Waveshare board: <b>0.4-0.5&nbsp;W</b>, so 80-100&nbsp;mA at 5&nbsp;V. The reading moves smoothly up and down between the two values, one round in about 3-4&nbsp;s.</p>
+  <table>
+    <tr><th style="width:24%">Part (at 3.3&nbsp;V)</th><th style="width:16%">Current</th><th>Why</th></tr>
+    <tr><td>ESP32-C6</td><td>about 40-50&nbsp;mA</td><td>The processor runs all the time at 160&nbsp;MHz: 27-38&nbsp;mA. Wi-Fi is in modem sleep, the ESP32's default: the radio wakes for the router's beacons and for each request, and draws 78&nbsp;mA while it listens (ESP32-C6-WROOM-1 datasheet).</td></tr>
+    <tr><td>SCD-41</td><td>15&nbsp;mA on average</td><td>One measurement every 5&nbsp;s, with short pulses of up to 175&nbsp;mA (SCD4x datasheet).</td></tr>
+    <tr><td>SGP40</td><td>about 3&nbsp;mA</td><td>Its heated sensing layer, measured every second.</td></tr>
+    <tr><td>Power LEDs, display, 8&nbsp;mm LED</td><td>a few mA</td><td>The power LEDs draw about 1&nbsp;mA each, taped or not. The display is off except for 30&nbsp;s after a button press. The LED uses at most step 25 of 255 (section 6, <i>Brightness</i>).</td></tr>
+    <tr><td><b>Together</b></td><td><b>about 65-75&nbsp;mA</b></td><td>Typical datasheet values, not measured one by one. The rest of the measured 80-100&nbsp;mA goes to the board's USB hub and USB-serial chips (CH334F, CH343P), the regulators on the breakouts and the spread in these values.</td></tr>
+  </table>
+  </div>
+  <p>The board's 3.3&nbsp;V regulator (SGM2212) is a linear one: the same current goes in at 5&nbsp;V as comes out at 3.3&nbsp;V. So about a third of the 0.45&nbsp;W only warms the regulator.</p>
+  <p><b>The 3-4&nbsp;s swing</b> most likely comes from the SCD-41: its lamp pulses during each 5&nbsp;s measurement and stays dark in between. A USB meter averages each reading over a while, so the pulses show as a smooth rise and fall. With the web page open, its request for new values every 5&nbsp;s (8.3) wakes the Wi-Fi in the same rhythm. The LED's breathing (3&nbsp;s) is too faint to show: a few mW at most. <b>To check:</b> close the web page and count the peaks for 30&nbsp;s. 6 peaks = a 5&nbsp;s cycle, the SCD-41.</p>
+  <table>
+    <tr><th style="width:24%">What it means</th><th></th></tr>
+    <tr><td>Running cost</td><td>About 4&nbsp;kWh a year (0.45&nbsp;W &times; 8760&nbsp;h), around &euro;1.50.</td></tr>
+    <tr><td>Heat in the case</td><td>Nearly all of the 0.45&nbsp;W ends up as heat inside the case, a third of it in the regulator. Once the case is closed, compare the SHT45 with another thermometer (section 9, step 5): if it reads high, the case warms it.</td></tr>
+    <tr><td>Power bank</td><td>A 10&nbsp;000&nbsp;mAh power bank gives about 30&nbsp;Wh at 5&nbsp;V: about 2.5-3 days. Some power banks switch off by themselves at such a low current.</td></tr>
+  </table>
 </section>
 
 <!-- ============================================================ 12 -->
@@ -1920,6 +1941,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.55</td><td>18 Nov 2026</td><td><b>Power consumption measured.</b> The whole monitor draws 0.4-0.5&nbsp;W from USB (80-100&nbsp;mA at 5&nbsp;V), moving smoothly between the two values every 3-4&nbsp;s. New part <i>Power consumption</i> at the end of section 11: where the current goes (datasheet values), why the reading swings (most likely the SCD-41's 5&nbsp;s cycle), running cost, heat in the case and power bank time. No firmware change.</td></tr>
     <tr><td>0.54</td><td>17 Nov 2026</td><td><b>Web page: tab icon.</b> The page had no icon (<code>&lt;link rel="icon" href="data:,"&gt;</code>, only so the browser doesn't ask the monitor for one). Now the tab shows a "CO<sub>2</sub>" badge whose colour follows the CO<sub>2</sub> rating: dark green, light green, orange or red, grey without a live value (section 8.3). The icon is a small SVG that the page draws itself (<code>showIcon()</code> in <code>index.html</code>), so the monitor needs no new address. <b>Costs</b> 472 bytes of program flash (firmware 1,214,240 bytes, 38&nbsp;%, page 15.2&nbsp;KB compressed, 44&nbsp;KB); fixed RAM unchanged (71,140 bytes), as the page stays in the flash; history storage unchanged. The mockup (8.7) has the icon too. Section 8.3 updated.</td></tr>
     <tr><td>0.53</td><td>15 Nov 2026</td><td><b>Mockup online.</b> GitHub Pages is switched on, so the mockup opens at <code>https://pleb666.github.io/Co2-Meter/web_page_mockup.html</code>. The note at its top now only says <i>Mockup, test values</i>. Section 8.7 updated.</td></tr>
     <tr><td>0.52</td><td>15 Nov 2026</td><td><b>Simpler mockup, one file.</b> The mockup is now <code>docs/web_page_mockup.html</code> (was <code>docs/mockup/index.html</code>) and only shows how the page looks: 7 days of values on a simple daily rhythm with a little noise, and live values that change a bit every 5&nbsp;s. The room simulation, the gaps and the request limits are gone (<code>mockup.js</code> 240 &rarr; 83 lines). GitHub Pages is not switched on yet. Section 8.7 rewritten, sections 1 and 8.6 updated.</td></tr>
