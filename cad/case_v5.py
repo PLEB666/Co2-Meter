@@ -4,7 +4,7 @@ Run from the project folder:
     cad\\.venv\\Scripts\\python.exe cad\\case_v5.py
 
 Writes cad/out/v5/:
-    base.step, lid.step   the files for the school's printer (one STEP per part, mm)
+    base.step, lid.step   the files to print (one STEP per part, mm; Bambu Studio reads them)
     *.stl                 meshes of every part, for Cura and the viewer
     viewer.html           open it in a browser to turn the model around
 
@@ -100,8 +100,11 @@ BACK_HANGING_Z = {}                         # index in BACK_CORNERS: lowest poin
 FRONT_BOSS_X = sum(CROSS_WALL[0] + CROSS_WALL[1]) / 4
 FRONT_BOSSES = [(FRONT_BOSS_X, Y_OUTER_IN + BOSS_INSET), (FRONT_BOSS_X, BAY_W - BOSS_INSET)]
 BOSSES = [(x + sx * BOSS_INSET, y + sy * BOSS_INSET) for x, y, sx, sy in BACK_CORNERS] + FRONT_BOSSES
-BOSS_PILOT, BOSS_HOLE_DEPTH = 1.8, 12.0     # drill to 2.5
-LID_PILOT = 2.5                             # drill to 3.2
+# Holes are printed to size, no drilling (21 Nov: the case is PLA from the X2D). Small printed holes come out
+# about 0.2 smaller than drawn, so each one is drawn 0.2 over the size it should have (the old drill size);
+# checked with the ESP32 and sensor-post test pieces. The names still say PILOT from the drilling plan.
+BOSS_PILOT, BOSS_HOLE_DEPTH = 2.7, 12.0     # comes out 2.5: M3 lid screws, self-tapping
+LID_PILOT = 3.4                             # comes out 3.2: the M3 screws pass through
 
 FOOT_D, FOOT_H = 12.7, 3.5
 FEET = [(x, y) for x in (X0 + 7.5, X1 - 7.5) for y in (Y0 + 7.5, Y1 - 7.5)]
@@ -112,7 +115,7 @@ BOARD_BACK_Y = DW_OUT - 6.0            # back face of the boards; standoffs betw
 STANDOFF_W = 7.0                       # 14 Nov: was 5.0; the SHT45 test piece cracked beside its screw holes
 NEAR_HOLE_W = 5.0                      # a post is only half of this wide on a side that faces a cable hole or the
                                        # column-j wall end: those stay where they were for 5 mm posts (post_x)
-STANDOFF_PILOT = 1.6                   # teardrop, drilled to 2.1 through the slot; M2.5 x 5 countersunk
+STANDOFF_PILOT = 2.3                   # teardrop, comes out 2.1; M2.5 x 5 countersunk (test piece posts_sht45)
 STANDOFF_PILOT_DEPTH = 5.0
 HOLE_IN = 2.54
 BOARD_Z = 7.0
@@ -193,9 +196,9 @@ ESP_HOLES = [(ESP_HOLE_IN, ESP_HOLE_IN), (ESP_HOLE_IN, ESP_W - ESP_HOLE_IN),
 # ESP_POST_OFF outward from the hole, away from the part under the board next to it: towards the long edge
 # at the antenna end (module), towards the back wall at the USB end (buttons, and the posts run 0.43 into
 # that wall). On that side a post reaches ESP_POST_D / 2 - ESP_POST_OFF = 1.7 from the hole, as the old
-# 3.4 neck did; 0.8 of plastic is left there around the 1.8 no-drill hole.
+# 3.4 neck did; 0.8 of plastic is left there around the 1.8 hole.
 ESP_POST_D, ESP_POST_OFF = 4.4, 0.5
-ESP_PILOT = 1.2
+ESP_PILOT = 1.8                        # comes out 1.6; M2 x 5 countersunk (test piece esp32_floor)
 ESP_ROW_Y = {"P1": ESP_Y0 + 1.25, "P2": ESP_Y0 + ESP_W - 1.25}
 HEADER_H, PIN_UP, JUMPER_L = 2.5, 6.0, 14.0
 USED_PINS = {"P1": (1, 12, 13, 14, 15),
@@ -273,7 +276,7 @@ OLED_MID_Z = (OLED_WIN[1] + OLED_WIN[3]) / 2
 # behind its lower ear and the lid's tab.
 OLED_SCREWS = [(oled_y(39.37), oled_z(bx)) for bx in (33.02, 2.54)]   # (y, z): lower, upper
 OLED_SPACER_W = 4.4                    # board front face to the front wall: 1.2 deep
-OLED_PILOT = 1.6                       # teardrop, drill to 2.1; 2.5 deep from the spacer face, 0.7 of the wall left
+OLED_PILOT = 2.3                       # teardrop, comes out 2.1; 2.5 deep from the spacer face, 0.7 of the wall left
 OLED_PILOT_END = L + 1.3
 
 # ---- VEML7700 right angle (5378), standing on its edge right next to the display: the edge with the
@@ -296,14 +299,14 @@ VEML_WINDOW_GAP = 0.3
 VEML_SOCKET_X = VEML_X0 + VEML_D / 2   # both sockets (top and bottom edge)
 VEML_SOCKET_Y = VEML_PARTS_Y + 1.48
 VEML_SCREWS = [(VEML_X0 + HOLE_IN, VEML_Z0 + z) for z in (HOLE_IN, VEML_W - HOLE_IN)]
-VEML_SCREW_HOLE = 2.7                  # M2.5 clearance, teardrop
+VEML_SCREW_HOLE = 2.9                  # M2.5 clearance, teardrop, comes out 2.7
 VEML_NOTCH_X = (VEML_SOCKET_X - 4.5, VEML_SOCKET_X + 1.5)   # pointed hole in the wall for the bottom socket's cable
 
 # ---- panel button, Berrybase 10130: as v4, at the display's middle + 7
 # y 38.5, near the light sensor: the LED's sleeve stays 1.7 from its sockets, the button nut 1.8 and the
 # LED rim 2.4 from its window
 BUTTON_Y, BUTTON_Z = 38.5, OLED_MID_Z + 7.0
-BUTTON_PILOT = 6.0                     # drill to 7.0 (M7 x 0.75)
+BUTTON_PILOT = 7.2                     # comes out 7.0 (M7 x 0.75)
 BUTTON = {"cap": (7.4, 1.7), "stem": (3.4, 3.8), "thread": (6.7, 6.3), "collar": (9.7, 2.4),
           "body": (7.9, 7.0), "lugs": 6.3, "washer": (9.3, 1.1), "nut": (10.1, 1.7)}   # (diameter, length)
 
@@ -312,13 +315,13 @@ LED_Y, LED_Z = BUTTON_Y, OLED_MID_Z - 7.0
 LED_D, LED_RIM_D, LED_RIM_T, LED_H = 8.0, 8.9, 1.0, 11.0
 LED_PROUD = 1.5
 LED_RIM_X = X1 + LED_PROUD - LED_H
-LED_PILOT = 7.5                        # drill to 8.0 through the wall and the sleeve
+LED_PILOT = 8.2                        # comes out 8.0, through the wall and the sleeve
 
 # ---- speaker (3885) under the lid, over the ESP32: as v4
 SPK_X, SPK_Y = 6.0, 6.5
 SPK_Z = LID_Z - 0.5 - 6.57
 SPK_HOLES = [(2.54, 2.54), (27.94, 2.54), (2.54, 34.29), (27.94, 34.29)]
-SPK_STANDOFF_D, SPK_PILOT = 4.5, 1.2
+SPK_STANDOFF_D, SPK_PILOT = 4.5, 1.8   # comes out 1.6; M2 x 6
 GRILLE_D = 1.8
 GRILLE = [(SPK_X + 15.39 + 4 * i, SPK_Y + 21.54 + 4 * j) for i in range(-3, 4) for j in range(-2, 3)]
 
@@ -547,7 +550,7 @@ def make_base():
     g = VEML_WINDOW_GAP
     base -= block(x_wall - 0.5, vp - g, VEML_Z0 + s0 - g, X1 + 1, vp + sh + g, VEML_Z0 + s1 + g)
 
-    # LED sleeve: stands on the floor behind the front wall; round hole (the printer's soluble support fills it)
+    # LED sleeve: stands on the floor behind the front wall; round hole, prints without support (check its top in the preview)
     base += block(LED_RIM_X + LED_RIM_T, LED_Y - 5.0, FLOOR, x_wall, LED_Y + 5.0, LED_Z + LED_D / 2 + 1.5)
     base -= rod_x(LED_RIM_X, X1 + 1, LED_Y, LED_Z, LED_PILOT)
 
