@@ -242,14 +242,19 @@ OLED_GLASS_FRONT = L + OLED_RECESS
 OLED_FRONT = OLED_GLASS_FRONT - OLED_GLASS_T - OLED_TAPE   # front face of the board
 OLED_BACK = OLED_FRONT - OLED_PCB_T
 OLED_GLASS = (1.007, 34.807, 0.419, 36.919)   # bx0, bx1, by0, by1: 33.8 x 36.5
-OLED_LIT = (4.48, 31.34, 8.07, 34.92)         # 26.86 square, centred in the viewing-area outline
+# The 128 x 128 pixels, 26.86 square: centred in the board file's viewing-area outline, but moved
+# OLED_LIT_SHIFT towards the ears (by -). On the front-wall test print (22 Nov), drawn with 1.5 on both sides,
+# the gap between the pixels and the window MEASURED 1.0 at the ear end and 2.0 at the header end: the real
+# pixels sit 0.5 further towards the ears than the board file says. Top and bottom are not measured.
+OLED_LIT_SHIFT = 0.5
+OLED_LIT = (4.48, 31.34, 8.07 - OLED_LIT_SHIFT, 34.92 - OLED_LIT_SHIFT)
 OLED_HOLES = [(bx, by) for bx in (2.54, 33.02) for by in (-2.54, 39.37)]
 OLED_HEADER_BY = 39.37                        # 8 pads at bx 8.89 .. 26.67 (not used)
 OLED_SOCKET_BY = 18.415                       # both STEMMA QT sockets (in parallel); the top one is used
 OLED_SOCKET_IN = 0.45                         # socket face inside the board edge (board file: 0.454)
 OLED_PEG_BY = (8.0, 30.0)                     # lid pegs on the board's top edge, clear of the socket
 OLED_END_Y = OLED_Y0 + OLED_LEN               # header end
-OLED_WIN_MARGIN = 1.5
+OLED_WIN_MARGIN = 1.5                         # window past the lit area, on all four sides
 RAIL_T, RAIL_LIP = 1.2, 1.0
 
 
@@ -310,9 +315,11 @@ BUTTON_PILOT = 7.2                     # comes out 7.0 (M7 x 0.75)
 BUTTON = {"cap": (7.4, 1.7), "stem": (3.4, 3.8), "thread": (6.7, 6.3), "collar": (9.7, 2.4),
           "body": (7.9, 7.0), "lugs": 6.3, "washer": (9.3, 1.1), "nut": (10.1, 1.7)}   # (diameter, length)
 
-# ---- 8 mm addressable LED (Berrybase PL9823-F8): as v4, at the display's middle - 7. Sizes ASSUMED.
+# ---- 8 mm addressable LED (Berrybase PL9823-F8): as v4, at the display's middle - 7. Diameters ASSUMED.
+# LED_H (back of the rim to the tip) is 9.5: drawn as Adafruit's 11.0, its tip came out flush with the front
+# instead of 1.5 out (front-wall test print, 22 Nov), so it is 1.5 shorter. The sleeve follows from it.
 LED_Y, LED_Z = BUTTON_Y, OLED_MID_Z - 7.0
-LED_D, LED_RIM_D, LED_RIM_T, LED_H = 8.0, 8.9, 1.0, 11.0
+LED_D, LED_RIM_D, LED_RIM_T, LED_H = 8.0, 8.9, 1.0, 9.5
 LED_PROUD = 1.5
 LED_RIM_X = X1 + LED_PROUD - LED_H
 LED_PILOT = 8.2                        # comes out 8.0, through the wall and the sleeve

@@ -6,9 +6,10 @@ Run from the project folder (after cad\\case_v5.py, or on its own: it builds the
 Writes cad/out/v5/test_pieces/*.stl, ready to print floor down, as the base is printed. Each piece is
 the base of case_v5.py cut by a box, so it follows every change there; run this again after changing
 case_v5.py. The cuts are placed where they cross only plain walls and floor (no slot, post or hole is
-cut in half); the check below says so if a cut leaves a loose bit.
+cut in half; the one exception is the chamber-side front lid boss, which front_wall cuts through its
+screw hole); the check below says so if a cut leaves a loose bit.
 
-The pieces (docs section 13, Printing at school):
+The pieces (docs section 13, Printing):
 - esp32_floor: back wall, floor and the 4 ESP32 posts, 14 mm high. USB-C opening with the real cable,
   the posts against the module and the parts under the board, the screw heads against the jumper plugs
   at the antenna end. Needs the Waveshare board.
@@ -16,6 +17,13 @@ The pieces (docs section 13, Printing at school):
   them, cut off 1 mm above the posts. Screw the board on: do the holes line up, does the thread hold? The other sensor boards have the same hole spacing (20.32); their posts are only taller
   (SGP40 and BMP580 by 2 mm, SCD-41 by 5 mm), so this one piece stands for all of them. Its front post
   stands next to the cable hole, so it is narrower on that side, like the BMP580's front post.
+- front_wall: the front of the base, full height, from the chamber's outer wall to just past the LED,
+  cut off inside the cross wall behind the display. The display's glass recess, window and floor groove,
+  its two screw spacers and the rail with its lip, the block behind its lower ear, the light sensor's
+  window and ribs, the button hole, and the LED hole with its sleeve. Checks the 29.9 mm bridge over the
+  window in the 1 mm skin, whether the 4741 drops in (glass and board thickness are assumed), the
+  M2.5 x 4 screws in the spacers (only 0.7 mm of wall in front of them), the button's M7 thread and the
+  LED in its round hole, which prints without support. Needs the 4741, the button and the LED.
 
 The screw holes are printed to size, as in the case (case_v5.py, 21 Nov: no drilling). Until then each piece
 also came as *_no_drill.stl; those are now the only version, under the plain names.
@@ -33,6 +41,12 @@ ESP_Z = 14.0      # board on its posts at 7.63..9.23, 4.25 mm of back wall over 
 POST_MARGIN = 1.0             # floor and wall left beside the posts and above them
 POST_Y = (c.BOARD_BACK_Y,     # the posts' board face (the chamber's floor vents end there)
           c.DOUBLE_WALL[0][1] + 0.8)   # into the double wall's air gap: its chamber skin stays, the floor under the gap too
+
+FRONT_X = c.CROSS_WALL[1][0] + 0.05   # 74.85: inside the cross wall's bay skin (1.15 of it stays), just past
+                                      # the light sensor wall's cable notch (74.81); keeps the LED sleeve (75.8),
+                                      # the ear block (75.5) and the floor groove (76.2) whole
+FRONT_Y1 = (c.LED_Y + 5.0 + c.BAY_W - c.BOSS_INSET - c.BOSS_R) / 2   # 44.75: between the LED sleeve (43.5)
+                                      # and the column-j front lid boss (46.0)
 
 BIG = 10.0        # boxes reach this far past the case where a side is not cut
 
@@ -62,6 +76,7 @@ def main():
     cuts = [
         ("esp32_floor", box(x1=ESP_X, y0=ESP_Y[0], y1=ESP_Y[1], z1=ESP_Z)),
         ("posts_sht45", posts_box("SHT45")),         # the lowest posts: the smallest piece
+        ("front_wall", box(x0=FRONT_X, y1=FRONT_Y1)),
     ]
     pieces = [(name, base & cut) for name, cut in cuts]
     for old in OUT.glob("*.stl"):                  # pieces dropped from the list must not linger
