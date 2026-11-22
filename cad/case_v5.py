@@ -76,7 +76,9 @@ CORNER_R = 2.0
 # with its cable bent as tight as it goes reaches 4 mm out of a socket (measured). The display stands
 # in a 1 mm groove in the floor and the lid has a pocket over the plug, so the case grows by 1.4 mm.
 LID_Z = 39.4
-LID_POCKET = 5 * LAYER     # 1.27, leaves 3 layers of lid over the plug
+# 22 Nov 2026: the printed base shows the cable lying almost flat on its top, so the pocket is 3 layers
+# deep instead of 5 (it still clears the measured 4 mm by 0.03).
+LID_POCKET = 3 * LAYER     # 0.76, leaves 5 layers of lid over the plug
 PLUG_ROOM = 4.0            # socket face to the far side of the bent cable (measured)
 L = 82.3
 BAY_W = 51.0               # 5 more than v4: the column-j compartment is 18 deep, as the chamber
@@ -105,6 +107,14 @@ BOSSES = [(x + sx * BOSS_INSET, y + sy * BOSS_INSET) for x, y, sx, sy in BACK_CO
 # checked with the ESP32 and sensor-post test pieces. The names still say PILOT from the drilling plan.
 BOSS_PILOT, BOSS_HOLE_DEPTH = 2.7, 12.0     # comes out 2.5: M3 lid screws, self-tapping
 LID_PILOT = 3.4                             # comes out 3.2: the M3 screws pass through
+# 22 Nov 2026: the lid screws are M3 x 10 countersunk, hex socket (DIN 7991 / ISO 10642: head 6.0 across,
+# 1.7 tall, 90 degrees, 2 mm key), so each lid hole gets a 90 degree countersink. The head's cone, carried
+# up to its top face, is 6.4 across (6.0 + 2 x its 0.2 rim). The countersink is drawn 6.7 at the top and
+# comes out about 6.5, so the head sits flush (0.15 below as drawn). It is 1.65 deep: 0.38 of straight hole
+# is left, and 0.65 of lid to the outer edge at the top. (The M4 x 10 DIN 7991 at hand don't fit: their
+# 8 mm heads would cut through the lid's edge, 4 mm from the holes, and the bosses are made for M3.)
+# The lid prints top down, so the countersink opens onto the plate as a 45 degree cone: no support.
+LID_SCREW_HEAD, LID_SCREW_RIM, LID_SCREW_KEY, LID_CSK_D = 6.0, 0.2, 2.0, 6.7
 
 FOOT_D, FOOT_H = 12.7, 3.5
 FEET = [(x, y) for x in (X0 + 7.5, X1 - 7.5) for y in (Y0 + 7.5, Y1 - 7.5)]
@@ -252,7 +262,6 @@ OLED_HOLES = [(bx, by) for bx in (2.54, 33.02) for by in (-2.54, 39.37)]
 OLED_HEADER_BY = 39.37                        # 8 pads at bx 8.89 .. 26.67 (not used)
 OLED_SOCKET_BY = 18.415                       # both STEMMA QT sockets (in parallel); the top one is used
 OLED_SOCKET_IN = 0.45                         # socket face inside the board edge (board file: 0.454)
-OLED_PEG_BY = (8.0, 30.0)                     # lid pegs on the board's top edge, clear of the socket
 OLED_END_Y = OLED_Y0 + OLED_LEN               # header end
 OLED_WIN_MARGIN = 1.5                         # window past the lit area, on all four sides
 RAIL_T, RAIL_LIP = 1.2, 1.0
@@ -597,8 +606,11 @@ def make_lid():
     lid = rounded_z(block(X0, Y0, LID_Z, X1, Y1, LID_Z + LID_T), CORNER_R)
     for x, y in GRILLE:
         lid -= rod(x, y, LID_Z - 1, LID_Z + LID_T + 1, GRILLE_D)
+    top, sink = LID_Z + LID_T, (LID_CSK_D - LID_PILOT) / 2
     for x, y in BOSSES:
-        lid -= rod(x, y, LID_Z - 1, LID_Z + LID_T + 1, LID_PILOT)
+        lid -= rod(x, y, LID_Z - 1, top + 1, LID_PILOT)
+        lid -= Pos(x, y, top - sink) * Cone(LID_PILOT / 2, LID_CSK_D / 2 + 1, sink + 1,
+                                            align=(Align.CENTER, Align.CENTER, Align.MIN))   # countersink
     board_top = SPK_Z + BOARD_T
     for x, y in speaker_holes():
         lid += rod(x, y, board_top, LID_Z, SPK_STANDOFF_D)
@@ -606,11 +618,10 @@ def make_lid():
     # a tab behind the display's upper ear
     lid += block(FRONT_BOSS_X + BOSS_R + FIT, Y_OUTER_IN + 0.2, OLED_Z0 + OLED_HT - OLED_EAR + 0.5,
                  OLED_BACK - FIT, oled_y(0) - FIT, LID_Z)
-    # pocket over the display's STEMMA QT plug and the bend of its cable; pegs on the display's top edge
+    # pocket over the display's STEMMA QT plug and the bend of its cable. No pegs on the display's top
+    # edge any more (22 Nov 2026): its two screws hold it.
     ys = oled_y(OLED_SOCKET_BY)
     lid -= block(CROSS_WALL[0][0] + 1.5, ys - 3.6, LID_Z - 1, OLED_BACK + 0.5, ys + 3.6, LID_Z + LID_POCKET)
-    for by in OLED_PEG_BY:
-        lid += rod((OLED_BACK + OLED_FRONT) / 2, oled_y(by), OLED_Z0 + OLED_HT + 0.2, LID_Z, 2.0)
     lid.label = "lid"
     return lid
 
@@ -762,11 +773,11 @@ def make_sensors():
     a = (scd_back[0] - PLUG_OUT, y_sock, scd_back[1])
     sb = scd_back[0]
     turn = (sb - 3.84, y_sock, scd_back[1])
-    above = (ox, oy, oz + PLUG_OUT + 0.25)
+    above = (ox, oy, oz + PLUG_ROOM - CABLE_D / 2)    # the bend's top at the measured 4 mm
     zf = FLOOR + 1.8
     floor = [(x, -11.3, zf) for x in (sb + 0.71, sb + 3.21, 14.0, 22.0, 30.0, 40.0, 50.0, 58.0, 64.5)]
     tube, edge = routed([turn, (sb - 3.69, -12.4, 13.0), (sb - 3.09, -11.7, 8.0), (sb - 1.59, -11.3, zf + 0.7)] + floor + [(69.0, -8.5, zf), (70.4, -3.0, zf + 0.2), (70.6, 1.5, zf + 0.5),
-                         (72.6, 2.6, 12.0), (73.4, 2.4, 30.0), (74.0, 2.2, 37.0), (76.0, 2.0, 39.4), above],
+                         (72.6, 2.6, 12.0), (73.4, 2.4, 30.0), (74.0, 2.2, 36.9), (76.0, 2.0, above[2] - 0.05), above],
                         (0, 0, -1), (1, 0, 0))
     note("SCD-41 - display (200 mm)", [stub(a, turn), tube, stub(above, (ox, oy, oz + PLUG_OUT))], edge, 191.0)
 
@@ -920,6 +931,23 @@ def make_screws():
     return Compound(heads)
 
 
+def make_lid_screws():
+    """The 4 lid screws' heads, M3 countersunk hex socket (DIN 7991), in the lid's countersinks: a 0.2 rim
+    6.0 across on a 90 degree cone down to the 3.0 shank, with a 2 mm hex socket 1.1 deep. Separate from
+    make_screws: they come off with the lid."""
+    up = (Align.CENTER, Align.CENTER, Align.MIN)
+    cone_top = LID_SCREW_HEAD + 2 * LID_SCREW_RIM                     # the cone carried up to the head's top: 6.4
+    top = LID_Z + LID_T - (LID_CSK_D - cone_top) / 2                  # head's top face, 0.15 below the lid's (as drawn)
+    k = (LID_SCREW_HEAD - 3.0) / 2                                    # cone height, 1.5
+    key = build123d.extrude(build123d.RegularPolygon(LID_SCREW_KEY / math.sqrt(3), 6), amount=1.1)
+    heads = []
+    for x, y in BOSSES:
+        head = (Pos(x, y, top - LID_SCREW_RIM - k) * Cone(1.5, LID_SCREW_HEAD / 2, k, align=up)
+                + Pos(x, y, top - LID_SCREW_RIM) * Cylinder(LID_SCREW_HEAD / 2, LID_SCREW_RIM, align=up))
+        heads.append(head - Pos(x, y, top - 1.1) * key)
+    return Compound(heads)
+
+
 def make_references():
     esp, jumpers = make_esp()
     button, nut = make_button()
@@ -933,6 +961,7 @@ def make_references():
         "led": make_led(),
         "speaker": make_speaker(),
         "screws": make_screws(),
+        "lid_screws": make_lid_screws(),
         "rubber_feet": Compound([rod(x, y, -FOOT_H, 0, FOOT_D) for x, y in FEET]),
     }
 
@@ -1018,7 +1047,7 @@ def main():
     for name, (length, wire, low, top) in lengths.items():
         print(f"  {name}: {length:.1f} of {wire:.0f} mm, z {low:.1f} to {top:.1f} (floor {FLOOR:.1f}, lid {LID_Z:.0f})")
 
-    on_lid = {"lid", "speaker"}
+    on_lid = {"lid", "speaker", "lid_screws"}
     parts = [
         ("base", base, "#ddd5c0", 1.0, "print"),
         ("lid", lid, "#ddd5c0", 1.0, "print"),
@@ -1038,6 +1067,7 @@ def main():
         ("led", refs["led"], "#f0f0f0", 1.0, "ref"),
         ("speaker", refs["speaker"], "#d85a30", 1.0, "ref"),
         ("screws", refs["screws"], "#8c959f", 1.0, "ref"),
+        ("lid_screws", refs["lid_screws"], "#8c959f", 1.0, "ref"),
         ("rubber_feet", refs["rubber_feet"], "#24292f", 1.0, "ref"),
     ]
     data = {"stamp": f"v5 with the 4741 OLED, {datetime.now():%d %b %Y %H:%M}, build123d {build123d.__version__}", "parts": []}

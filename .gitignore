@@ -21,3 +21,6 @@ cad/out/*
 # ...except the current case, so the 3D viewer and print files are in the repo
 !cad/out/v5/
 __pycache__/
+
+# MakerWorld pictures and listing texts: kept on this PC only (cad/makerworld_pictures.py makes the pictures)
+docs/makerworld/
