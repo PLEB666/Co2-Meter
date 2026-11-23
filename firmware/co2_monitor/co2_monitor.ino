@@ -4,7 +4,10 @@
   + Adafruit 1.5" 128x128 grayscale OLED (SSD1327) + 8 mm LED (PL9823-F8) + button
 
   - SCD-41   -> CO2 in periodic mode (a new value every 5 s)
-  - SHT45    -> temperature and humidity (more accurate than the SCD-41's own values)
+  - SHT45    -> temperature and humidity (more accurate than the SCD-41's own values).
+                The electronics warm the air in the case, so SHT_TEMPERATURE_OFFSET_C is
+                taken off its temperature and the humidity is worked out again for the
+                cooler room air.
   - BMP580   -> air pressure (0x46 or 0x47, whichever answers), sent to the SCD-41 so it
                 can correct its CO2 value for the pressure (SCD_PRESSURE_STEP_HPA)
   - SGP40    -> VOC index (air quality, 100 = the room's usual air), worked out from
@@ -110,6 +113,12 @@ constexpr float SCD_PRESSURE_STEP_HPA = 1.0f;
 // Only used when there is no BMP580: the height of your location above sea level in
 // metres, from which the SCD-41 estimates the pressure. Find it on any map / GPS app.
 constexpr uint16_t SENSOR_ALTITUDE_M = 0;
+// The electronics (about 0.5 W) warm the air in the closed case, so the SHT45 reads
+// warmer than the room. This much is taken off its temperature, and its humidity is
+// worked out again for the cooler room air (roomHumidity()). Found next to a Technoline
+// WS 8016 on 23 Nov 2026, with the monitor running for hours: 23.7 C in the case, 21.4 C
+// on the clock. 0 = the SHT45's own values.
+constexpr float SHT_TEMPERATURE_OFFSET_C = 2.3f;
 // After start-up the sensors measure this long before any value is shown, printed
 // or saved. Values measured during the warm-up are thrown away.
 constexpr uint32_t WARMUP_TIME_MS = 120000;
@@ -368,8 +377,12 @@ uint32_t lastLightsUpdate = 0;
 bool warmingUp = true;
 uint32_t warmupStart = 0;  // when the sensors started measuring
 
+// The room's temperature and humidity: shown, printed, stored and on the web page
 float temperatureC = NAN;
 float humidityPct = NAN;
+// What the SHT45 itself measures, in the warmer air inside the case (readSht45())
+float shtTemperatureC = NAN;
+float shtHumidityPct = NAN;
 uint16_t co2Ppm = 0;  // 0 = no valid reading yet
 float pressureHpa = NAN;
 float scdPressureHpa = NAN;  // the pressure the SCD-41 corrects for (NAN = from SENSOR_ALTITUDE_M)
@@ -1054,14 +1067,30 @@ bool initSgp40() {
   return sgp.begin(&Wire);
 }
 
+// How much water vapour air can hold at this temperature (C), relative: the Magnus
+// formula with Sensirion's constants, without its factor 6.112 hPa, as only ratios are used
+float saturationPressure(float t) {
+  return expf(17.62f * t / (243.12f + t));
+}
+
+// The air in the case is the room air, warmed up: it holds the same water, but warm air
+// can hold more, so its relative humidity is lower. At the room temperature it is higher
+// again by the ratio of the two saturation pressures (about 6 % of the value per degree).
+float roomHumidity(float caseHumidity, float caseTemperature, float roomTemperature) {
+  float rh = caseHumidity * saturationPressure(caseTemperature) / saturationPressure(roomTemperature);
+  return constrain(rh, 0.0f, 100.0f);
+}
+
 void readSht45() {
   sensors_event_t humidity, temperature;
   if (sht4.getEvent(&humidity, &temperature)) {
-    temperatureC = temperature.temperature;
-    humidityPct = humidity.relative_humidity;
+    shtTemperatureC = temperature.temperature;
+    shtHumidityPct = humidity.relative_humidity;
+    temperatureC = shtTemperatureC - SHT_TEMPERATURE_OFFSET_C;
+    humidityPct = roomHumidity(shtHumidityPct, shtTemperatureC, temperatureC);
   } else {
-    temperatureC = NAN;
-    humidityPct = NAN;
+    shtTemperatureC = shtHumidityPct = NAN;
+    temperatureC = humidityPct = NAN;
   }
   screenChanged = true;
 }
@@ -1129,10 +1158,11 @@ uint8_t sensirionCrc(const uint8_t *data, uint8_t length) {
 
 // The SGP40 library waits 250 ms for every reading. Here the reading is started, and
 // fetched SGP_MEASURE_MS later, so the button and the web page don't have to wait.
-// The SHT45's values compensate it (25 C and 50 %RH while there are none).
+// The SHT45's own values compensate it (25 C and 50 %RH while there are none): the SGP40
+// is in the case too, so the case air is closer to its own than the room's.
 bool startSgp40Reading() {
-  float t = isnan(temperatureC) ? 25 : constrain(temperatureC, -45.0f, 130.0f);
-  float rh = isnan(humidityPct) ? 50 : constrain(humidityPct, 0.0f, 100.0f);
+  float t = isnan(shtTemperatureC) ? 25 : constrain(shtTemperatureC, -45.0f, 130.0f);
+  float rh = isnan(shtHumidityPct) ? 50 : constrain(shtHumidityPct, 0.0f, 100.0f);
   uint16_t rhTicks = (uint16_t)(rh * 65535 / 100 + 0.5f);
   uint16_t tTicks = (uint16_t)((t + 45) * 65535 / 175 + 0.5f);
   uint8_t command[8] = {0x26, 0x0F, (uint8_t)(rhTicks >> 8), (uint8_t)rhTicks, 0, (uint8_t)(tTicks >> 8), (uint8_t)tTicks, 0};
@@ -1413,6 +1443,10 @@ void printStatus() {
   } else {
     Serial.printf("Now: %u ppm, %.2f C, %.1f %%RH, %.2f hPa, %.1f lux%s\n", co2Ppm, temperatureC, humidityPct,
                   pressureHpa, lightLux, lightTooBright ? " (or more)" : "");
+    if (shtFound) {
+      Serial.printf("SHT45 in the case: %.2f C, %.1f %%RH (the room: %.1f C less, humidity worked out again)\n",
+                    shtTemperatureC, shtHumidityPct, SHT_TEMPERATURE_OFFSET_C);
+    }
   }
   printVoc();
   if (scdFound) printScdPressure();
