@@ -117,8 +117,9 @@ constexpr uint16_t SENSOR_ALTITUDE_M = 0;
 // warmer than the room. This much is taken off its temperature, and its humidity is
 // worked out again for the cooler room air (roomHumidity()). Found next to a Technoline
 // WS 8016 on 23 Nov 2026, with the monitor running for hours: 23.7 C in the case, 21.4 C
-// on the clock. 0 = the SHT45's own values.
-constexpr float SHT_TEMPERATURE_OFFSET_C = 2.3f;
+// on the clock. Outside the case, 5 cm from the clock, the SHT45 read within 0.3 C and
+// 2 %RH of it (24 Nov 2026). 0 = the SHT45's own values.
+constexpr float SHT_TEMPERATURE_OFFSET_C = 2.0f;
 // After start-up the sensors measure this long before any value is shown, printed
 // or saved. Values measured during the warm-up are thrown away.
 constexpr uint32_t WARMUP_TIME_MS = 120000;
