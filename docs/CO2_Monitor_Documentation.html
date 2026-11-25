@@ -105,7 +105,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.68: temperature offset 2.0&nbsp;&deg;C</span>
+    <span><b>Version</b> 0.69: ASC target 425&nbsp;ppm</span>
     <span><b>Updated</b> 24 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
@@ -1197,6 +1197,7 @@ VEML7700 found
 SGP40 found, self-test passed
 SCD-41 found, serial 0x...
 SCD-41 automatic self-calibration (ASC): enabled
+SCD-41 ASC target: 425 ppm
 SCD-41 measuring
 SCD-41 corrects for 1013 hPa (BMP580)
 Warm-up: the first values follow in 120 s
@@ -1307,16 +1308,16 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><th></th><th>ASC (automatic self-calibration)</th><th>FRC (forced recalibration)</th></tr>
     <tr><td><b>Who does it</b></td><td>The <b>sensor itself</b> (firmware inside the SCD-41)</td><td><b>Your code</b> sends one command</td></tr>
     <tr><td><b>Default</b></td><td><b>On</b> from the factory</td><td>Only when you trigger it</td></tr>
-    <tr><td><b>Code needed</b></td><td>None. Our main sketch leaves it as it is.</td><td>The optional <code>scd41_calibration.ino</code> tool</td></tr>
-    <tr><td><b>How it works</b></td><td>Watches the readings over days. Assumes the <b>lowest</b> level seen in each period was fresh outdoor air (target 400&nbsp;ppm) and slowly corrects the offset. First correction after ~<b>44&nbsp;h</b> of operation, then every ~<b>156&nbsp;h</b> (6.5 days).</td><td>You put the sensor in air of known CO<sub>2</sub> (outdoors &asymp; 425&nbsp;ppm), let it run &ge; 3 min, and tell it "this is 425&nbsp;ppm". The correction is applied immediately.</td></tr>
-    <tr><td><b>Requirement</b></td><td>The sensor sees fresh air (~400&nbsp;ppm) <b>at least once per week of operating time</b>, while running <b>&ge; 4&nbsp;hours in one go</b>.</td><td>Stable, known reference air, and the sensor running in its normal mode for &ge; 3 minutes beforehand.</td></tr>
+    <tr><td><b>Code needed</b></td><td>None. Our main sketch leaves it on and only sets its target to 425&nbsp;ppm (<code>ASC_TARGET_PPM</code>).</td><td>The optional <code>scd41_calibration.ino</code> tool</td></tr>
+    <tr><td><b>How it works</b></td><td>Watches the readings over days. Assumes the <b>lowest</b> level seen in each period was fresh outdoor air (the target: 425&nbsp;ppm in our sketch, 400&nbsp;ppm from the factory) and slowly corrects the offset. First correction after ~<b>44&nbsp;h</b> of operation, then every ~<b>156&nbsp;h</b> (6.5 days).</td><td>You put the sensor in air of known CO<sub>2</sub> (outdoors &asymp; 425&nbsp;ppm), let it run &ge; 3 min, and tell it "this is 425&nbsp;ppm". The correction is applied immediately.</td></tr>
+    <tr><td><b>Requirement</b></td><td>The sensor sees fresh air (~425&nbsp;ppm) <b>at least once per week of operating time</b>, while running <b>&ge; 4&nbsp;hours in one go</b>.</td><td>Stable, known reference air, and the sensor running in its normal mode for &ge; 3 minutes beforehand.</td></tr>
     <tr><td><b>Use when</b></td><td>Normal homes and offices that get aired regularly.</td><td>Readings are clearly off in fresh air, or the room never gets fresh air (then also switch ASC off).</td></tr>
   </table>
 
   <h3>Your questions, answered</h3>
   <div class="qa">
     <div class="q">Is the CO<sub>2</sub> sensor calibrated by the code or by the sensor itself?</div>
-    <p><span class="a-short">Both</span><b>Normally the sensor does it itself.</b> ASC runs inside the SCD-41 and is switched on at the factory, so no code is needed. Our main program doesn't touch the calibration; it only tells the sensor the air pressure (from the BMP580, or the altitude without one). That is a correction, not a calibration. <b>FRC</b> is triggered by code when you know the true CO<sub>2</sub> level. The separate <code>scd41_calibration.ino</code> sketch does exactly that.</p>
+    <p><span class="a-short">Both</span><b>Normally the sensor does it itself.</b> ASC runs inside the SCD-41 and is switched on at the factory, so no code is needed. Our main program doesn't calibrate anything itself. It tells the sensor the air pressure (from the BMP580, or the altitude without one), which is a correction, not a calibration, and the ASC target, the fresh-air level ASC aims the weekly lowest value at (425&nbsp;ppm instead of the factory 400). <b>FRC</b> is triggered by code when you know the true CO<sub>2</sub> level. The separate <code>scd41_calibration.ino</code> sketch does exactly that.</p>
   </div>
   <div class="qa">
     <div class="q">How should I start testing: open the door and let fresh air in, or just plug it in?</div>
@@ -1332,15 +1333,15 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <table>
     <tr><th>Item</th><th>Stored</th><th>After unplugging</th></tr>
     <tr><td>Factory calibration, ASC history, FRC correction</td><td>Sensor EEPROM (automatically)</td><td><b>Kept</b></td></tr>
-    <tr><td>Altitude, air pressure, ASC on/off, temperature offset, ASC target</td><td>Sensor RAM; EEPROM only after <code>persistSettings()</code> (not the air pressure)</td><td>Lost, back to the saved values. Our code re-sends the altitude and the BMP580's pressure at every start, so there's no need to persist them.</td></tr>
+    <tr><td>Altitude, air pressure, ASC on/off, temperature offset, ASC target</td><td>Sensor RAM; EEPROM only after <code>persistSettings()</code> (not the air pressure)</td><td>Lost, back to the saved values. Our code re-sends the altitude, the ASC target and the BMP580's pressure at every start, so there's no need to persist them.</td></tr>
   </table>
   </div>
   <div class="box warn">The EEPROM is rated for only ~2000 writes. <b>Never call <code>persistSettings()</code> in <code>loop()</code></b>, only once after a deliberate settings change. Our sketches never call it.</div>
 
   <h3>When ASC can go wrong</h3>
   <ul>
-    <li><b>The room never gets fresh air</b> (always occupied, never aired). ASC then treats e.g. 700&nbsp;ppm as "400" and pulls all readings too low. Switch ASC off with <code>setAutomaticSelfCalibrationEnabled(0)</code> + <code>persistSettings()</code> and use FRC every few months instead.</li>
-    <li><b>Target 400 vs real outdoor air:</b> ASC assumes 400&nbsp;ppm, but outdoor air today is ~420-430&nbsp;ppm. ASC can therefore read ~25&nbsp;ppm low. That is well inside the sensor's accuracy, so it's fine for step 1. It could later be changed with <code>setAutomaticSelfCalibrationTarget()</code>.</li>
+    <li><b>The room never gets fresh air</b> (always occupied, never aired). ASC then treats e.g. 700&nbsp;ppm as fresh air (425) and pulls all readings too low. Switch ASC off with <code>setAutomaticSelfCalibrationEnabled(0)</code> + <code>persistSettings()</code> and use FRC every few months instead.</li>
+    <li><b>Target 400 vs real outdoor air (fixed in v0.69):</b> from the factory ASC assumes 400&nbsp;ppm, but outdoor air is about 425&nbsp;ppm in 2026 and rises about 2.5&nbsp;ppm a year, so readings would end up about 25&nbsp;ppm low. The main program now sends <code>ASC_TARGET_PPM</code> = 425 with <code>setAutomaticSelfCalibrationTarget()</code> at every start (sensor RAM, no EEPROM write; the EEPROM keeps 400) and prints the value the sensor reads back. Nothing changes at once: the next ASC correction moves the zero point so that the period's lowest value reads 425. It is one offset for all readings, and it settles: once the lowest value reads 425, the next period corrects nothing more, as long as the room gets the same airing. Raise the setting by about 5 every two years.</li>
   </ul>
 
   <h3>FRC procedure (only if needed)</h3>
@@ -1985,6 +1986,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.69</td><td>25 Nov 2026</td><td><b>ASC target 425&nbsp;ppm.</b> Outdoors, in the case, the monitor read a steady 449-461&nbsp;ppm for half an hour, which is normal for winter air near a town and well inside the SCD-41's accuracy. The sensor's automatic self-calibration assumed 400&nbsp;ppm for the lowest value of each period, about 25&nbsp;ppm below today's outdoor air. The new setting <code>ASC_TARGET_PPM</code> (425) is sent at every start with <code>setAutomaticSelfCalibrationTarget()</code>, into the sensor's RAM only, and the value read back is printed. It takes effect at the next ASC correction. Compiled, not uploaded yet. Sections 9 and 10 updated.</td></tr>
     <tr><td>0.68</td><td>24 Nov 2026</td><td><b>Temperature offset 2.0&nbsp;&deg;C.</b> With the SHT45 out of the case, 5&nbsp;cm from the Technoline WS 8016, the two read at most 0.3&nbsp;&deg;C and 2&nbsp;%RH apart, so the clock is a fair reference and the difference in the case is the warm case air. <code>SHT_TEMPERATURE_OFFSET_C</code> is now 2.0 (was 2.3); the humidity correction adds about 13&nbsp;% of the value instead of 15&nbsp;%. With the readings of 23 Nov the room values are 21.7&nbsp;&deg;C and 40.6&nbsp;%RH (clock 21.4&nbsp;&deg;C, 39&nbsp;%RH). New in section 6: how slowly the case follows the room, measured from the 1-minute history (an airing shows as a dip of only 0.5-1.6&nbsp;&deg;C; after closing the case, 2.9&nbsp;&deg;C within 10 minutes and the last few tenths over hours), and compare with a thermometer only after 2 hours without airing. Compiled, not uploaded yet. Sections 6, 7, 9 and 11 updated.</td></tr>
     <tr><td>0.67</td><td>23 Nov 2026</td><td><b>Temperature offset for the case.</b> The electronics warm the air in the closed case: next to a Technoline WS 8016 the SHT45 read 23.7&nbsp;&deg;C and 36&nbsp;%RH, the clock 21.4&nbsp;&deg;C and 39&nbsp;%RH, and the history shows the step at the assembly on 22 Nov. The new setting <code>SHT_TEMPERATURE_OFFSET_C</code> (2.3) is taken off the SHT45's temperature, and the humidity is worked out again for the cooler room air (same water content, Magnus formula), which adds about 6&nbsp;% of the value per degree. Display, web page, Serial and history get the room values; <code>status</code> also prints the SHT45's own values, and the SGP40 is still compensated with them. The WS 8016 has no stated accuracy. Values stored from 22 Nov, 19:55 up to this upload stay about 2-2.5&nbsp;&deg;C too warm and 5-7&nbsp;%RH too dry. Compiled, not uploaded yet. Sections 6, 7, 9 and 11 updated.</td></tr>
     <tr><td>0.66</td><td>23 Nov 2026</td><td><b>MakerWorld app cover.</b> MakerWorld asks for a 4:3 cover for the web and the app and a 3:4 one for the tall cards in the Bambu Handy app. The new <code>docs/makerworld/01_cover_3x4.png</code> (1200 &times; 1600) is the cover in that shape, seen a little more from above; cropping the 4:3 one would cut off the sides of the case. <code>makerworld_pictures.py</code> takes a size per picture for it. <code>MakerWorld_listing.md</code> says which file goes in which cover field. <code>docs/makerworld/</code> is now in <code>.gitignore</code>: the pictures and texts stay on this PC. No change to the model. Sections 1 and 13 updated.</td></tr>

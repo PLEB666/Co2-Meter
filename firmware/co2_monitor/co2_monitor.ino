@@ -113,6 +113,11 @@ constexpr float SCD_PRESSURE_STEP_HPA = 1.0f;
 // Only used when there is no BMP580: the height of your location above sea level in
 // metres, from which the SCD-41 estimates the pressure. Find it on any map / GPS app.
 constexpr uint16_t SENSOR_ALTITUDE_M = 0;
+// Automatic self-calibration (ASC, on from the factory): after about every 6.5 days of
+// measuring, the SCD-41 takes the lowest CO2 it saw as fresh outdoor air and moves its zero
+// point so that this lowest value reads ASC_TARGET_PPM. The sensor's own default is 400 ppm,
+// but outdoor air is about 425 ppm (2026) and rises about 2.5 ppm a year.
+constexpr uint16_t ASC_TARGET_PPM = 425;
 // The electronics (about 0.5 W) warm the air in the closed case, so the SHT45 reads
 // warmer than the room. This much is taken off its temperature, and its humidity is
 // worked out again for the cooler room air (roomHumidity()). Found next to a Technoline
@@ -1034,10 +1039,18 @@ bool initScd41() {
     Serial.printf("SCD-41 automatic self-calibration (ASC): %s\n", ascEnabled ? "enabled" : "disabled");
   }
 
-  // Stored in the sensor's RAM only, so it is sent on every boot (no EEPROM wear).
-  // The BMP580's pressure replaces it as soon as there is one (sendPressureToScd41()).
+  // Stored in the sensor's RAM only, so they are sent on every boot (no EEPROM wear; the
+  // EEPROM keeps the factory values). The BMP580's pressure replaces the altitude as soon
+  // as there is one (sendPressureToScd41()).
   scd4x.setSensorAltitude(SENSOR_ALTITUDE_M);
   scdPressureHpa = NAN;
+  uint16_t ascTarget = 0;
+  if (scd4x.setAutomaticSelfCalibrationTarget(ASC_TARGET_PPM) == 0 &&
+      scd4x.getAutomaticSelfCalibrationTarget(ascTarget) == 0) {
+    Serial.printf("SCD-41 ASC target: %u ppm\n", ascTarget);
+  } else {
+    Serial.println(F("The SCD-41 did not take the ASC target"));
+  }
 
   return scd4x.startPeriodicMeasurement() == 0;
 }
