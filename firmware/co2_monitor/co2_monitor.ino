@@ -30,8 +30,8 @@
     colour (LED_SHOWS_VOC), but from "VENTILATE" on (LED_BREATH_FROM_VOC), and from
     2000 ppm CO2 (LED_BREATH_FROM_CO2), the LED slowly breathes: dims and brightens
     again every 3 s, until the value has been lower again for a minute. The LED has
-    its own task, and while it breathes or fades it flicks between neighbouring steps
-    (LED_DITHER), so it dims smoothly although it only uses its lowest 25 of 256 steps.
+    its own task, and it flicks between neighbouring steps (LED_DITHER), so it dims
+    smoothly and keeps its colour although it only uses its lowest 25 of 256 steps.
   - Brightness: one level, 0-100 %, sets the display and the LED together. On Auto the
     light sensor sets it (darker room = dimmer). The web page and the Serial Monitor
     can switch Auto off and set a fixed level instead. Both survive a restart.
@@ -199,11 +199,19 @@ constexpr float LED_BREATH_DEPTH = 40;
 constexpr uint32_t LED_BREATH_HOLD_MS = 60000;
 // The LED has 256 steps per colour, but it is so bright that it only uses the lowest
 // 1-25 of them (LED_BRIGHTNESS_MIN/MAX below), at 35 % brightness 1-3. A breath or a fade
-// down there would go in a few visible jumps (green 3 -> 2 -> 1). true = while the light
-// breathes or fades, the LED flicks between the two nearest steps so fast that the eye
-// sees the level in between (temporal dithering): 2.3 = 2, 3, 2, 2, 3, 2, ... A light
-// that stays the same gets the nearest step, as with false.
+// down there would go in a few visible jumps (green 3 -> 2 -> 1). true = the LED flicks
+// between the two nearest steps so fast that the eye sees the level in between (temporal
+// dithering): 2.3 = 2, 3, 2, 2, 3, 2, ... false = always the nearest step.
 constexpr bool LED_DITHER = true;
+// A light that stays the same is dithered too, or its colour would change: at 0 %
+// brightness orange-yellow is red 0.86 and green 0.41 of one step, which round to pure
+// red. But a small rest like 0.02 would light the LED once every 42 frames, a flicker
+// the eye can see. So while it is still, each colour is rounded to this fraction of a
+// step first: 8 = in eighths, every pattern repeats within 8 frames (42 Hz or faster),
+// and less than 1/16 of a step shows as nothing. While it breathes or fades the level
+// keeps moving, so it is dithered in full. 0 = a still light gets the nearest step
+// (up to version 0.69).
+constexpr uint8_t LED_STILL_DITHER_STEPS = 8;
 // While the light moves, the LED gets a new value this often (ms). Its own task sends it,
 // so it keeps going while the display is drawn or the web page is served. Shorter = the
 // in-between levels flicker less, but each value should last at least one of the LED's
@@ -532,8 +540,10 @@ LedColour airColour() {
 // One colour of the LED as a whole step, 0-255. value: what it should be, with a fraction.
 // With dither, what is left over goes into "error" and is added in the next frame, so a
 // few frames together show the value exactly: 2.3 = 2, 3, 2, 2, 3, 2, ... Without, the
-// nearest step.
-uint8_t ledStep(float value, float &error, bool dither) {
+// nearest step. fineness > 0: the value is first rounded to 1/fineness of a step, so the
+// pattern repeats within that many frames (LED_STILL_DITHER_STEPS).
+uint8_t ledStep(float value, float &error, bool dither, uint8_t fineness = 0) {
+  if (dither && fineness > 0) value = roundf(value * fineness) / fineness;
   if (!dither || value <= 0) {
     error = 0;
     return (uint8_t)lroundf(max(value, 0.0f));
@@ -601,8 +611,9 @@ float ledBreathDip() {
 
 // Every LED_FRAME_MS, in the LED's own task (ledTask()). The LED fades to the air quality
 // colour at the current brightness, and down to off until the first value arrives and in
-// sleep mode. While the VOC index or the CO2 is high it breathes (ledBreathDip()). While it breathes
-// or fades it is dithered (LED_DITHER). It is only sent a colour when that has changed.
+// sleep mode. While the VOC index or the CO2 is high it breathes (ledBreathDip()). It is
+// dithered (LED_DITHER), in full while it breathes or fades, in LED_STILL_DITHER_STEPS
+// while it is still. It is only sent a colour when that has changed.
 void updateLed() {
   bool on = (co2Ppm > 0 || (LED_SHOWS_VOC && vocIndex > 0)) && !sleepMode;
   if (on) {
@@ -624,10 +635,12 @@ void updateLed() {
   // What 255 is dimmed to, as a share (0 = dark)
   float scale = level > FADE_OFF_LEVEL ? brightnessBetween(LED_BRIGHTNESS_MIN, LED_BRIGHTNESS_MAX, level) / 255 : 0;
   bool moving = ledBreathing || !ledLevel.done() || !ledRed.done() || !ledGreen.done() || !ledBlue.done();
-  bool dither = LED_DITHER && moving;
+  bool dither = LED_DITHER && (moving || LED_STILL_DITHER_STEPS > 0);
+  uint8_t fineness = moving ? 0 : LED_STILL_DITHER_STEPS;
   static float error[3] = {0, 0, 0};  // what dithering carries over to the next frame
-  LedColour shown = {ledStep(ledRed.value() * scale, error[0], dither), ledStep(ledGreen.value() * scale, error[1], dither),
-                     ledStep(ledBlue.value() * scale, error[2], dither)};
+  LedColour shown = {ledStep(ledRed.value() * scale, error[0], dither, fineness),
+                     ledStep(ledGreen.value() * scale, error[1], dither, fineness),
+                     ledStep(ledBlue.value() * scale, error[2], dither, fineness)};
   uint32_t test = ledTestColour;
   if (test != NO_LED_TEST) shown = {(uint8_t)(test >> 16), (uint8_t)(test >> 8), (uint8_t)test};
   if (!ledResend && shown.r == ledSent.r && shown.g == ledSent.g && shown.b == ledSent.b) return;
