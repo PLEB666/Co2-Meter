@@ -42,6 +42,7 @@
     Hold the button for 2 s, or use the switch on the web page, to turn it on or off.
   - All readings are also printed at 115200 baud (Serial Monitor / Serial Plotter).
   - Wi-Fi gets the time from the internet and uses the fixed address FIXED_IP.
+    After 10 s without Wi-Fi a small no Wi-Fi icon appears in the display's top line.
     CO2, temperature, humidity, air pressure and the VOC index are stored in the flash as
     1-minute and 5-minute averages (history.h explains how). Light is not stored.
   - A web page on the home network shows the live values, graphs of any stored
@@ -293,6 +294,9 @@ const IPAddress SUBNET_MASK(255, 255, 255, 0);
 // Internet time servers. The clock runs on UTC; the web page shows local time.
 constexpr char NTP_SERVER_1[] = "pool.ntp.org";
 constexpr char NTP_SERVER_2[] = "time.google.com";
+// The display shows the no Wi-Fi icon after this long without a connection, so it doesn't
+// blink at the start or when the router drops the monitor for a moment
+constexpr uint32_t WIFI_ICON_DELAY_MS = 10000;
 
 Adafruit_SSD1327 display(OLED_SIZE, OLED_SIZE, &Wire, -1);
 Adafruit_SHT4x sht4;
@@ -303,8 +307,23 @@ Adafruit_SGP40 sgp;
 VocAlgorithmParams vocAlgorithm;  // Sensirion's VOC index algorithm and what it has learned
 Preferences settings;             // keeps sleep mode and brightness through a restart
 
-// 8 x 8 moon, shown in the top line of the display while sleep mode is on
+// The status icons in the top line of the display, as high as the text (8 pixels).
+// Moon while sleep mode is on: 8 x 8, the last column empty.
 const uint8_t MOON_ICON[] PROGMEM = {0x30, 0x60, 0xE0, 0xE0, 0xE0, 0xF8, 0x7E, 0x3C};
+constexpr int16_t MOON_WIDTH = 7;
+// No Wi-Fi: the Wi-Fi fan with a small x in the corner, 11 x 8, two bytes per row
+constexpr int16_t NO_WIFI_WIDTH = 11;
+const uint8_t NO_WIFI_ICON[] PROGMEM = {
+  0x3E, 0x00,  // ..#####....
+  0x41, 0x00,  // .#.....#...
+  0x9C, 0x80,  // #..###..#..
+  0x22, 0x00,  // ..#...#....
+  0x00, 0x00,  // ...........
+  0x08, 0xA0,  // ....#...#.#
+  0x1C, 0x40,  // ...###...#.
+  0x00, 0xA0,  // ........#.#
+};
+constexpr int16_t STATUS_ICON_GAP = 4;  // between the moon and the no Wi-Fi icon
 
 // A value that glides to each new target in a straight line, in FADE_TIME_MS (or the
 // time given). A new target in the middle of a fade starts from where the value is at
@@ -368,6 +387,7 @@ Fade displayLevel;           // the display's brightness now, in % (FADE_OFF_LEV
 uint8_t oledContrast = 0;    // what the display is set to
 
 bool sleepMode = false;
+bool wifiLost = false;  // no Wi-Fi for WIFI_ICON_DELAY_MS: the display shows the no Wi-Fi icon
 bool sleepMessageShown = false;  // the display confirms a long press
 uint32_t sleepMessageSince = 0;
 
@@ -740,10 +760,27 @@ void printRating(const char *rating, bool inverted, int16_t y) {
   printAt(rating, 1, x, y, SSD1327_BLACK);
 }
 
+// How wide the status icons of the top line are together: the moon in sleep mode and the
+// no Wi-Fi icon. 0 = none.
+int16_t statusIconsWidth() {
+  int16_t width = sleepMode ? MOON_WIDTH : 0;
+  if (wifiLost) width += (width > 0 ? STATUS_ICON_GAP : 0) + NO_WIFI_WIDTH;
+  return width;
+}
+
+// The status icons from x on: the moon first, then the no Wi-Fi icon
+void drawStatusIcons(int16_t x) {
+  if (sleepMode) {
+    display.drawBitmap(x, 1, MOON_ICON, 8, 8, SSD1327_WHITE);
+    x += MOON_WIDTH + STATUS_ICON_GAP;
+  }
+  if (wifiLost) display.drawBitmap(x, 1, NO_WIFI_ICON, NO_WIFI_WIDTH, 8, SSD1327_WHITE);
+}
+
 /*
   Main screen, 128 x 128 pixels, the same as on the prototype's 0.96" display,
   with more room:
-    y   1  "CO2 ppm"   (moon in sleep mode)        rating
+    y   1  "CO2 ppm"   (moon, no Wi-Fi icon)       rating
     y  28            CO2 value, large
     y  80  ------------------------------------------------
     y  88  temperature                             humidity
@@ -753,9 +790,12 @@ void drawMainScreen() {
   char text[22];
   display.clearDisplay();
 
-  // Top line: label left, moon in sleep mode, rating right (inverted when the air is bad)
+  // Top line: label left, rating right (inverted when the air is bad), and the status icons
+  // centred in the space between the label and the widest rating, VENTILATE (x 42-71)
   printAt("CO2 ppm", 1, 0, 1);
-  if (sleepMode) display.drawBitmap(53, 1, MOON_ICON, 8, 8, SSD1327_WHITE);
+  int16_t freeLeft = textWidth("CO2 ppm", 1);
+  int16_t freeRight = OLED_SIZE - textWidth("VENTILATE", 1) - 2;  // its inverted box starts 2 earlier
+  drawStatusIcons((freeLeft + freeRight - statusIconsWidth()) / 2);
   printRating(co2Rating(co2Ppm), co2Ppm >= CO2_OK_BELOW, 1);
 
   // CO2 value, large and centred
@@ -845,7 +885,7 @@ const char *sensorText(char *text, size_t size, bool found, float value, const c
 
 /*
   Sensor screen, all six values (a short press switches to it and back):
-    y   1  "Sensors"  (moon in sleep mode)   "warm-up 87s"
+    y   1  "Sensors"  (moon, no Wi-Fi icon)  "warm-up 87s" ("87s" with the no Wi-Fi icon)
     y  10  ------------------------------------------------
     y  14  CO2                                   612 ppm
     y  33  Temp                                 22.4 °C
@@ -859,9 +899,10 @@ void drawSensorScreen() {
   display.clearDisplay();
 
   printAt("Sensors", 1, 0, 1);
-  if (sleepMode) display.drawBitmap(47, 1, MOON_ICON, 8, 8, SSD1327_WHITE);
+  drawStatusIcons(47);
   if (warmingUp) {
-    snprintf(text, sizeof text, "warm-up %us", warmupSecondsLeft());
+    // Only the seconds while the no Wi-Fi icon is there, which needs the room
+    snprintf(text, sizeof text, wifiLost ? "%us" : "warm-up %us", warmupSecondsLeft());
     printRight(text, 1, 1);
   }
   display.drawFastHLine(0, 10, OLED_SIZE, SSD1327_WHITE);
@@ -1403,23 +1444,33 @@ void startWifi() {
   Serial.printf("Wi-Fi: connecting to \"%s\"\n", WIFI_SSID);
 }
 
-// Reports connection changes and starts the internet time and the web page once Wi-Fi is up
+// Reports connection changes, starts the internet time and the web page once Wi-Fi is up,
+// and puts the no Wi-Fi icon on the display after WIFI_ICON_DELAY_MS without a connection
 void updateWifi() {
   static bool wasConnected = false;
   static bool timeStarted = false;
+  static uint32_t lostSince = millis();  // the first call, right after setup()
 
   bool connected = WiFi.status() == WL_CONNECTED;
-  if (connected == wasConnected) return;
-  wasConnected = connected;
-  if (connected) {
-    Serial.printf("Wi-Fi connected, web page at http://%s/\n", WiFi.localIP().toString().c_str());
-    if (!timeStarted) {
-      configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);  // UTC, updated every 3 hours
-      timeStarted = true;
+  if (connected != wasConnected) {
+    wasConnected = connected;
+    if (connected) {
+      Serial.printf("Wi-Fi connected, web page at http://%s/\n", WiFi.localIP().toString().c_str());
+      if (!timeStarted) {
+        configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);  // UTC, updated every 3 hours
+        timeStarted = true;
+      }
+      webBegin(CO2_LIMITS, VOC_LIMITS, setSleepMode, setBrightness);  // only the first time
+    } else {
+      Serial.println(F("Wi-Fi lost, reconnecting"));
+      lostSince = millis();
     }
-    webBegin(CO2_LIMITS, VOC_LIMITS, setSleepMode, setBrightness);  // only the first time
-  } else {
-    Serial.println(F("Wi-Fi lost, reconnecting"));
+  }
+
+  bool lost = !connected && millis() - lostSince >= WIFI_ICON_DELAY_MS;
+  if (lost != wifiLost) {
+    wifiLost = lost;
+    screenChanged = true;  // adds or removes the icon if the display is on
   }
 }
 

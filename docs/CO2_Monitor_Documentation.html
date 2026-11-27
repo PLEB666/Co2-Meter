@@ -105,7 +105,7 @@
   <h1>CO<sub>2</sub> Monitor</h1>
   <p class="subtitle">ESP32-C6 &middot; Sensirion SCD-41 CO<sub>2</sub> sensor &middot; SHT45 temperature &amp; humidity &middot; 1.5" OLED &middot; light, pressure and air-quality sensors &middot; printed case</p>
   <div class="meta">
-    <span><b>Version</b> 0.70: a still LED keeps its colour when dim</span>
+    <span><b>Version</b> 0.71: no Wi-Fi icon on the display</span>
     <span><b>Updated</b> 27 Nov 2026</span>
     <span><b>Status</b> case v5 designed; display, sensors and LED running on the Waveshare board, speaker not yet</span>
   </div>
@@ -221,7 +221,7 @@
   <h3>Project files</h3>
   <table>
     <tr><th>File</th><th>Purpose</th></tr>
-    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program: the six I&sup2;C parts &rarr; 1.5" display with two screens, button wake and screen switch, 30&nbsp;s timeout, CO<sub>2</sub> colour on the 8&nbsp;mm LED, sleep mode, serial output, Wi-Fi with a fixed address and internet time, Serial Monitor commands.</td></tr>
+    <tr><td><code>firmware/co2_monitor/co2_monitor.ino</code></td><td>Main program: the six I&sup2;C parts &rarr; 1.5" display with two screens, button wake and screen switch, 30&nbsp;s timeout, CO<sub>2</sub> colour on the 8&nbsp;mm LED, sleep mode, serial output, Wi-Fi with a fixed address and internet time, no Wi-Fi icon on the display, Serial Monitor commands.</td></tr>
     <tr><td><code>firmware/co2_monitor/history.h</code>, <code>history.cpp</code></td><td>History storage in the flash (section 7). The Arduino IDE shows them as tabs next to the main program.</td></tr>
     <tr><td><code>firmware/co2_monitor/web.h</code>, <code>web.cpp</code></td><td>Web server: the page and the data addresses it uses (section 8).</td></tr>
     <tr><td><code>firmware/co2_monitor/web/index.html</code>, <code>make_web_page.ps1</code>, <code>../web_page.h</code></td><td>The web page; the script packs it into <code>web_page.h</code>, the compressed copy the firmware serves (8.6).</td></tr>
@@ -567,7 +567,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
         <li><b>Brightness</b>: one level, 0-100&nbsp;%, for the display and the LED together. On <i>Auto</i> the light sensor sets it; the web page and the Serial Monitor can set a fixed level instead (see <i>Brightness</i> below).</li>
         <li><b>Fading</b>: like a smart bulb, the light never jumps. A new brightness, a new LED colour, and the LED or the display going on or off all fade over 1&nbsp;s, the display going on over 0.5&nbsp;s (see <i>Fading</i> below).</li>
         <li><b>Serial</b>: one line per CO<sub>2</sub> reading after the warm-up, with all six values and the brightness, usable in the Serial Monitor and the Serial Plotter.</li>
-        <li><b>Wi-Fi and clock</b>: connects with the details in <code>secrets.h</code> at the fixed address 192.168.178.40 (8.2) and reconnects by itself. Gets the time (UTC) from the internet and updates it every 3&nbsp;hours.</li>
+        <li><b>Wi-Fi and clock</b>: connects with the details in <code>secrets.h</code> at the fixed address 192.168.178.40 (8.2) and reconnects by itself. Gets the time (UTC) from the internet and updates it every 3&nbsp;hours. After 10&nbsp;s without a connection a small <b>no Wi-Fi icon</b> appears in the display's top line, next to where the moon goes (Figure 4), and it goes again as soon as Wi-Fi is back. The 10&nbsp;s (<code>WIFI_ICON_DELAY_MS</code>) keep it from flashing up at every start and when the router drops the monitor for a moment. It also shows when <code>secrets.h</code> has no network. Everything else carries on without Wi-Fi: the display, the LED and the sensors work as usual, and the history keeps recording, because the clock runs on once it is set (before that, the values wait in RAM for up to 24&nbsp;h, section 7). Only the web page can't be reached.</li>
         <li><b>History</b>: stores 1-minute and 5-minute values of CO<sub>2</sub>, temperature, humidity, air pressure and the VOC index in the flash (section 7). You can view them with commands in the Serial Monitor (7.6).</li>
         <li><b>Web page</b>: live values, graphs and CSV downloads in a browser on the home network (section 8).</li>
         <li>A missing part is reported on Serial and by <code>status</code>; the display shows <code>--</code> for its value (or "SCD-41 missing"). The rest keeps working.</li>
@@ -592,7 +592,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
           </g>
         </g>
       </svg>
-      <svg viewBox="0 0 300 344" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sensor screen, sleep mode, warm-up and sleep mode message" style="margin-top:8px">
+      <svg viewBox="0 0 300 516" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sensor screen, sleep mode, warm-up, sleep mode message and the no Wi-Fi icon" style="margin-top:8px">
         <g transform="translate(12 12)">
           <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
           <rect width="128" height="128" fill="#05080c"/>
@@ -663,8 +663,46 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
           <path transform="translate(0 1)" fill="#f2f2f2" d="M55 0h2v1h-2zM54 1h2v1h-2zM53 2h3v3h-3zM53 5h5v1h-5zM54 6h6v1h-6zM55 7h4v1h-4z"/>
         </g>
         <text x="224" y="167" font-size="10" text-anchor="middle" fill="#57606a">Sleep mode on: moon at the top</text>
+        <g transform="translate(12 356)">
+          <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
+          <rect width="128" height="128" fill="#05080c"/>
+          <g fill="#f2f2f2">
+            <text class="mono" x="0" y="8" font-size="10">CO2 ppm</text>
+            <text class="mono" x="127" y="8" font-size="10" text-anchor="end">GOOD</text>
+            <text class="mono" x="64" y="63" font-size="50" text-anchor="middle">612</text>
+            <rect y="80" width="128" height="1"/>
+            <text class="mono" x="0" y="102" font-size="20">22.4</text>
+            <circle cx="51" cy="89" r="1.2" fill="none" stroke="#f2f2f2" stroke-width="0.8"/>
+            <text class="mono" x="54" y="95" font-size="10">C</text>
+            <text class="mono" x="127" y="102" font-size="20" text-anchor="end">45%</text>
+            <text class="mono" x="0" y="121" font-size="10">VOC 105</text>
+            <text class="mono" x="127" y="121" font-size="10" text-anchor="end">GOOD</text>
+          </g>
+          <path transform="translate(0 1)" fill="#f2f2f2" d="M53 0h5v1h-5zM52 1h1v1h-1zM58 1h1v1h-1zM51 2h1v1h-1zM54 2h3v1h-3zM59 2h1v1h-1zM53 3h1v1h-1zM57 3h1v1h-1zM55 5h1v1h-1zM59 5h1v1h-1zM61 5h1v1h-1zM54 6h3v1h-3zM60 6h1v1h-1zM59 7h1v1h-1zM61 7h1v1h-1z"/>
+        </g>
+        <g transform="translate(160 356)">
+          <rect x="-8" y="-8" width="144" height="144" rx="6" fill="#1d3557"/>
+          <rect width="128" height="128" fill="#05080c"/>
+          <g fill="#f2f2f2">
+            <text class="mono" x="0" y="8" font-size="10">CO2 ppm</text>
+            <rect x="72" width="56" height="10"/>
+            <text class="mono" x="127" y="8" font-size="10" text-anchor="end" fill="#05080c">VENTILATE</text>
+            <text class="mono" x="64" y="63" font-size="50" text-anchor="middle">1180</text>
+            <rect y="80" width="128" height="1"/>
+            <text class="mono" x="0" y="102" font-size="20">22.4</text>
+            <circle cx="51" cy="89" r="1.2" fill="none" stroke="#f2f2f2" stroke-width="0.8"/>
+            <text class="mono" x="54" y="95" font-size="10">C</text>
+            <text class="mono" x="127" y="102" font-size="20" text-anchor="end">45%</text>
+            <text class="mono" x="0" y="121" font-size="10">VOC 105</text>
+            <text class="mono" x="127" y="121" font-size="10" text-anchor="end">GOOD</text>
+          </g>
+          <path transform="translate(-7 1)" fill="#f2f2f2" d="M55 0h2v1h-2zM54 1h2v1h-2zM53 2h3v3h-3zM53 5h5v1h-5zM54 6h6v1h-6zM55 7h4v1h-4z"/>
+          <path transform="translate(0 1)" fill="#f2f2f2" d="M59 0h5v1h-5zM58 1h1v1h-1zM64 1h1v1h-1zM57 2h1v1h-1zM60 2h3v1h-3zM65 2h1v1h-1zM59 3h1v1h-1zM63 3h1v1h-1zM61 5h1v1h-1zM65 5h1v1h-1zM67 5h1v1h-1zM60 6h3v1h-3zM66 6h1v1h-1zM65 7h1v1h-1zM67 7h1v1h-1z"/>
+        </g>
+        <text x="76" y="511" font-size="10" text-anchor="middle" fill="#57606a">No Wi-Fi: icon at the top</text>
+        <text x="224" y="511" font-size="10" text-anchor="middle" fill="#57606a">Sleep mode and no Wi-Fi</text>
       </svg>
-      <figcaption>Figure 4: The 1.5" display, 128&nbsp;&times;&nbsp;128 pixels. At the top, twice the size, the <b>main screen</b> with the prototype's layout: CO<sub>2</sub> and its rating at the top, temperature and humidity (from the SHT45) below the line, and the VOC index with its rating in the bottom line ("learning" instead of GOOD or OK for 3 hours after a fresh start). Below it the <b>sensor screen</b> that a short press switches to: all six values, the name and unit small, the value large (one decimal for temperature, humidity and pressure, and for light below 100&nbsp;lux; "missing" for a sensor that was not found). In sleep mode a small moon sits next to "CO2 ppm" or "Sensors". During the warm-up the main screen counts down; the sensor screen then shows <code>--</code> for every value and "warm-up 87s" at the top right. A long press on the button confirms the new mode on the full screen (a sun with "off - LED on" when it is switched off). In the case the display is turned a quarter turn, so the firmware turns the picture back (<code>OLED_ROTATION</code> 3).</figcaption>
+      <figcaption>Figure 4: The 1.5" display, 128&nbsp;&times;&nbsp;128 pixels. At the top, twice the size, the <b>main screen</b> with the prototype's layout: CO<sub>2</sub> and its rating at the top, temperature and humidity (from the SHT45) below the line, and the VOC index with its rating in the bottom line ("learning" instead of GOOD or OK for 3 hours after a fresh start). Below it the <b>sensor screen</b> that a short press switches to: all six values, the name and unit small, the value large (one decimal for temperature, humidity and pressure, and for light below 100&nbsp;lux; "missing" for a sensor that was not found). In sleep mode a small moon sits next to "CO2 ppm" or "Sensors". After 10&nbsp;s without Wi-Fi the <b>no Wi-Fi icon</b> joins it, a Wi-Fi fan with a small x (bottom row; 11&nbsp;&times;&nbsp;8 pixels, as high as the text). On the main screen the icons sit centred between "CO2 ppm" and the rating, side by side when both are on, and even next to the widest rating, VENTILATE, 4 pixels stay free. On the sensor screen they follow "Sensors". During the warm-up the main screen counts down; the sensor screen then shows <code>--</code> for every value and "warm-up 87s" at the top right, or only "87s" while the no Wi-Fi icon needs the room. A long press on the button confirms the new mode on the full screen (a sun with "off - LED on" when it is switched off). In the case the display is turned a quarter turn, so the firmware turns the picture back (<code>OLED_ROTATION</code> 3).</figcaption>
     </figure>
   </div>
 
@@ -732,6 +770,7 @@ constexpr char WIFI_PASSWORD[] = "my secret password";</pre>
     <tr><td><code>USE_FIXED_IP</code></td><td>true</td><td><code>true</code> = the monitor always uses <code>FIXED_IP</code> (8.2). <code>false</code> = the router gives it an address (DHCP).</td></tr>
     <tr><td><code>FIXED_IP</code>, <code>ROUTER_IP</code>, <code>SUBNET_MASK</code></td><td>192.168.178.40 / 192.168.178.1 / 255.255.255.0</td><td>The monitor's address, the router's address (also asked for names, for example of the time servers) and the network mask. In another network all three must match it.</td></tr>
     <tr><td><code>NTP_SERVER_1</code>, <code>NTP_SERVER_2</code></td><td>pool.ntp.org / time.google.com</td><td>Internet time servers. Your router's address also works if it offers time itself.</td></tr>
+    <tr><td><code>WIFI_ICON_DELAY_MS</code></td><td>10000</td><td>How long the monitor must be without Wi-Fi before the display shows the no Wi-Fi icon (ms), counted from the end of the start-up or from the moment the connection was lost. Shorter = sooner, but it may then flash up while the monitor connects at the start.</td></tr>
   </table>
   <p class="muted">The Wi-Fi name and password are in <code>secrets.h</code> (5.8). The history settings are in <code>history.cpp</code> (7.9).</p>
 
@@ -1259,6 +1298,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <li>Type <code>csv m5 1</code>. There is one line per finished 5 minutes, each the average of the 1-minute values in it.</li>
     <li><b>Power cut test:</b> unplug the monitor for about 20 minutes, then plug it back in. In <code>csv m1 1</code> the gap starts at the last save before unplugging (at most 10 minutes earlier) and ends at the restart. Nothing else is missing.</li>
     <li><b>Optional, no internet at start:</b> switch off the router, restart the monitor, wait a few minutes, then switch the router back on. <code>status</code> shows "Clock: not set yet" until the router is back. Once the clock is set, the minutes measured without it appear in <code>csv m1 1</code> with the correct times.</li>
+    <li><b>Optional, no Wi-Fi icon:</b> press the button so the display is on, then switch off the router's Wi-Fi (or unplug the router). The Serial Monitor shows "Wi-Fi lost, reconnecting", and about 10&nbsp;s later the small Wi-Fi fan with an x appears in the top line, next to "CO2 ppm" (Figure 4). Press briefly: it is on the sensor screen too, after "Sensors". Switch the Wi-Fi back on: the icon goes within a second of "Wi-Fi connected". In sleep mode it sits to the right of the moon.</li>
   </ol>
 
   <h3>Step 9: Web page</h3>
@@ -1650,6 +1690,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
     <tr><td>Compile error about <code>SensirionI2cScd4x</code></td><td>Old SCD4x library (0.x) installed &rarr; update to 1.x in the Library Manager.</td></tr>
     <tr><td>Compile error "secrets.h is missing"</td><td>Copy <code>secrets_example.h</code> to <code>secrets.h</code> and enter your Wi-Fi (5.8).</td></tr>
     <tr><td>Serial: <code>Wi-Fi: enter your network in secrets.h</code></td><td><code>secrets.h</code> still has the example name. Enter your network and upload again. Without Wi-Fi there's no clock, so nothing is recorded.</td></tr>
+    <tr><td>A small Wi-Fi fan with an x at the top of the display</td><td>The monitor has had no Wi-Fi for 10&nbsp;s or more (section 6, <i>Wi-Fi and clock</i>). It keeps measuring and reconnects by itself; the icon goes as soon as it is connected again. If it stays: is the router on, and in range? <code>status</code> says "Wi-Fi: not connected"; the next rows give the causes. It also shows when <code>secrets.h</code> has no network.</td></tr>
     <tr><td>"Wi-Fi: connecting&hellip;" but never "connected"</td><td>Wrong name or password (both are case-sensitive), a 5&nbsp;GHz-only network, or the router is too far away.</td></tr>
     <tr><td><code>status</code>: "Clock: not set yet" although Wi-Fi is connected</td><td>The router has no internet or blocks time requests (UDP port 123). The values wait in RAM for up to 24&nbsp;h. If your router offers time itself, enter its address as <code>NTP_SERVER_1</code>.</td></tr>
     <tr><td>Serial: <code>History OFF: wrong partition scheme</code></td><td>Tools menu: Flash Size <b>16MB</b>, Partition Scheme <b>16M Flash (3MB APP/9.9MB FATFS)</b> (5.4), then upload again. The history is normally still there.</td></tr>
@@ -1988,6 +2029,7 @@ History: clock set to 2026-10-28 17:05:12 UTC</pre>
   <h2><span class="n">14</span>Change log</h2>
   <table>
     <tr><th style="width:16%">Version</th><th style="width:18%">Date</th><th>Changes</th></tr>
+    <tr><td>0.71</td><td>27 Nov 2026</td><td><b>No Wi-Fi icon on the display.</b> After 10&nbsp;s without Wi-Fi (new setting <code>WIFI_ICON_DELAY_MS</code>) a small Wi-Fi fan with an x, 11&nbsp;&times;&nbsp;8 pixels, appears in the top line of both screens, and it goes as soon as Wi-Fi is back. The place was picked from a pixel-exact mockup: the top line already holds the moon, like a phone's status bar, and it is the only free spot on both screens. On the main screen the moon and the icon sit centred between "CO2 ppm" and the rating, side by side when both are on (the moon alone stays where it was); on the sensor screen they follow "Sensors", and during the warm-up the countdown there shows only the seconds ("87s") while the icon is on. Firmware 1,218,054 bytes (38&nbsp;%), compiled, <b>not uploaded</b>. Sections 6, 9 and 12 and Figure 4 updated.</td></tr>
     <tr><td>0.70</td><td>27 Nov 2026</td><td><b>A still LED keeps its colour when dim.</b> In the dark (0.5&nbsp;lux, brightness 0&nbsp;%) at 1148&nbsp;ppm the LED was red for about 4&nbsp;s, then yellow for 1&nbsp;s, over and over. A still LED got the nearest step of each colour, and the orange-yellow there is red 0.86 and green 0.41 of one step, which round to 1 and 0, pure red. Only during the 1&nbsp;s colour fade after each 5&nbsp;s reading was it dithered and showed its true colour. Now a still LED is dithered too (<code>LED_DITHER</code>), but each colour is first rounded to eighths of a step (new setting <code>LED_STILL_DITHER_STEPS</code> = 8), so every pattern repeats within 8 frames (24&nbsp;ms) and a tiny rest such as 0.02 doesn't light the LED once every 42 frames, which would flicker visibly. Breathing and fades are dithered in full as before. Firmware 1,216,302 bytes (38&nbsp;%). <b>Uploaded</b> on COM8 right after the monitor's own 10-minute history save, without opening the port for <code>save</code> first, so no history was lost; it came back with its history. This upload also brings the changes of 0.67-0.69 to the board if they weren't on it yet. Sections 6 and 12 updated.</td></tr>
     <tr><td>0.69</td><td>25 Nov 2026</td><td><b>ASC target 425&nbsp;ppm.</b> Outdoors, in the case, the monitor read a steady 449-461&nbsp;ppm for half an hour, which is normal for winter air near a town and well inside the SCD-41's accuracy. The sensor's automatic self-calibration assumed 400&nbsp;ppm for the lowest value of each period, about 25&nbsp;ppm below today's outdoor air. The new setting <code>ASC_TARGET_PPM</code> (425) is sent at every start with <code>setAutomaticSelfCalibrationTarget()</code>, into the sensor's RAM only, and the value read back is printed. It takes effect at the next ASC correction. Compiled, not uploaded yet. Sections 9 and 10 updated.</td></tr>
     <tr><td>0.68</td><td>24 Nov 2026</td><td><b>Temperature offset 2.0&nbsp;&deg;C.</b> With the SHT45 out of the case, 5&nbsp;cm from the Technoline WS 8016, the two read at most 0.3&nbsp;&deg;C and 2&nbsp;%RH apart, so the clock is a fair reference and the difference in the case is the warm case air. <code>SHT_TEMPERATURE_OFFSET_C</code> is now 2.0 (was 2.3); the humidity correction adds about 13&nbsp;% of the value instead of 15&nbsp;%. With the readings of 23 Nov the room values are 21.7&nbsp;&deg;C and 40.6&nbsp;%RH (clock 21.4&nbsp;&deg;C, 39&nbsp;%RH). New in section 6: how slowly the case follows the room, measured from the 1-minute history (an airing shows as a dip of only 0.5-1.6&nbsp;&deg;C; after closing the case, 2.9&nbsp;&deg;C within 10 minutes and the last few tenths over hours), and compare with a thermometer only after 2 hours without airing. Compiled, not uploaded yet. Sections 6, 7, 9 and 11 updated.</td></tr>
